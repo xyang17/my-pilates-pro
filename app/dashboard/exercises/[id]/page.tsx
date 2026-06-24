@@ -299,7 +299,7 @@ export default function ExerciseDetailPage() {
               paddingBottom: '20px',
               borderBottom: '1px solid #eee',
             }}>
-              {language === 'en' ? exercise.type_en : exercise.type_cn && (
+              {(language === 'en' ? exercise.type_en : exercise.type_cn) && (
                 <div>
                   <p style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#999', textTransform: 'uppercase' }}>TYPE</p>
                   <p style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: '#333' }}>
@@ -307,7 +307,7 @@ export default function ExerciseDetailPage() {
                   </p>
                 </div>
               )}
-              {language === 'en' ? exercise.difficulty_en : exercise.difficulty_cn && (
+              {(language === 'en' ? exercise.difficulty_en : exercise.difficulty_cn) && (
                 <div>
                   <p style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#999', textTransform: 'uppercase' }}>DIFFICULTY</p>
                   <p style={{
@@ -320,7 +320,7 @@ export default function ExerciseDetailPage() {
                   </p>
                 </div>
               )}
-              {language === 'en' ? exercise.target_muscles_en : exercise.target_muscles_cn && (
+              {(language === 'en' ? exercise.target_muscles_en : exercise.target_muscles_cn) && (
                 <div>
                   <p style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#999', textTransform: 'uppercase' }}>TARGET MUSCLES</p>
                   <p style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: '#333' }}>
@@ -330,14 +330,14 @@ export default function ExerciseDetailPage() {
               )}
             </div>
 
-            {language === 'en' ? exercise.description_en : exercise.description_cn && (
+            {(language === 'en' ? exercise.description_en : exercise.description_cn) && (
               <div style={{ marginBottom: '20px' }}>
                 <h3 style={{ margin: '0 0 10px 0', color: '#666' }}>Description</h3>
                 <p style={{ margin: 0, lineHeight: '1.6' }}>{language === 'en' ? exercise.description_en : exercise.description_cn}</p>
               </div>
             )}
 
-            {language === 'en' ? exercise.instructions_en : exercise.instructions_cn && (
+            {(language === 'en' ? exercise.instructions_en : exercise.instructions_cn) && (
               <div style={{ marginBottom: '20px' }}>
                 <h3 style={{ margin: '0 0 10px 0', color: '#666' }}>{language === 'en' ? 'How to Perform' : '如何执行'}</h3>
                 <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
