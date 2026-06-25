@@ -210,8 +210,8 @@ export default function ExercisesPage() {
                     justifyContent: 'center',
                     fontSize: '40px',
                   }}>
-                    {exercise.image_url ? (
-                      <img src={exercise.image_url} alt={exercise.name_en} style={{
+                    {exercise.featured_image_url ? (
+                      <img src={exercise.featured_image_url} alt={exercise.name_en} style={{
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
