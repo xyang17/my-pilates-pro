@@ -1,0 +1,105 @@
+import { createClient } from '@supabase/supabase-js'
+import { NextRequest, NextResponse } from 'next/server'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+// GET /api/classes/[id]
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = req.headers.get('x-user-id')
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { id } = await params
+
+    const { data, error } = await supabaseAdmin
+      .from('class')
+      .select(`
+        *,
+        exercises:class_exercise_instance(
+          *,
+          master_exercise(id, name_en, name_cn, featured_image_url, description_en, description_cn)
+        )
+      `)
+      .eq('id', id)
+      .single()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+
+    // Sort exercises by order
+    if (data.exercises) {
+      data.exercises.sort((a: any, b: any) => a.order - b.order)
+    }
+
+    return NextResponse.json(data)
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+// PUT /api/classes/[id]
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = req.headers.get('x-user-id')
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { id } = await params
+    const body = await req.json()
+
+    const { data, error } = await supabaseAdmin
+      .from('class')
+      .update({
+        name: body.name,
+        date: body.date,
+        duration: body.duration,
+        type: body.type,
+        status: body.status,
+        notes: body.notes,
+        feedback: body.feedback,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('created_by', userId)
+      .select()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (!data || data.length === 0) return NextResponse.json({ error: 'Not found or unauthorized' }, { status: 404 })
+
+    return NextResponse.json(data[0])
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+// DELETE /api/classes/[id]
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = req.headers.get('x-user-id')
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { id } = await params
+
+    const { error } = await supabaseAdmin
+      .from('class')
+      .delete()
+      .eq('id', id)
+      .eq('created_by', userId)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    return NextResponse.json({ message: 'Deleted' })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
