@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
         date: body.date,
         duration: body.duration || 60,
         type: body.type,
+        class_type: body.class_type || 'private',
         status: 'planned',
         created_by: userId,
         assigned_to: body.assigned_to || null,

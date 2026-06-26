@@ -9,9 +9,6 @@ interface MasterExercise {
   id: string
   name_en: string
   name_cn: string
-  description?: string
-  instructions?: string
-  image_url?: string
 }
 
 interface ClassExercise {
@@ -25,7 +22,20 @@ interface ClassExercise {
   duration_unit: string
   order: number
   instance_notes?: string
+  actual_sets?: number
+  actual_reps?: number
+  actual_weight?: number
+  post_note?: string
   master_exercise: MasterExercise
+}
+
+interface StudentNote {
+  id: string
+  exercise_instance_id: string
+  student_id: string
+  student_name?: string
+  content: string
+  created_at: string
 }
 
 interface ClassData {
@@ -34,15 +44,29 @@ interface ClassData {
   date: string
   duration: number
   type: string
-  status: string
+  class_type: 'private' | 'group'
+  status: 'planned' | 'in_progress' | 'completed'
   notes?: string
-  feedback?: string
+  post_summary?: string
+  completed_at?: string
   exercises: ClassExercise[]
   created_by: string
 }
 
+const STATUS_COLOR: Record<string, string> = {
+  planned: '#9B7DB5',
+  in_progress: '#FF9800',
+  completed: '#4CAF50',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  planned: '未开始',
+  in_progress: '进行中',
+  completed: '已完成',
+}
+
 export default function ClassDetailPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, userRole, loading: authLoading } = useAuth()
   const router = useRouter()
   const params = useParams()
   const classId = params.id as string
@@ -53,33 +77,37 @@ export default function ClassDetailPage() {
   const [showAddExercise, setShowAddExercise] = useState(false)
   const [selectedExerciseId, setSelectedExerciseId] = useState('')
   const [availableExercises, setAvailableExercises] = useState<MasterExercise[]>([])
+  const [activeTab, setActiveTab] = useState<'exercises' | 'student-notes'>('exercises')
+  const [studentNotes, setStudentNotes] = useState<StudentNote[]>([])
+
+  const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
+  const isGroupClass = classData?.class_type === 'group'
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth/login')
       return
     }
-
     if (user) {
       fetchClassData()
-      fetchExercises()
+      if (isTrainer) fetchAvailableExercises()
     }
   }, [user, authLoading])
 
+  // Fetch student notes when switching to that tab
+  useEffect(() => {
+    if (activeTab === 'student-notes' && classData) {
+      fetchStudentNotes()
+    }
+  }, [activeTab, classData])
+
   const fetchClassData = async () => {
     try {
-      const response = await fetch(`/api/classes/${classId}`, {
-        headers: {
-          'x-user-id': user?.id || '',
-        },
+      const res = await fetch(`/api/classes/${classId}`, {
+        headers: { 'x-user-id': user?.id || '' },
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch class')
-      }
-
-      const data = await response.json()
-      setClassData(data)
+      if (!res.ok) throw new Error('Failed to fetch class')
+      setClassData(await res.json())
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -87,46 +115,39 @@ export default function ClassDetailPage() {
     }
   }
 
-  const fetchExercises = async () => {
+  const fetchAvailableExercises = async () => {
     try {
-      const response = await fetch('/api/exercises', {
+      const res = await fetch('/api/exercises', {
+        headers: { 'x-user-id': user?.id || '' },
+      })
+      if (res.ok) setAvailableExercises(await res.json())
+    } catch { /* non-critical */ }
+  }
+
+  const fetchStudentNotes = async () => {
+    try {
+      const res = await fetch(`/api/classes/${classId}/student-notes`, {
         headers: {
           'x-user-id': user?.id || '',
+          'x-user-role': userRole || '',
         },
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch exercises')
-      }
-
-      const data = await response.json()
-      setAvailableExercises(data)
-    } catch (err: any) {
-      console.error('Error fetching exercises:', err)
-    }
+      if (res.ok) setStudentNotes(await res.json())
+    } catch { /* non-critical */ }
   }
 
   const handleAddExercise = async () => {
     if (!selectedExerciseId) return
-
     try {
-      const response = await fetch(`/api/classes/${classId}/exercises`, {
+      const res = await fetch(`/api/classes/${classId}/exercises`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-user-id': user?.id || '',
         },
-        body: JSON.stringify({
-          exerciseId: selectedExerciseId,
-          weightUnit: 'kg',
-          durationUnit: 'minutes',
-        }),
+        body: JSON.stringify({ exercise_id: selectedExerciseId }),
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to add exercise')
-      }
-
+      if (!res.ok) throw new Error('Failed to add exercise')
       setShowAddExercise(false)
       setSelectedExerciseId('')
       fetchClassData()
@@ -135,24 +156,15 @@ export default function ClassDetailPage() {
     }
   }
 
-  const handleRemoveExercise = async (exerciseInstanceId: string) => {
-    if (!confirm('Remove this exercise from the class?')) return
-
+  const handleRemoveExercise = async (instanceId: string) => {
+    if (!confirm('确认移除这个动作？')) return
     try {
-      const response = await fetch(
-        `/api/classes/${classId}/exercises/${exerciseInstanceId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'x-user-id': user?.id || '',
-          },
-        }
-      )
-
-      if (!response.ok) {
-        throw new Error('Failed to remove exercise')
-      }
-
+      // Fixed: use path param instead of query param
+      const res = await fetch(`/api/classes/${classId}/exercises/${instanceId}`, {
+        method: 'DELETE',
+        headers: { 'x-user-id': user?.id || '' },
+      })
+      if (!res.ok) throw new Error('Failed to remove exercise')
       fetchClassData()
     } catch (err: any) {
       setError(err.message)
@@ -166,13 +178,14 @@ export default function ClassDetailPage() {
   if (!classData) {
     return (
       <div style={{ padding: '40px', textAlign: 'center' }}>
-        <p>Class not found</p>
-        <Link href="/dashboard/classes" style={{ color: '#9B7DB5' }}>
-          ← Back to Classes
-        </Link>
+        <p>课程未找到</p>
+        <Link href="/dashboard/classes" style={{ color: '#9B7DB5' }}>← 返回课程列表</Link>
       </div>
     )
   }
+
+  const canReview = isTrainer && classData.class_type === 'private'
+  const canAddStudentNote = !isTrainer && classData.class_type === 'group'
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
@@ -180,216 +193,317 @@ export default function ClassDetailPage() {
       <header style={{
         backgroundColor: '#9B7DB5',
         color: 'white',
-        padding: '20px',
+        padding: '16px 20px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
       }}>
-        <Link href="/dashboard/classes" style={{ color: 'white', textDecoration: 'none' }}>
-          ← Back
+        <Link href="/dashboard/classes" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
+          ← 返回
         </Link>
-        <h1 style={{ margin: 0 }}>{classData.name}</h1>
-        <div></div>
+        <h1 style={{ margin: 0, fontSize: '18px' }}>{classData.name}</h1>
+        {/* Action button based on status and role */}
+        {canReview && classData.status !== 'completed' && (
+          <Link
+            href={`/dashboard/classes/${classId}/review`}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'rgba(255,255,255,0.25)',
+              color: 'white',
+              textDecoration: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+            }}
+          >
+            开始复盘 →
+          </Link>
+        )}
+        {canReview && classData.status === 'completed' && (
+          <Link
+            href={`/dashboard/classes/${classId}/review`}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              color: 'white',
+              textDecoration: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+            }}
+          >
+            查看复盘
+          </Link>
+        )}
+        {canAddStudentNote && (
+          <Link
+            href={`/dashboard/classes/${classId}/student-notes`}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'rgba(255,255,255,0.25)',
+              color: 'white',
+              textDecoration: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+            }}
+          >
+            记录笔记 ✍️
+          </Link>
+        )}
+        {!canReview && !canAddStudentNote && <div style={{ width: 80 }} />}
       </header>
 
-      {/* Main Content */}
-      <main style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
+      <main style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
         {error && (
-          <div style={{
-            backgroundColor: '#ffebee',
-            color: '#c62828',
-            padding: '15px',
-            borderRadius: '4px',
-            marginBottom: '20px',
-          }}>
+          <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '12px', borderRadius: '6px', marginBottom: '16px' }}>
             {error}
           </div>
         )}
 
         {/* Class Info */}
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          marginBottom: '30px',
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
             <div>
-              <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '12px' }}>DATE</p>
-              <p style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>
-                {new Date(classData.date).toLocaleDateString()}
-              </p>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>日期</p>
+              <p style={{ margin: 0, fontWeight: 'bold' }}>{new Date(classData.date).toLocaleDateString('zh-CN')}</p>
             </div>
             <div>
-              <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '12px' }}>DURATION</p>
-              <p style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>
-                {classData.duration} minutes
-              </p>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>时长</p>
+              <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.duration} 分钟</p>
             </div>
             <div>
-              <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '12px' }}>TYPE</p>
-              <p style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>
-                {classData.type}
-              </p>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>类型</p>
+              <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.type}</p>
             </div>
             <div>
-              <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '12px' }}>STATUS</p>
-              <p style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#9B7DB5' }}>
-                {classData.status}
-              </p>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>课程形式</p>
+              <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.class_type === 'group' ? '团课' : '私教'}</p>
+            </div>
+            <div>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>状态</p>
+              <span style={{
+                display: 'inline-block',
+                padding: '3px 10px',
+                backgroundColor: STATUS_COLOR[classData.status] || '#999',
+                color: 'white',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+              }}>
+                {STATUS_LABEL[classData.status] || classData.status}
+              </span>
             </div>
           </div>
 
           {classData.notes && (
-            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
-              <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '12px' }}>NOTES</p>
-              <p style={{ margin: 0 }}>{classData.notes}</p>
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>课前备注</p>
+              <p style={{ margin: 0, color: '#444' }}>{classData.notes}</p>
+            </div>
+          )}
+
+          {classData.post_summary && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>课后总结</p>
+              <p style={{ margin: 0, color: '#444' }}>{classData.post_summary}</p>
             </div>
           )}
         </div>
 
-        {/* Exercises */}
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', overflow: 'hidden' }}>
-          <div style={{
-            backgroundColor: '#f5f5f5',
-            padding: '15px 20px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderBottom: '1px solid #ddd',
-          }}>
-            <h2 style={{ margin: 0 }}>Exercises ({classData.exercises.length})</h2>
-            <button
-              onClick={() => setShowAddExercise(!showAddExercise)}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#9B7DB5',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-              }}
-            >
-              {showAddExercise ? '✕ Cancel' : '+ Add Exercise'}
-            </button>
+        {/* Tabs (group class trainer view shows student notes tab) */}
+        {isTrainer && isGroupClass && (
+          <div style={{ display: 'flex', gap: '2px', marginBottom: '0', borderBottom: '2px solid #eee' }}>
+            {(['exercises', 'student-notes'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: '10px 20px',
+                  border: 'none',
+                  background: 'none',
+                  cursor: 'pointer',
+                  fontWeight: activeTab === tab ? 'bold' : 'normal',
+                  color: activeTab === tab ? '#9B7DB5' : '#666',
+                  borderBottom: activeTab === tab ? '2px solid #9B7DB5' : '2px solid transparent',
+                  marginBottom: '-2px',
+                  fontSize: '14px',
+                }}
+              >
+                {tab === 'exercises' ? `动作列表 (${classData.exercises.length})` : `学员笔记 (${studentNotes.length})`}
+              </button>
+            ))}
           </div>
+        )}
 
-          {/* Add Exercise Form */}
-          {showAddExercise && (
-            <div style={{ padding: '20px', borderBottom: '1px solid #ddd', backgroundColor: '#fafafa' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px' }}>
-                <select
-                  value={selectedExerciseId}
-                  onChange={(e) => setSelectedExerciseId(e.target.value)}
-                  style={{
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                  }}
-                >
-                  <option value="">Select an exercise...</option>
-                  {availableExercises.map((exercise) => (
-                    <option key={exercise.id} value={exercise.id}>
-                      {exercise.name_en} ({exercise.name_cn})
-                    </option>
-                  ))}
-                </select>
+        {/* Exercise List */}
+        {activeTab === 'exercises' && (
+          <div style={{ backgroundColor: 'white', borderRadius: isTrainer && isGroupClass ? '0 0 8px 8px' : '8px', overflow: 'hidden' }}>
+            {isTrainer && classData.status !== 'completed' && (
+              <div style={{
+                padding: '12px 20px',
+                borderBottom: '1px solid #eee',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
+                <span style={{ fontWeight: 'bold', color: '#444' }}>动作列表</span>
                 <button
-                  onClick={handleAddExercise}
-                  disabled={!selectedExerciseId}
+                  onClick={() => setShowAddExercise(!showAddExercise)}
                   style={{
-                    padding: '10px 20px',
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
+                    padding: '6px 14px',
+                    backgroundColor: showAddExercise ? '#eee' : '#9B7DB5',
+                    color: showAddExercise ? '#333' : 'white',
                     border: 'none',
                     borderRadius: '4px',
-                    cursor: selectedExerciseId ? 'pointer' : 'not-allowed',
-                    fontWeight: 'bold',
-                    opacity: selectedExerciseId ? 1 : 0.5,
+                    cursor: 'pointer',
+                    fontSize: '13px',
                   }}
                 >
-                  Add
+                  {showAddExercise ? '✕ 取消' : '+ 添加动作'}
                 </button>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Exercise List */}
-          {classData.exercises.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-              No exercises yet. Add your first exercise to the class!
-            </div>
-          ) : (
-            <div>
-              {classData.exercises.map((exercise, index) => (
+            {showAddExercise && (
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', backgroundColor: '#fafafa' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px' }}>
+                  <select
+                    value={selectedExerciseId}
+                    onChange={(e) => setSelectedExerciseId(e.target.value)}
+                    style={{ padding: '9px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                  >
+                    <option value="">选择动作...</option>
+                    {availableExercises.map((ex) => (
+                      <option key={ex.id} value={ex.id}>
+                        {ex.name_en}（{ex.name_cn}）
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleAddExercise}
+                    disabled={!selectedExerciseId}
+                    style={{
+                      padding: '9px 18px',
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: selectedExerciseId ? 'pointer' : 'not-allowed',
+                      opacity: selectedExerciseId ? 1 : 0.5,
+                    }}
+                  >
+                    添加
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {classData.exercises.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+                暂无动作。{isTrainer ? '点击上方"添加动作"开始计划课程。' : ''}
+              </div>
+            ) : (
+              classData.exercises.map((ex, i) => (
                 <div
-                  key={exercise.id}
+                  key={ex.id}
                   style={{
-                    padding: '20px',
-                    borderBottom: index < classData.exercises.length - 1 ? '1px solid #eee' : 'none',
+                    padding: '16px 20px',
+                    borderBottom: i < classData.exercises.length - 1 ? '1px solid #f0f0f0' : 'none',
                     display: 'grid',
-                    gridTemplateColumns: '30px 1fr auto',
+                    gridTemplateColumns: '28px 1fr auto',
+                    gap: '14px',
                     alignItems: 'start',
-                    gap: '20px',
                   }}
                 >
                   <div style={{
-                    backgroundColor: '#9B7DB5',
-                    color: 'white',
-                    width: '30px',
-                    height: '30px',
+                    width: '28px', height: '28px',
+                    backgroundColor: '#9B7DB5', color: 'white',
                     borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '12px', fontWeight: 'bold', flexShrink: 0,
                   }}>
-                    {index + 1}
+                    {i + 1}
                   </div>
 
                   <div>
-                    <h3 style={{ margin: '0 0 5px 0' }}>
-                      {exercise.master_exercise.name_en}
-                      <span style={{ color: '#999', fontSize: '14px', marginLeft: '10px' }}>
-                        {exercise.master_exercise.name_cn}
+                    <p style={{ margin: '0 0 6px 0', fontWeight: 'bold' }}>
+                      {ex.master_exercise.name_en}
+                      <span style={{ color: '#999', fontSize: '13px', marginLeft: '8px' }}>
+                        {ex.master_exercise.name_cn}
                       </span>
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginTop: '10px', fontSize: '14px' }}>
-                      {exercise.sets !== null && <p style={{ margin: 0 }}>Sets: <strong>{exercise.sets}</strong></p>}
-                      {exercise.reps !== null && <p style={{ margin: 0 }}>Reps: <strong>{exercise.reps}</strong></p>}
-                      {exercise.weight !== null && <p style={{ margin: 0 }}>Weight: <strong>{exercise.weight} {exercise.weight_unit}</strong></p>}
-                      {exercise.duration !== null && <p style={{ margin: 0 }}>Duration: <strong>{exercise.duration} {exercise.duration_unit}</strong></p>}
+                    </p>
+                    {/* Planned params */}
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '13px', color: '#555' }}>
+                      {ex.sets != null && <span>计划 {ex.sets} 组</span>}
+                      {ex.reps != null && <span>× {ex.reps} 次</span>}
+                      {ex.weight != null && <span>{ex.weight} {ex.weight_unit}</span>}
+                      {ex.duration != null && <span>{ex.duration} {ex.duration_unit}</span>}
                     </div>
-                    {exercise.instance_notes && (
-                      <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
-                        💡 {exercise.instance_notes}
+                    {/* Actual params (from review) */}
+                    {(ex.actual_sets != null || ex.actual_reps != null || ex.actual_weight != null) && (
+                      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '13px', color: '#4CAF50', marginTop: '4px' }}>
+                        <span>实际：</span>
+                        {ex.actual_sets != null && <span>{ex.actual_sets} 组</span>}
+                        {ex.actual_reps != null && <span>× {ex.actual_reps} 次</span>}
+                        {ex.actual_weight != null && <span>{ex.actual_weight} kg</span>}
+                      </div>
+                    )}
+                    {ex.instance_notes && (
+                      <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#888', fontStyle: 'italic' }}>
+                        📌 {ex.instance_notes}
+                      </p>
+                    )}
+                    {ex.post_note && (
+                      <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#9B7DB5', fontStyle: 'italic' }}>
+                        💬 {ex.post_note}
                       </p>
                     )}
                   </div>
 
-                  <button
-                    onClick={() => handleRemoveExercise(exercise.id)}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#ffebee',
-                      color: '#c62828',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    Remove
-                  </button>
+                  {isTrainer && classData.status !== 'completed' && (
+                    <button
+                      onClick={() => handleRemoveExercise(ex.id)}
+                      style={{
+                        padding: '4px 10px',
+                        backgroundColor: '#ffebee',
+                        color: '#c62828',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      移除
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Student Notes Tab (trainer view of group class) */}
+        {activeTab === 'student-notes' && (
+          <div style={{ backgroundColor: 'white', borderRadius: '0 0 8px 8px', padding: '20px' }}>
+            {studentNotes.length === 0 ? (
+              <p style={{ color: '#999', textAlign: 'center', padding: '20px 0' }}>暂无学员笔记</p>
+            ) : (
+              studentNotes.map((note) => {
+                const exercise = classData.exercises.find((e) => e.id === note.exercise_instance_id)
+                return (
+                  <div key={note.id} style={{ borderBottom: '1px solid #f0f0f0', paddingBottom: '12px', marginBottom: '12px' }}>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#999' }}>
+                      {note.student_name || '学员'} · {exercise ? `${exercise.master_exercise.name_en}` : '动作'} ·{' '}
+                      {new Date(note.created_at).toLocaleString('zh-CN')}
+                    </p>
+                    <p style={{ margin: 0, color: '#333' }}>{note.content}</p>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
       </main>
     </div>
   )

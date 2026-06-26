@@ -14,6 +14,7 @@ export default function NewClassPage() {
     date: new Date().toISOString().split('T')[0],
     duration: 60,
     type: 'Pilates',
+    class_type: 'private' as 'private' | 'group',
     notes: '',
   })
 
@@ -135,6 +136,32 @@ export default function NewClassPage() {
                 fontSize: '14px',
               }}
             />
+          </div>
+
+          {/* Class type toggle */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>课程形式</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              {(['private', 'group'] as const).map((ct) => (
+                <button
+                  key={ct}
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, class_type: ct }))}
+                  style={{
+                    padding: '10px',
+                    border: `2px solid ${formData.class_type === ct ? '#9B7DB5' : '#ddd'}`,
+                    borderRadius: '6px',
+                    backgroundColor: formData.class_type === ct ? '#f3eef9' : 'white',
+                    color: formData.class_type === ct ? '#9B7DB5' : '#555',
+                    cursor: 'pointer',
+                    fontWeight: formData.class_type === ct ? 'bold' : 'normal',
+                    fontSize: '14px',
+                  }}
+                >
+                  {ct === 'private' ? '🧘 私教课' : '👥 团课'}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
