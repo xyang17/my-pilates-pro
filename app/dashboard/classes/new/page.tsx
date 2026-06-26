@@ -62,6 +62,105 @@ const s = {
   } as React.CSSProperties,
 }
 
+// ── Inline Calendar ──────────────────────────────────────────────
+function InlineCalendar({ value, onChange }: { value: string; onChange: (d: string) => void }) {
+  const parseDate = (v: string) => v ? new Date(v + 'T12:00:00') : new Date()
+  const [view, setView] = useState(() => {
+    const d = parseDate(value)
+    return { year: d.getFullYear(), month: d.getMonth() }
+  })
+
+  const selected = value ? new Date(value + 'T12:00:00') : null
+  const todayMs = (() => { const t = new Date(); t.setHours(0,0,0,0); return t.getTime() })()
+
+  const firstDow = new Date(view.year, view.month, 1).getDay()
+  const daysInMonth = new Date(view.year, view.month + 1, 0).getDate()
+  const cells: (number | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ]
+
+  const navToMonth = (delta: number) => setView(prev => {
+    const d = new Date(prev.year, prev.month + delta, 1)
+    return { year: d.getFullYear(), month: d.getMonth() }
+  })
+
+  const select = (day: number) => {
+    const d = new Date(view.year, view.month, day)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    onChange(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`)
+  }
+
+  const CN_MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']
+
+  return (
+    <div style={{ border: '1px solid #e0d5f0', borderRadius: '10px', overflow: 'hidden', backgroundColor: 'white' }}>
+      {/* Nav */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: '#f9f6fd' }}>
+        <button type="button" onClick={() => navToMonth(-1)}
+          style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#9B7DB5', lineHeight: 1 }}>‹</button>
+        <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>
+          {view.year} {CN_MONTHS[view.month]}
+        </span>
+        <button type="button" onClick={() => navToMonth(1)}
+          style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#9B7DB5', lineHeight: 1 }}>›</button>
+      </div>
+      {/* Weekday headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '8px 10px 0' }}>
+        {['日','一','二','三','四','五','六'].map(d => (
+          <div key={d} style={{ textAlign: 'center', fontSize: '12px', color: '#bbb', paddingBottom: '4px' }}>{d}</div>
+        ))}
+      </div>
+      {/* Days */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '4px 10px 12px', gap: '2px' }}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} />
+          const thisMs = new Date(view.year, view.month, day).getTime()
+          const isSel = selected &&
+            selected.getFullYear() === view.year &&
+            selected.getMonth() === view.month &&
+            selected.getDate() === day
+          const isToday = thisMs === todayMs
+          return (
+            <button key={i} type="button" onClick={() => select(day)} style={{
+              padding: '7px 0', border: 'none', borderRadius: '50%', cursor: 'pointer',
+              fontSize: '13px', textAlign: 'center',
+              backgroundColor: isSel ? '#9B7DB5' : 'transparent',
+              color: isSel ? 'white' : isToday ? '#9B7DB5' : '#333',
+              fontWeight: isSel || isToday ? 'bold' : 'normal',
+              outline: isToday && !isSel ? '1.5px solid #9B7DB5' : 'none',
+            }}>{day}</button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Time Slot Picker ──────────────────────────────────────────────
+function TimeSlotPicker({ value, onChange }: { value: string; onChange: (t: string) => void }) {
+  const slots: string[] = []
+  for (let h = 6; h <= 21; h++) {
+    slots.push(`${String(h).padStart(2,'0')}:00`)
+    slots.push(`${String(h).padStart(2,'0')}:30`)
+  }
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+      {slots.map(slot => (
+        <button key={slot} type="button" onClick={() => onChange(slot)} style={{
+          padding: '6px 12px',
+          border: `1.5px solid ${value === slot ? '#9B7DB5' : '#ddd'}`,
+          borderRadius: '20px',
+          backgroundColor: value === slot ? '#9B7DB5' : 'white',
+          color: value === slot ? 'white' : '#555',
+          cursor: 'pointer', fontSize: '13px',
+          fontWeight: value === slot ? 'bold' : 'normal',
+        }}>{slot}</button>
+      ))}
+    </div>
+  )
+}
+
 function BiLabel({ cn, en, note }: { cn: string; en: string; note?: string }) {
   return (
     <span>
@@ -275,17 +374,20 @@ export default function NewClassPage() {
           <section style={s.section}>
             <h2 style={s.sectionTitle}>时间安排 Schedule</h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div style={s.field}>
-                <label style={s.label}><BiLabel cn="日期" en="Date" /> *</label>
-                <input type="date" name="date" value={formData.date}
-                  onChange={handleChange} required style={s.input} />
-              </div>
-              <div style={s.field}>
-                <label style={s.label}><BiLabel cn="开始时间" en="Start Time" /></label>
-                <input type="time" name="start_time" value={formData.start_time}
-                  onChange={handleChange} style={s.input} />
-              </div>
+            <div style={s.field}>
+              <label style={s.label}><BiLabel cn="日期" en="Date" /> *</label>
+              <InlineCalendar
+                value={formData.date}
+                onChange={(d) => setFormData((prev) => ({ ...prev, date: d }))}
+              />
+            </div>
+
+            <div style={s.field}>
+              <label style={s.label}><BiLabel cn="开始时间" en="Start Time" /></label>
+              <TimeSlotPicker
+                value={formData.start_time}
+                onChange={(t) => setFormData((prev) => ({ ...prev, start_time: t }))}
+              />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: formData.class_type === 'group' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '16px' }}>
