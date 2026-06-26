@@ -475,6 +475,106 @@ Before committing:
 **Day 3:** Deploy locally, look at one feature end-to-end  
 **Day 4:** Pick first small task, submit PR  
 
+---
+
+## AI Collaboration Workflow (Claude + Jessica)
+
+> **重要：** 以下流程是在实际开发中总结出来的，所有 AI 协作都必须遵守。违反任何一条都会导致部署失败、代码冲突或浪费大量时间。
+
+---
+
+### 一、每次开发新功能前（AI 必须做）
+
+1. **读现有代码** — 开发新模块前，先读相关文件，了解现有数据结构、API 格式、组件命名规范，避免重复造轮子或与旧代码冲突。
+2. **确认影响范围** — 修改 API（路径、字段、方法）时，搜索所有调用该 API 的前端文件，一并更新。
+3. **检查 TypeScript 类型** — 增加新字段或新角色（如 TRAINER）时，必须同时更新 `types/` 和相关 interface 定义（如 `AuthContext.tsx`）。
+
+---
+
+### 二、数据库改动（SQL Migration 标准模板）
+
+每次给数据库 migration，必须包含以下三部分，缺一不可：
+
+```sql
+-- 第1步：建表或加字段
+CREATE TABLE IF NOT EXISTS xxx (...);
+-- 或
+ALTER TABLE xxx ADD COLUMN IF NOT EXISTS yyy TEXT;
+
+-- 第2步：授权（必须包含，否则会报 permission denied）
+GRANT ALL ON TABLE public.xxx TO anon, authenticated, service_role;
+
+-- 第3步：明确 RLS 状态（必须显式说明）
+ALTER TABLE xxx DISABLE ROW LEVEL SECURITY;
+-- 或（如果需要启用）：
+ALTER TABLE xxx ENABLE ROW LEVEL SECURITY;
+```
+
+**不能只给第1步就结束。**
+
+---
+
+### 三、代码提交流程（Jessica 在 Terminal 执行）
+
+每次修改代码后，按顺序执行：
+
+```bash
+# 第1步：本地构建检查（提前发现 TypeScript 错误，避免浪费 Vercel build）
+cd /Users/jessica/my-fitness-pro && npm run build
+
+# 第2步：没有报错，再提交并推送（commit + push 必须写在同一条命令）
+git add -A && git commit -m "描述本次改动" && git push
+```
+
+**AI 给出的 git 命令，commit 和 push 必须在同一行，不能分开。**
+
+---
+
+### 四、部署验证（每次 push 后必做）
+
+1. 去 Vercel → Deployments，确认 **30秒内** 出现新的 build（带本次 commit message）
+2. Build 完成后，打开生产页面确认改动生效
+3. 如果 30 秒内没有新 build 出现，说明 GitHub webhook 断了 → 参考下方"常见问题"处理
+
+---
+
+### 五、新模块开发原则（避免与旧代码冲突）
+
+| 原则 | 说明 |
+|------|------|
+| 新页面放新路径 | 例如新增 `/dashboard/classes/[id]/review/`，不修改已有路径 |
+| 新 API 用新文件 | 例如新增 `/api/classes/[id]/student-notes/route.ts`，不在旧 route 里加逻辑 |
+| 修改旧 API 前先告知 | 修改现有 API 的字段或返回格式，必须先说明影响，再同步更新所有前端调用 |
+| 新表不影响旧表 | 数据库加新表/新字段用 `IF NOT EXISTS` / `IF NOT EXISTS`，不动旧表结构 |
+| 共用组件不改接口 | 修改 AuthContext、supabase client 等共用文件时，保证向后兼容 |
+
+---
+
+### 六、已知坑（过去踩过，以后避免）
+
+| 问题 | 原因 | 预防方法 |
+|------|------|----------|
+| Vercel 部署 404 | Framework Preset 设置错误 | 建项目时确认设置为 Next.js，立即推测试 commit 验证 |
+| git index.lock | AI 在沙箱里跑 git 命令权限不足 | **所有 git 操作只在 Jessica 的 Terminal 执行** |
+| push 后 Vercel 不自动部署 | GitHub webhook 未注册 | 建项目后立即验证：push → 看 Vercel 是否自动触发 |
+| permission denied for table | Migration 缺 GRANT 语句 | 每次 migration 都包含三步模板（见上方） |
+| 新代码不上线 | staged 但未 commit，或 commit 但未 push | 用一条命令：`git add -A && git commit -m "..." && git push` |
+| TypeScript 编译失败 | 新角色/字段未更新类型定义 | 改代码前先检查 interface，push 前先跑 `npm run build` |
+| 前端调用 API 报错 | API 路径或参数改了，前端没同步更新 | 改 API 前搜索所有调用方，一并修改 |
+
+---
+
+### 七、Vercel-GitHub 连接验证（初始设置 Checklist）
+
+新建 Vercel 项目时，必须完成以下验证才能开始开发：
+
+- [ ] Framework Preset 设置为 **Next.js**
+- [ ] Connected Git Repository 已连接 GitHub 仓库
+- [ ] 推一个测试 commit，确认 Vercel Deployments 30秒内自动出现新 build
+- [ ] 访问生产 URL，确认页面正常加载（无 404）
+
+**以上四项全部完成才算部署配置完成。**
+
 **Essential Files to Review First:**
 1. This file (TECH_ARCHITECTURE.md)
 2. `/types/index.ts` — All data types
