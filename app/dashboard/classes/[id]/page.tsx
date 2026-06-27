@@ -95,7 +95,9 @@ export default function ClassDetailPage() {
   const [error, setError] = useState('')
   const [showAddExercise, setShowAddExercise] = useState(false)
   const [selectedExerciseId, setSelectedExerciseId] = useState('')
-  const [availableExercises, setAvailableExercises] = useState<MasterExercise[]>([])
+  const [availableExercises, setAvailableExercises] = useState<any[]>([])
+  const [exSearch, setExSearch] = useState('')
+  const [exFilterAll, setExFilterAll] = useState(false)
   const [activeTab, setActiveTab] = useState<'exercises' | 'student-notes'>('exercises')
   const [studentNotes, setStudentNotes] = useState<StudentNote[]>([])
 
@@ -160,7 +162,11 @@ export default function ClassDetailPage() {
       const res = await fetch('/api/exercises', {
         headers: { 'x-user-id': user?.id || '' },
       })
-      if (res.ok) setAvailableExercises(await res.json())
+      if (res.ok) {
+        const data = await res.json()
+        // Sort: matching discipline first
+        setAvailableExercises(data)
+      }
     } catch { /* non-critical */ }
   }
 
@@ -479,39 +485,92 @@ export default function ClassDetailPage() {
               </div>
             )}
 
-            {showAddExercise && (
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', backgroundColor: '#fafafa' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px' }}>
-                  <select
-                    value={selectedExerciseId}
-                    onChange={(e) => setSelectedExerciseId(e.target.value)}
-                    style={{ padding: '9px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
-                  >
-                    <option value="">选择动作...</option>
-                    {availableExercises.map((ex) => (
-                      <option key={ex.id} value={ex.id}>
-                        {ex.name_en}（{ex.name_cn}）
-                      </option>
+            {showAddExercise && (() => {
+              // Discipline → exercise type matching
+              const discipline = classData.discipline || ''
+              const filtered = availableExercises.filter(ex => {
+                const matchDiscipline = exFilterAll || !discipline ||
+                  (ex.type_en || '').toLowerCase().includes(discipline.toLowerCase()) ||
+                  discipline.toLowerCase().includes((ex.type_en || '').toLowerCase())
+                const matchSearch = !exSearch ||
+                  (ex.name_cn || '').includes(exSearch) ||
+                  (ex.name_en || '').toLowerCase().includes(exSearch.toLowerCase()) ||
+                  (ex.target_muscles_cn || '').includes(exSearch) ||
+                  (ex.target_muscles_en || '').toLowerCase().includes(exSearch.toLowerCase())
+                return matchDiscipline && matchSearch
+              })
+
+              return (
+                <div style={{ borderBottom: '1px solid #eee', backgroundColor: '#fafafa' }}>
+                  {/* Search bar */}
+                  <div style={{ padding: '12px 16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      placeholder="搜索动作名称或肌群... Search"
+                      value={exSearch}
+                      onChange={e => { setExSearch(e.target.value); setSelectedExerciseId('') }}
+                      autoFocus
+                      style={{ flex: 1, padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px' }}
+                    />
+                    {discipline && (
+                      <button
+                        onClick={() => setExFilterAll(v => !v)}
+                        style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', backgroundColor: exFilterAll ? '#f0f0f0' : '#f3eef9', color: exFilterAll ? '#666' : '#9B7DB5', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                      >
+                        {exFilterAll ? '全部动作' : `仅 ${discipline}`}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Exercise list */}
+                  <div style={{ maxHeight: '240px', overflowY: 'auto', borderTop: '1px solid #eee' }}>
+                    {filtered.length === 0 ? (
+                      <p style={{ padding: '20px', textAlign: 'center', color: '#bbb', fontSize: '13px', margin: 0 }}>
+                        没有匹配动作
+                        {!exFilterAll && discipline && <span> · <button onClick={() => setExFilterAll(true)} style={{ background: 'none', border: 'none', color: '#9B7DB5', cursor: 'pointer', fontSize: '13px' }}>查看全部</button></span>}
+                      </p>
+                    ) : filtered.map(ex => (
+                      <div
+                        key={ex.id}
+                        onClick={() => setSelectedExerciseId(ex.id === selectedExerciseId ? '' : ex.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px',
+                          cursor: 'pointer', borderBottom: '1px solid #f5f5f5',
+                          backgroundColor: selectedExerciseId === ex.id ? '#f3eef9' : 'white',
+                        }}
+                      >
+                        <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${selectedExerciseId === ex.id ? '#9B7DB5' : '#ddd'}`, backgroundColor: selectedExerciseId === ex.id ? '#9B7DB5' : 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {selectedExerciseId === ex.id && <span style={{ color: 'white', fontSize: '11px' }}>✓</span>}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: '0 0 1px 0', fontSize: '13px', fontWeight: 'bold' }}>{ex.name_cn || ex.name_en}</p>
+                          <p style={{ margin: 0, fontSize: '11px', color: '#999' }}>
+                            {ex.name_en}
+                            {ex.target_muscles_cn && ` · ${ex.target_muscles_cn}`}
+                          </p>
+                        </div>
+                        {ex.type_cn && <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '8px', backgroundColor: '#f0eaf8', color: '#9B7DB5', flexShrink: 0 }}>{ex.type_cn}</span>}
+                      </div>
                     ))}
-                  </select>
-                  <button
-                    onClick={handleAddExercise}
-                    disabled={!selectedExerciseId}
-                    style={{
-                      padding: '9px 18px',
-                      backgroundColor: '#4CAF50',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: selectedExerciseId ? 'pointer' : 'not-allowed',
-                      opacity: selectedExerciseId ? 1 : 0.5,
-                    }}
-                  >
-                    添加
-                  </button>
+                  </div>
+
+                  {/* Add button */}
+                  <div style={{ padding: '10px 16px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <button onClick={() => { setShowAddExercise(false); setSelectedExerciseId(''); setExSearch('') }}
+                      style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontSize: '13px' }}>
+                      取消
+                    </button>
+                    <button
+                      onClick={() => { handleAddExercise(); setExSearch(''); setSelectedExerciseId('') }}
+                      disabled={!selectedExerciseId}
+                      style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', backgroundColor: '#9B7DB5', color: 'white', cursor: selectedExerciseId ? 'pointer' : 'not-allowed', opacity: selectedExerciseId ? 1 : 0.5, fontWeight: 'bold', fontSize: '13px' }}
+                    >
+                      + 添加动作
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {classData.exercises.length === 0 ? (
               <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
