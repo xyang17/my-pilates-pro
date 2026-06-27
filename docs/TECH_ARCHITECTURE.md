@@ -561,6 +561,9 @@ git add -A && git commit -m "描述本次改动" && git push
 | 新代码不上线 | staged 但未 commit，或 commit 但未 push | 用一条命令：`git add -A && git commit -m "..." && git push` |
 | TypeScript 编译失败 | 新角色/字段未更新类型定义 | 改代码前先检查 interface，push 前先跑 `npm run build` |
 | 前端调用 API 报错 | API 路径或参数改了，前端没同步更新 | 改 API 前搜索所有调用方，一并修改 |
+| 修改用户角色/权限后页面不生效 | AuthContext 在登录时读取一次角色并缓存在 React state，DB 改动不会自动刷新 | **只要修改了 `public.user` 的 `role` 字段，必须告知用户退出登录再重新登录**，否则前端看到的是旧的角色 |
+| 用户角色改了但浏览器还显示旧角色 | 重新登录发生在 DB 改动之前（时序问题）| 确保操作顺序：先完成 SQL 改动并确认 SELECT 结果正确 → 再退出登录 → 再重新登录 |
+| `public.user` 表没有对应记录 | 用户通过 Supabase Auth 注册，但 `public.user` 没有对应触发器自动创建行；代码默认 role = 'CLIENT' | 手动注册流程必须同时往 `public.user` 插入记录；或排查确认 signup trigger 存在 |
 
 ---
 
