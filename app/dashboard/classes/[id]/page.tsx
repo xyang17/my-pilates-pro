@@ -100,6 +100,15 @@ export default function ClassDetailPage() {
   const [exFilterAll, setExFilterAll] = useState(false)
   const [activeTab, setActiveTab] = useState<'exercises' | 'student-notes'>('exercises')
   const [studentNotes, setStudentNotes] = useState<StudentNote[]>([])
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<{sets:string,reps:string,weight:string,weight_unit:string,duration:string,duration_unit:string,instance_notes:string}>({sets:'',reps:'',weight:'',weight_unit:'kg',duration:'',duration_unit:'minutes',instance_notes:''})
+  const [editSaving, setEditSaving] = useState(false)
+  const [showHomework, setShowHomework] = useState(false)
+  const [homeworkSelected, setHomeworkSelected] = useState<Set<string>>(new Set())
+  const [homeworkDueDate, setHomeworkDueDate] = useState('')
+  const [homeworkNotes, setHomeworkNotes] = useState('')
+  const [homeworkStudentId, setHomeworkStudentId] = useState('')
+  const [homeworkSubmitting, setHomeworkSubmitting] = useState(false)
 
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
   const isGroupClass = classData?.class_type === 'group'
@@ -180,6 +189,80 @@ export default function ClassDetailPage() {
       })
       if (res.ok) setStudentNotes(await res.json())
     } catch { /* non-critical */ }
+  }
+
+  const startEdit = (ex: ClassExercise) => {
+    setEditingId(ex.id)
+    setEditForm({
+      sets: ex.sets?.toString() || '',
+      reps: ex.reps?.toString() || '',
+      weight: ex.weight?.toString() || '',
+      weight_unit: ex.weight_unit || 'kg',
+      duration: ex.duration?.toString() || '',
+      duration_unit: ex.duration_unit || 'minutes',
+      instance_notes: ex.instance_notes || '',
+    })
+  }
+
+  const handleSaveEdit = async (instanceId: string) => {
+    setEditSaving(true)
+    try {
+      const body: Record<string, unknown> = {
+        sets: editForm.sets ? parseInt(editForm.sets) : null,
+        reps: editForm.reps ? parseInt(editForm.reps) : null,
+        weight: editForm.weight ? parseFloat(editForm.weight) : null,
+        weight_unit: editForm.weight_unit,
+        duration: editForm.duration ? parseInt(editForm.duration) : null,
+        duration_unit: editForm.duration_unit,
+        instance_notes: editForm.instance_notes || null,
+      }
+      const res = await fetch(`/api/classes/${classId}/exercises/${instanceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      setEditingId(null)
+      fetchClassData()
+    } catch (err: any) { setError(err.message) }
+    finally { setEditSaving(false) }
+  }
+
+  const handleCreateHomework = async () => {
+    if (!homeworkStudentId || homeworkSelected.size === 0) return
+    setHomeworkSubmitting(true)
+    try {
+      const exercises = Array.from(homeworkSelected).map((instanceId, i) => {
+        const ex = classData?.exercises.find(e => e.id === instanceId)
+        return {
+          exercise_id: ex?.exercise_id,
+          class_instance_id: instanceId,
+          sets: ex?.sets, reps: ex?.reps, weight: ex?.weight,
+          weight_unit: ex?.weight_unit || 'kg', notes: ex?.instance_notes || '',
+          order_num: i + 1,
+        }
+      })
+      const res = await fetch('/api/homework', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({
+          class_id: classId,
+          student_id: homeworkStudentId,
+          title: `${classData?.name} 作业`,
+          due_date: homeworkDueDate || null,
+          notes: homeworkNotes || null,
+          exercises,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to create homework')
+      setShowHomework(false)
+      setHomeworkSelected(new Set())
+      setHomeworkStudentId('')
+      setHomeworkDueDate('')
+      setHomeworkNotes('')
+      alert('作业已布置！')
+    } catch (err: any) { setError(err.message) }
+    finally { setHomeworkSubmitting(false) }
   }
 
   const handleAddExercise = async () => {
@@ -468,6 +551,13 @@ export default function ClassDetailPage() {
                 alignItems: 'center',
               }}>
                 <span style={{ fontWeight: 'bold', color: '#444' }}>动作列表</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                {classData.exercises.length > 0 && (
+                  <button onClick={() => setShowHomework(true)}
+                    style={{ padding: '6px 14px', backgroundColor: '#E8A87C', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
+                    📋 布置作业
+                  </button>
+                )}
                 <button
                   onClick={() => setShowAddExercise(!showAddExercise)}
                   style={{
@@ -482,6 +572,7 @@ export default function ClassDetailPage() {
                 >
                   {showAddExercise ? '✕ 取消' : '+ 添加动作'}
                 </button>
+                </div>
               </div>
             )}
 
@@ -578,78 +669,117 @@ export default function ClassDetailPage() {
               </div>
             ) : (
               classData.exercises.map((ex, i) => (
-                <div
-                  key={ex.id}
-                  style={{
-                    padding: '16px 20px',
-                    borderBottom: i < classData.exercises.length - 1 ? '1px solid #f0f0f0' : 'none',
-                    display: 'grid',
-                    gridTemplateColumns: '28px 1fr auto',
-                    gap: '14px',
-                    alignItems: 'start',
-                  }}
-                >
-                  <div style={{
-                    width: '28px', height: '28px',
-                    backgroundColor: '#9B7DB5', color: 'white',
-                    borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '12px', fontWeight: 'bold', flexShrink: 0,
-                  }}>
-                    {i + 1}
-                  </div>
-
-                  <div>
-                    <p style={{ margin: '0 0 6px 0', fontWeight: 'bold' }}>
-                      {ex.master_exercise.name_en}
-                      <span style={{ color: '#999', fontSize: '13px', marginLeft: '8px' }}>
-                        {ex.master_exercise.name_cn}
-                      </span>
-                    </p>
-                    {/* Planned params */}
-                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '13px', color: '#555' }}>
-                      {ex.sets != null && <span>计划 {ex.sets} 组</span>}
-                      {ex.reps != null && <span>× {ex.reps} 次</span>}
-                      {ex.weight != null && <span>{ex.weight} {ex.weight_unit}</span>}
-                      {ex.duration != null && <span>{ex.duration} {ex.duration_unit}</span>}
-                    </div>
-                    {/* Actual params (from review) */}
-                    {(ex.actual_sets != null || ex.actual_reps != null || ex.actual_weight != null) && (
-                      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '13px', color: '#4CAF50', marginTop: '4px' }}>
-                        <span>实际：</span>
-                        {ex.actual_sets != null && <span>{ex.actual_sets} 组</span>}
-                        {ex.actual_reps != null && <span>× {ex.actual_reps} 次</span>}
-                        {ex.actual_weight != null && <span>{ex.actual_weight} kg</span>}
+                <div key={ex.id} style={{ borderBottom: i < classData.exercises.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                  {editingId === ex.id ? (
+                    /* ── EDIT MODE ── */
+                    <div style={{ padding: '16px 20px', backgroundColor: '#faf8fd' }}>
+                      <p style={{ margin: '0 0 12px 0', fontWeight: 'bold', color: '#9B7DB5' }}>
+                        {ex.master_exercise.name_cn || ex.master_exercise.name_en}
+                      </p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '10px' }}>
+                        <label style={{ fontSize: '12px', color: '#666' }}>
+                          组数 Sets
+                          <input type="number" min="0" value={editForm.sets}
+                            onChange={e => setEditForm(f => ({...f, sets: e.target.value}))}
+                            style={{ display: 'block', width: '100%', marginTop: '4px', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
+                          />
+                        </label>
+                        <label style={{ fontSize: '12px', color: '#666' }}>
+                          次数 Reps
+                          <input type="number" min="0" value={editForm.reps}
+                            onChange={e => setEditForm(f => ({...f, reps: e.target.value}))}
+                            style={{ display: 'block', width: '100%', marginTop: '4px', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
+                          />
+                        </label>
+                        <label style={{ fontSize: '12px', color: '#666' }}>
+                          配重 Weight
+                          <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                            <input type="number" min="0" step="0.5" value={editForm.weight}
+                              onChange={e => setEditForm(f => ({...f, weight: e.target.value}))}
+                              style={{ flex: 1, padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
+                            />
+                            <select value={editForm.weight_unit} onChange={e => setEditForm(f => ({...f, weight_unit: e.target.value}))}
+                              style={{ padding: '7px 4px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '12px' }}>
+                              <option value="kg">kg</option>
+                              <option value="lb">lb</option>
+                            </select>
+                          </div>
+                        </label>
+                        <label style={{ fontSize: '12px', color: '#666' }}>
+                          时长 Duration
+                          <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                            <input type="number" min="0" value={editForm.duration}
+                              onChange={e => setEditForm(f => ({...f, duration: e.target.value}))}
+                              style={{ flex: 1, padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
+                            />
+                            <select value={editForm.duration_unit} onChange={e => setEditForm(f => ({...f, duration_unit: e.target.value}))}
+                              style={{ padding: '7px 4px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '12px' }}>
+                              <option value="seconds">秒</option>
+                              <option value="minutes">分</option>
+                            </select>
+                          </div>
+                        </label>
+                        <label style={{ fontSize: '12px', color: '#666', gridColumn: 'span 2' }}>
+                          备注 Notes
+                          <input type="text" value={editForm.instance_notes}
+                            onChange={e => setEditForm(f => ({...f, instance_notes: e.target.value}))}
+                            placeholder="教练提示、注意事项..."
+                            style={{ display: 'block', width: '100%', marginTop: '4px', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
+                          />
+                        </label>
                       </div>
-                    )}
-                    {ex.instance_notes && (
-                      <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#888', fontStyle: 'italic' }}>
-                        📌 {ex.instance_notes}
-                      </p>
-                    )}
-                    {ex.post_note && (
-                      <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#9B7DB5', fontStyle: 'italic' }}>
-                        💬 {ex.post_note}
-                      </p>
-                    )}
-                  </div>
-
-                  {isTrainer && classData.status !== 'completed' && (
-                    <button
-                      onClick={() => handleRemoveExercise(ex.id)}
-                      style={{
-                        padding: '4px 10px',
-                        backgroundColor: '#ffebee',
-                        color: '#c62828',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        flexShrink: 0,
-                      }}
-                    >
-                      移除
-                    </button>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button onClick={() => setEditingId(null)} style={{ padding: '7px 16px', borderRadius: '6px', border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontSize: '13px' }}>取消</button>
+                        <button onClick={() => handleSaveEdit(ex.id)} disabled={editSaving}
+                          style={{ padding: '7px 20px', borderRadius: '6px', border: 'none', backgroundColor: '#9B7DB5', color: 'white', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', opacity: editSaving ? 0.6 : 1 }}>
+                          {editSaving ? '保存中...' : '✓ 保存'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* ── VIEW MODE ── */
+                    <div style={{ padding: '14px 20px', display: 'grid', gridTemplateColumns: '28px 1fr auto', gap: '12px', alignItems: 'start' }}>
+                      <div style={{ width: '28px', height: '28px', backgroundColor: '#9B7DB5', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold', flexShrink: 0 }}>
+                        {i + 1}
+                      </div>
+                      <div>
+                        <p style={{ margin: '0 0 5px 0', fontWeight: 'bold', fontSize: '14px' }}>
+                          {ex.master_exercise.name_cn || ex.master_exercise.name_en}
+                          <span style={{ color: '#bbb', fontSize: '12px', marginLeft: '8px', fontWeight: 'normal' }}>{ex.master_exercise.name_en}</span>
+                        </p>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '13px' }}>
+                          {ex.sets != null && <span style={{ color: '#555' }}>{ex.sets} 组</span>}
+                          {ex.reps != null && <span style={{ color: '#555' }}>× {ex.reps} 次</span>}
+                          {ex.weight != null && <span style={{ color: '#555' }}>{ex.weight} {ex.weight_unit}</span>}
+                          {ex.duration != null && <span style={{ color: '#555' }}>{ex.duration} {ex.duration_unit === 'seconds' ? '秒' : '分'}</span>}
+                          {!ex.sets && !ex.reps && !ex.weight && !ex.duration && (
+                            <span style={{ color: '#ccc', fontSize: '12px' }}>未设置参数</span>
+                          )}
+                        </div>
+                        {(ex.actual_sets != null || ex.actual_reps != null || ex.actual_weight != null) && (
+                          <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: '#4CAF50', marginTop: '3px' }}>
+                            <span>✓ 实际：</span>
+                            {ex.actual_sets != null && <span>{ex.actual_sets} 组</span>}
+                            {ex.actual_reps != null && <span>× {ex.actual_reps} 次</span>}
+                            {ex.actual_weight != null && <span>{ex.actual_weight} kg</span>}
+                          </div>
+                        )}
+                        {ex.instance_notes && <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#888', fontStyle: 'italic' }}>📌 {ex.instance_notes}</p>}
+                        {ex.post_note && <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#9B7DB5', fontStyle: 'italic' }}>💬 {ex.post_note}</p>}
+                      </div>
+                      {isTrainer && classData.status !== 'completed' && (
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                          <button onClick={() => startEdit(ex)}
+                            style={{ padding: '4px 10px', backgroundColor: '#f0eaf8', color: '#9B7DB5', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                            编辑
+                          </button>
+                          <button onClick={() => handleRemoveExercise(ex.id)}
+                            style={{ padding: '4px 10px', backgroundColor: '#ffebee', color: '#c62828', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                            移除
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               ))
@@ -679,6 +809,75 @@ export default function ClassDetailPage() {
           </div>
         )}
       </main>
+
+      {/* Homework Modal */}
+      {showHomework && classData && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0, fontSize: '17px' }}>📋 布置课后作业</h2>
+              <button onClick={() => setShowHomework(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>✕</button>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1, padding: '20px' }}>
+              <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: '#888' }}>选择要布置的动作（可多选），学员将在作业页查看：</p>
+
+              {/* Exercise selection */}
+              <div style={{ backgroundColor: '#f9f6fc', borderRadius: '10px', overflow: 'hidden', marginBottom: '16px' }}>
+                {classData.exercises.map((ex, i) => (
+                  <div key={ex.id}
+                    onClick={() => {
+                      const s = new Set(homeworkSelected)
+                      s.has(ex.id) ? s.delete(ex.id) : s.add(ex.id)
+                      setHomeworkSelected(s)
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', cursor: 'pointer', borderBottom: i < classData.exercises.length - 1 ? '1px solid #eee' : 'none', backgroundColor: homeworkSelected.has(ex.id) ? '#f0eaf8' : 'white' }}>
+                    <div style={{ width: '22px', height: '22px', borderRadius: '6px', border: `2px solid ${homeworkSelected.has(ex.id) ? '#9B7DB5' : '#ddd'}`, backgroundColor: homeworkSelected.has(ex.id) ? '#9B7DB5' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {homeworkSelected.has(ex.id) && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: '0 0 2px 0', fontWeight: 'bold', fontSize: '14px' }}>{ex.master_exercise.name_cn || ex.master_exercise.name_en}</p>
+                      <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
+                        {[ex.sets && `${ex.sets}组`, ex.reps && `${ex.reps}次`, ex.weight && `${ex.weight}${ex.weight_unit}`].filter(Boolean).join(' · ') || '未设置参数'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Student + due date */}
+              <div style={{ display: 'grid', gap: '12px' }}>
+                <label style={{ fontSize: '13px', color: '#666' }}>
+                  分配给学员 ID（暂用 UUID，后续改为下拉）
+                  <input type="text" value={homeworkStudentId} onChange={e => setHomeworkStudentId(e.target.value)}
+                    placeholder="学员 User ID"
+                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
+                </label>
+                <label style={{ fontSize: '13px', color: '#666' }}>
+                  截止日期（选填）
+                  <input type="date" value={homeworkDueDate} onChange={e => setHomeworkDueDate(e.target.value)}
+                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
+                </label>
+                <label style={{ fontSize: '13px', color: '#666' }}>
+                  备注（选填）
+                  <textarea value={homeworkNotes} onChange={e => setHomeworkNotes(e.target.value)}
+                    placeholder="给学员的提示或说明..."
+                    rows={2}
+                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', resize: 'none' }} />
+                </label>
+              </div>
+            </div>
+            <div style={{ padding: '16px 20px', borderTop: '1px solid #eee', display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowHomework(false)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontSize: '14px' }}>取消</button>
+              <button
+                onClick={handleCreateHomework}
+                disabled={homeworkSelected.size === 0 || !homeworkStudentId || homeworkSubmitting}
+                style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: '#E8A87C', color: 'white', cursor: homeworkSelected.size > 0 && homeworkStudentId ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '14px', opacity: homeworkSelected.size > 0 && homeworkStudentId ? 1 : 0.5 }}>
+                {homeworkSubmitting ? '布置中...' : `布置作业（${homeworkSelected.size} 个动作）`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
