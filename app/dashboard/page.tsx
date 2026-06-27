@@ -1,19 +1,18 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
+import { useLang } from '@/context/LanguageContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import Link from 'next/link'
 
 export default function DashboardPage() {
   const { user, userRole, loading, logout } = useAuth()
+  const { t } = useLang()
   const router = useRouter()
 
-  // Redirect to login if not authenticated
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth/login')
-    }
+    if (!loading && !user) router.push('/auth/login')
   }, [user, loading, router])
 
   const handleLogout = async () => {
@@ -21,201 +20,55 @@ export default function DashboardPage() {
     router.push('/')
   }
 
-  if (loading) {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <p>Loading...</p>
-      </div>
-    )
-  }
+  if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
+  if (!user) return null
 
-  if (!user) {
-    return null // Will redirect via useEffect
-  }
+  const cards = [
+    { icon: '🏋️', title: t('动作库', 'Exercise Library'), desc: t('管理和查看所有课程动作', 'Manage and view all exercises'), href: '/dashboard/exercises' },
+    { icon: '📚', title: t('课程训练', 'Class Training'), desc: t('创建课程并记录训练动作', 'Create classes and log exercises'), href: '/dashboard/classes' },
+    { icon: '📅', title: t('课程日历', 'Calendar'), desc: t('按月查看所有课程排班', 'Monthly class schedule view'), href: '/dashboard/calendar' },
+    { icon: '📋', title: t('课后作业', 'Homework'), desc: t('布置课后练习任务（开发中）', 'Assign homework exercises (coming soon)'), href: '/dashboard/workouts' },
+    ...(userRole === 'ADMIN' || userRole === 'TRAINER' ? [
+      { icon: '👥', title: t('学员管理', 'Clients'), desc: t('查看学员列表和课程记录', 'Manage client profiles and history'), href: '/dashboard/clients' }
+    ] : []),
+    { icon: '👤', title: t('我的主页', 'My Profile'), desc: t('查看个人信息', 'View your profile'), href: '/dashboard/profile' },
+  ]
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      {/* Header */}
-      <header style={{
-        backgroundColor: '#9B7DB5',
-        color: 'white',
-        padding: '20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <h1>MyPilatesPro Dashboard</h1>
-        <div>
-          <span style={{ marginRight: '20px' }}>
-            {user.user_metadata?.name || user.email}
-          </span>
-          <button
-            onClick={handleLogout}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: 'rgba(255,255,255,0.2)',
-              color: 'white',
-              border: '1px solid white',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Logout
+      <header style={{ backgroundColor: '#9B7DB5', color: 'white', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1 style={{ margin: 0, fontSize: '20px' }}>MyPilatesPro</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span style={{ fontSize: '14px', opacity: 0.9 }}>{user.user_metadata?.name || user.email}</span>
+          <button onClick={handleLogout} style={{ padding: '7px 14px', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
+            {t('退出', 'Logout')}
           </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
-          <h2>Welcome to Your Dashboard</h2>
-          <p>User Email: {user.email}</p>
-          <p>User Role: {userRole}</p>
-          <p>User ID: {user.id}</p>
+      <main style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
+        <div style={{ backgroundColor: 'white', padding: '16px 20px', borderRadius: '10px', marginBottom: '20px' }}>
+          <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
+            {t('角色', 'Role')}: <strong style={{ color: '#9B7DB5' }}>{userRole}</strong>
+            <span style={{ margin: '0 12px', color: '#ddd' }}>|</span>
+            {user.email}
+          </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            border: '1px solid #ddd',
-          }}>
-            <h3>🏋️ Exercise Library</h3>
-            <p>Manage and view all exercises (bilingual, with notes & media)</p>
-            <Link
-              href="/dashboard/exercises"
-              style={{
-                color: '#9B7DB5',
-                textDecoration: 'none',
-                fontWeight: 'bold',
-              }}
-            >
-              Go to Exercises →
-            </Link>
-          </div>
-
-          <div style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            border: '1px solid #ddd',
-          }}>
-            <h3>📚 Class Training</h3>
-            <p>Create classes and log exercises (trainer & client training)</p>
-            <Link
-              href="/dashboard/classes"
-              style={{
-                color: '#9B7DB5',
-                textDecoration: 'none',
-                fontWeight: 'bold',
-              }}
-            >
-              Go to Classes →
-            </Link>
-          </div>
-
-          <div style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            border: '1px solid #ddd',
-          }}>
-            <h3>📋 Homework Assignments</h3>
-            <p>Assign exercises from classes as homework (coming soon)</p>
-            <Link
-              href="/dashboard/workouts"
-              style={{
-                color: '#9B7DB5',
-                textDecoration: 'none',
-                fontWeight: 'bold',
-              }}
-            >
-              Go to Homework →
-            </Link>
-          </div>
-
-          <div style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            border: '1px solid #ddd',
-          }}>
-            <h3>📅 Class Schedule</h3>
-            <p>View your upcoming pilates classes (coming soon)</p>
-            <Link
-              href="/dashboard/schedule"
-              style={{
-                color: '#9B7DB5',
-                textDecoration: 'none',
-                fontWeight: 'bold',
-              }}
-            >
-              View Schedule →
-            </Link>
-          </div>
-
-          <div style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            border: '1px solid #ddd',
-          }}>
-            <h3>🗓️ 课程日历 Calendar</h3>
-            <p>按月查看所有课程排班 Monthly class schedule view</p>
-            <Link
-              href="/dashboard/calendar"
-              style={{
-                color: '#9B7DB5',
-                textDecoration: 'none',
-                fontWeight: 'bold',
-              }}
-            >
-              查看日历 View Calendar →
-            </Link>
-          </div>
-
-          {(userRole === 'ADMIN' || userRole === 'TRAINER') && (
-            <div style={{
-              backgroundColor: 'white',
-              padding: '20px',
-              borderRadius: '8px',
-              border: '1px solid #ddd',
-            }}>
-              <h3>👥 学员管理 Clients</h3>
-              <p>查看学员列表和课程记录 Manage client profiles and history</p>
-              <Link
-                href="/dashboard/clients"
-                style={{
-                  color: '#9B7DB5',
-                  textDecoration: 'none',
-                  fontWeight: 'bold',
-                }}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+          {cards.map(card => (
+            <Link key={card.href} href={card.href} style={{ textDecoration: 'none' }}>
+              <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', transition: 'box-shadow 0.2s', cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(155,125,181,0.15)')}
+                onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
               >
-                查看学员 View Clients →
-              </Link>
-            </div>
-          )}
-
-          <div style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            border: '1px solid #ddd',
-          }}>
-            <h3>👤 我的主页 My Profile</h3>
-            <p>Update your profile information (coming soon)</p>
-            <Link
-              href="/dashboard/profile"
-              style={{
-                color: '#9B7DB5',
-                textDecoration: 'none',
-                fontWeight: 'bold',
-              }}
-            >
-              Go to Profile →
+                <div style={{ fontSize: '28px', marginBottom: '10px' }}>{card.icon}</div>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', color: '#333' }}>{card.title}</h3>
+                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#888' }}>{card.desc}</p>
+                <span style={{ color: '#9B7DB5', fontSize: '13px', fontWeight: 'bold' }}>{t('进入', 'Open')} →</span>
+              </div>
             </Link>
-          </div>
+          ))}
         </div>
       </main>
     </div>

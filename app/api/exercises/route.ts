@@ -17,9 +17,8 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('master_exercise')
       .select('*')
-      .eq('created_by', userId)
       .eq('is_active', true)
-      .order('created_at', { ascending: false })
+      .order('name_cn', { ascending: true })
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 

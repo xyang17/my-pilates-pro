@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
+import { useLang } from '@/context/LanguageContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -21,11 +22,13 @@ interface CalendarClass {
 
 const DAY_NAMES_CN = ['日', '一', '二', '三', '四', '五', '六']
 const DAY_NAMES_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTH_NAMES_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const MONTH_NAMES_CN = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
 
 export default function CalendarPage() {
   const { user, userRole, loading: authLoading } = useAuth()
   const router = useRouter()
+  const { lang, t } = useLang()
 
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
@@ -88,7 +91,7 @@ export default function CalendarPage() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <header style={{ backgroundColor: '#9B7DB5', color: 'white', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
         <Link href="/dashboard" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>← 返回 Back</Link>
-        <h1 style={{ margin: 0, fontSize: '18px', flex: 1 }}>课程日历 Calendar</h1>
+        <h1 style={{ margin: 0, fontSize: '18px', flex: 1 }}>{t('课程日历', 'Calendar')}</h1>
         <Link href="/dashboard/classes/new" style={{ backgroundColor: 'white', color: '#9B7DB5', padding: '6px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '13px', fontWeight: 'bold' }}>
           + 新建课程
         </Link>
@@ -100,14 +103,14 @@ export default function CalendarPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <button onClick={prevMonth} style={{ background: 'none', border: '1px solid #ddd', borderRadius: '8px', width: '36px', height: '36px', cursor: 'pointer', fontSize: '16px' }}>‹</button>
             <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{year}年 {MONTH_NAMES_CN[month]}</span>
+              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{lang === 'zh' ? `${year}年 ${MONTH_NAMES_CN[month]}` : `${MONTH_NAMES_EN[month]} ${year}`}</span>
             </div>
             <button onClick={nextMonth} style={{ background: 'none', border: '1px solid #ddd', borderRadius: '8px', width: '36px', height: '36px', cursor: 'pointer', fontSize: '16px' }}>›</button>
           </div>
 
           {/* Day headers */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
-            {DAY_NAMES_CN.map((d, i) => (
+            {(lang === 'zh' ? DAY_NAMES_CN : DAY_NAMES_EN).map((d, i) => (
               <div key={d} style={{ textAlign: 'center', fontSize: '12px', color: i === 0 || i === 6 ? '#E8A87C' : '#999', padding: '4px 0' }}>
                 {d}
               </div>
@@ -171,15 +174,15 @@ export default function CalendarPage() {
         {selectedDate && (
           <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '20px' }}>
             <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', borderBottom: '2px solid #f3eef9', paddingBottom: '10px' }}>
-              {new Date(selectedDate + 'T12:00:00').toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })}
+              {new Date(selectedDate + 'T12:00:00').toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', day: 'numeric', weekday: 'long' })}
               <span style={{ fontSize: '13px', color: '#999', marginLeft: '8px' }}>
                 {selectedClasses.length > 0 ? `${selectedClasses.length} 节课` : '无课程'}
               </span>
             </h3>
             {selectedClasses.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px 0', color: '#bbb' }}>
-                <p style={{ margin: '0 0 12px 0' }}>暂无课程 No classes</p>
-                <Link href="/dashboard/classes/new" style={{ color: '#9B7DB5', fontSize: '14px' }}>+ 新建课程 Add Class</Link>
+                <p style={{ margin: '0 0 12px 0' }}>{t('暂无课程', 'No classes')}</p>
+                <Link href="/dashboard/classes/new" style={{ color: '#9B7DB5', fontSize: '14px' }}>{t('+ 新建课程', '+ Add Class')}</Link>
               </div>
             ) : (
               selectedClasses
@@ -193,15 +196,15 @@ export default function CalendarPage() {
         {!selectedDate && (
           <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '20px' }}>
             <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', borderBottom: '2px solid #f3eef9', paddingBottom: '10px' }}>
-              {MONTH_NAMES_CN[month]} 本月课程 Monthly Overview
-              {isLoading && <span style={{ fontSize: '12px', color: '#bbb', marginLeft: '8px' }}>加载中...</span>}
+              {t(`${MONTH_NAMES_CN[month]} 本月课程`, `${MONTH_NAMES_EN[month]} Overview`)}
+              {isLoading && <span style={{ fontSize: '12px', color: '#bbb', marginLeft: '8px' }}>{t('加载中...', 'Loading...')}</span>}
             </h3>
             {(() => {
               const monthClasses = classes
                 .filter(c => c.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`))
                 .sort((a, b) => (a.date + (a.start_time || '')).localeCompare(b.date + (b.start_time || '')))
               if (monthClasses.length === 0 && !isLoading) return (
-                <p style={{ color: '#bbb', textAlign: 'center', padding: '20px 0' }}>本月暂无课程</p>
+                <p style={{ color: '#bbb', textAlign: 'center', padding: '20px 0' }}>{t('本月暂无课程', 'No classes this month')}</p>
               )
               return monthClasses.map(c => <CalendarClassCard key={c.id} c={c} showDate />)
             })()}
@@ -213,7 +216,10 @@ export default function CalendarPage() {
 }
 
 function CalendarClassCard({ c, showDate }: { c: CalendarClass; showDate?: boolean }) {
-  const STATUS_LABEL: Record<string, string> = { planned: '未开始', in_progress: '进行中', completed: '已完成' }
+  const { lang, t } = useLang()
+  const STATUS_LABEL_ZH: Record<string, string> = { planned: '未开始', in_progress: '进行中', completed: '已完成' }
+  const STATUS_LABEL_EN: Record<string, string> = { planned: 'Planned', in_progress: 'In Progress', completed: 'Completed' }
+  const STATUS_LABEL = lang === 'zh' ? STATUS_LABEL_ZH : STATUS_LABEL_EN
   const STATUS_BG: Record<string, string> = { planned: '#EBF5FB', in_progress: '#FEF9E7', completed: '#EAFAF1' }
   const STATUS_COLOR: Record<string, string> = { planned: '#2980B9', in_progress: '#D4AC0D', completed: '#1E8449' }
 
@@ -229,9 +235,9 @@ function CalendarClassCard({ c, showDate }: { c: CalendarClass; showDate?: boole
             </span>
           </div>
           <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
-            {showDate && `${new Date(c.date + 'T12:00:00').toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })} · `}
+            {showDate && `${new Date(c.date + 'T12:00:00').toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' })} · `}
             {c.start_time && `${c.start_time.slice(0, 5)} · `}
-            {c.duration}分钟
+            {c.duration}{t('分钟', 'min')}
             {c.discipline && ` · ${c.discipline}`}
           </p>
         </div>

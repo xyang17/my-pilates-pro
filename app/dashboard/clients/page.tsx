@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
+import { useLang } from '@/context/LanguageContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -23,6 +24,7 @@ interface NewClientForm {
 export default function ClientListPage() {
   const { user, userRole, loading: authLoading } = useAuth()
   const router = useRouter()
+  const { t } = useLang()
   const [clients, setClients] = useState<Client[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { LangProvider } from "@/context/LanguageContext";
 
 export const metadata: Metadata = {
   title: "MyPilatesPro",
@@ -15,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-full flex flex-col">
-        <AuthProvider>{children}</AuthProvider>
+        <LangProvider><AuthProvider>{children}</AuthProvider></LangProvider>
       </body>
     </html>
   );
