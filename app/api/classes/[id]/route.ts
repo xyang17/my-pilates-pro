@@ -55,16 +55,25 @@ export async function PUT(
     const body = await req.json()
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-    if (body.name         !== undefined) updates.name         = body.name
-    if (body.date         !== undefined) updates.date         = body.date
-    if (body.duration     !== undefined) updates.duration     = body.duration
-    if (body.type         !== undefined) updates.type         = body.type
-    if (body.class_type   !== undefined) updates.class_type   = body.class_type
-    if (body.status       !== undefined) updates.status       = body.status
-    if (body.notes        !== undefined) updates.notes        = body.notes
-    if (body.feedback     !== undefined) updates.feedback     = body.feedback
-    if (body.post_summary !== undefined) updates.post_summary = body.post_summary
-    if (body.completed_at !== undefined) updates.completed_at = body.completed_at
+    if (body.name            !== undefined) updates.name            = body.name
+    if (body.date            !== undefined) updates.date            = body.date
+    if (body.start_time      !== undefined) updates.start_time      = body.start_time
+    if (body.duration        !== undefined) updates.duration        = body.duration
+    if (body.type            !== undefined) updates.type            = body.type
+    if (body.discipline      !== undefined) updates.discipline      = body.discipline
+    if (body.class_type      !== undefined) updates.class_type      = body.class_type
+    if (body.level           !== undefined) updates.level           = body.level
+    if (body.description     !== undefined) updates.description     = body.description
+    if (body.max_capacity    !== undefined) updates.max_capacity    = body.max_capacity
+    if (body.price           !== undefined) updates.price           = body.price
+    if (body.color           !== undefined) updates.color           = body.color
+    if (body.cover_image_url !== undefined) updates.cover_image_url = body.cover_image_url
+    if (body.trainer_id      !== undefined) updates.trainer_id      = body.trainer_id
+    if (body.status          !== undefined) updates.status          = body.status
+    if (body.notes           !== undefined) updates.notes           = body.notes
+    if (body.feedback        !== undefined) updates.feedback        = body.feedback
+    if (body.post_summary    !== undefined) updates.post_summary    = body.post_summary
+    if (body.completed_at    !== undefined) updates.completed_at    = body.completed_at
 
     const { data, error } = await supabaseAdmin
       .from('class')

@@ -18,8 +18,10 @@ export async function GET(req: NextRequest) {
       .select('*')
       .order('date', { ascending: false })
 
-    // Admins/trainers see classes they created; clients see classes assigned to them
-    if (userRole === 'ADMIN' || userRole === 'TRAINER') {
+    // ADMIN sees all classes; TRAINERs see classes they created; clients see their own
+    if (userRole === 'ADMIN') {
+      // no filter — see all
+    } else if (userRole === 'TRAINER') {
       query = query.eq('created_by', userId)
     } else {
       query = query.or(`created_by.eq.${userId},assigned_to.eq.${userId}`)

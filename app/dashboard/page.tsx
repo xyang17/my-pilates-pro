@@ -161,7 +161,49 @@ export default function DashboardPage() {
             borderRadius: '8px',
             border: '1px solid #ddd',
           }}>
-            <h3>👤 My Profile</h3>
+            <h3>🗓️ 课程日历 Calendar</h3>
+            <p>按月查看所有课程排班 Monthly class schedule view</p>
+            <Link
+              href="/dashboard/calendar"
+              style={{
+                color: '#9B7DB5',
+                textDecoration: 'none',
+                fontWeight: 'bold',
+              }}
+            >
+              查看日历 View Calendar →
+            </Link>
+          </div>
+
+          {(userRole === 'ADMIN' || userRole === 'TRAINER') && (
+            <div style={{
+              backgroundColor: 'white',
+              padding: '20px',
+              borderRadius: '8px',
+              border: '1px solid #ddd',
+            }}>
+              <h3>👥 学员管理 Clients</h3>
+              <p>查看学员列表和课程记录 Manage client profiles and history</p>
+              <Link
+                href="/dashboard/clients"
+                style={{
+                  color: '#9B7DB5',
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                }}
+              >
+                查看学员 View Clients →
+              </Link>
+            </div>
+          )}
+
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            border: '1px solid #ddd',
+          }}>
+            <h3>👤 我的主页 My Profile</h3>
             <p>Update your profile information (coming soon)</p>
             <Link
               href="/dashboard/profile"

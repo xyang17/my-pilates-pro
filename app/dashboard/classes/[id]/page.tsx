@@ -38,13 +38,30 @@ interface StudentNote {
   created_at: string
 }
 
+interface TrainerInfo {
+  id: string
+  name: string
+  bio?: string
+  photo_url?: string
+  certificate?: string
+}
+
 interface ClassData {
   id: string
   name: string
   date: string
+  start_time?: string
   duration: number
   type: string
+  discipline?: string
   class_type: 'private' | 'group'
+  level?: string
+  description?: string
+  max_capacity?: number
+  price?: number
+  color?: string
+  cover_image_url?: string
+  trainer_id?: string
   status: 'planned' | 'in_progress' | 'completed'
   notes?: string
   post_summary?: string
@@ -72,6 +89,8 @@ export default function ClassDetailPage() {
   const classId = params.id as string
 
   const [classData, setClassData] = useState<ClassData | null>(null)
+  const [trainerInfo, setTrainerInfo] = useState<TrainerInfo | null>(null)
+  const [classPhotos, setClassPhotos] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [showAddExercise, setShowAddExercise] = useState(false)
@@ -107,7 +126,28 @@ export default function ClassDetailPage() {
         headers: { 'x-user-id': user?.id || '' },
       })
       if (!res.ok) throw new Error('Failed to fetch class')
-      setClassData(await res.json())
+      const data: ClassData = await res.json()
+      setClassData(data)
+
+      // Fetch trainer info if trainer_id exists
+      if (data.trainer_id) {
+        const tRes = await fetch(`/api/trainers/${data.trainer_id}`, {
+          headers: { 'x-user-id': user?.id || '' },
+        })
+        if (tRes.ok) {
+          const t = await tRes.json()
+          setTrainerInfo({ id: t.id, name: t.name, bio: t.bio, photo_url: t.photo_url, certificate: t.certificate })
+        }
+      }
+
+      // Fetch class photos
+      const pRes = await fetch(`/api/classes/${classId}/photos`, {
+        headers: { 'x-user-id': user?.id || '' },
+      })
+      if (pRes.ok) {
+        const photos = await pRes.json()
+        setClassPhotos(photos.map((p: any) => p.url))
+      }
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -260,55 +300,130 @@ export default function ClassDetailPage() {
           </div>
         )}
 
+        {/* Cover image */}
+        {classData.cover_image_url && (
+          <div style={{ marginBottom: '16px', borderRadius: '10px', overflow: 'hidden', maxHeight: '220px' }}>
+            <img src={classData.cover_image_url} alt={classData.name}
+              style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
+          </div>
+        )}
+
         {/* Class Info */}
-        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', marginBottom: '16px' }}>
+          {/* Color stripe */}
+          {classData.color && (
+            <div style={{ height: '4px', backgroundColor: classData.color, borderRadius: '2px', marginBottom: '16px' }} />
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '16px' }}>
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>日期</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{new Date(classData.date).toLocaleDateString('zh-CN')}</p>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>日期 Date</p>
+              <p style={{ margin: 0, fontWeight: 'bold' }}>{new Date(classData.date + 'T12:00:00').toLocaleDateString('zh-CN')}</p>
             </div>
+            {classData.start_time && (
+              <div>
+                <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>时间 Time</p>
+                <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.start_time.slice(0, 5)}</p>
+              </div>
+            )}
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>时长</p>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>时长 Duration</p>
               <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.duration} 分钟</p>
             </div>
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>类型</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.type}</p>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>类别 Discipline</p>
+              <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.discipline || classData.type || '—'}</p>
             </div>
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>课程形式</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.class_type === 'group' ? '团课' : '私教'}</p>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>形式 Format</p>
+              <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.class_type === 'group' ? '👥 团课' : '🧘 私教'}</p>
             </div>
+            {classData.level && (
+              <div>
+                <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>难度 Level</p>
+                <p style={{ margin: 0, fontWeight: 'bold' }}>
+                  {{ beginner: '初级', intermediate: '中级', advanced: '高级' }[classData.level] || classData.level}
+                </p>
+              </div>
+            )}
+            {classData.price != null && (
+              <div>
+                <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>价格 Price</p>
+                <p style={{ margin: 0, fontWeight: 'bold' }}>¥{classData.price}</p>
+              </div>
+            )}
+            {classData.class_type === 'group' && classData.max_capacity && (
+              <div>
+                <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>人数上限</p>
+                <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.max_capacity} 人</p>
+              </div>
+            )}
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>状态</p>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>状态 Status</p>
               <span style={{
-                display: 'inline-block',
-                padding: '3px 10px',
+                display: 'inline-block', padding: '3px 10px',
                 backgroundColor: STATUS_COLOR[classData.status] || '#999',
-                color: 'white',
-                borderRadius: '12px',
-                fontSize: '12px',
-                fontWeight: 'bold',
+                color: 'white', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold',
               }}>
                 {STATUS_LABEL[classData.status] || classData.status}
               </span>
             </div>
           </div>
 
+          {classData.description && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
+              <p style={{ margin: '0 0 6px 0', color: '#999', fontSize: '11px' }}>课程介绍 Description</p>
+              <p style={{ margin: 0, color: '#444', lineHeight: '1.6' }}>{classData.description}</p>
+            </div>
+          )}
+
           {classData.notes && (
             <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>课前备注</p>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>备注 Notes</p>
               <p style={{ margin: 0, color: '#444' }}>{classData.notes}</p>
             </div>
           )}
 
           {classData.post_summary && (
             <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px', textTransform: 'uppercase' }}>课后总结</p>
+              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>课后总结 Post Summary</p>
               <p style={{ margin: 0, color: '#444' }}>{classData.post_summary}</p>
             </div>
           )}
         </div>
+
+        {/* Trainer card */}
+        {trainerInfo && (
+          <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', marginBottom: '16px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+            {trainerInfo.photo_url ? (
+              <img src={trainerInfo.photo_url} alt={trainerInfo.name}
+                style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: '#9B7DB5', color: 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 'bold' }}>
+                {trainerInfo.name?.[0] || '?'}
+              </div>
+            )}
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: '0 0 2px 0', fontWeight: 'bold', fontSize: '15px' }}>{trainerInfo.name}</p>
+              {trainerInfo.certificate && <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9B7DB5' }}>🏆 {trainerInfo.certificate}</p>}
+              {trainerInfo.bio && <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#666', lineHeight: '1.5' }}>{trainerInfo.bio.length > 100 ? trainerInfo.bio.slice(0, 100) + '...' : trainerInfo.bio}</p>}
+              <Link href={`/dashboard/trainers/${trainerInfo.id}`} style={{ fontSize: '12px', color: '#9B7DB5', textDecoration: 'none' }}>查看教练主页 →</Link>
+            </div>
+          </div>
+        )}
+
+        {/* Photos gallery */}
+        {classPhotos.length > 0 && (
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+              {classPhotos.map((url, i) => (
+                <img key={i} src={url} alt={`photo ${i + 1}`}
+                  style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '6px' }}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Tabs (group class trainer view shows student notes tab) */}
         {isTrainer && isGroupClass && (
