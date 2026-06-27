@@ -144,19 +144,43 @@ function TimeSlotPicker({ value, onChange }: { value: string; onChange: (t: stri
     slots.push(`${String(h).padStart(2,'0')}:00`)
     slots.push(`${String(h).padStart(2,'0')}:30`)
   }
+  const isCustom = value && !slots.includes(value)
+  const [showCustom, setShowCustom] = useState(isCustom)
+
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-      {slots.map(slot => (
-        <button key={slot} type="button" onClick={() => onChange(slot)} style={{
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+        {slots.map(slot => (
+          <button key={slot} type="button" onClick={() => { onChange(slot); setShowCustom(false) }} style={{
+            padding: '6px 12px',
+            border: `1.5px solid ${value === slot ? '#9B7DB5' : '#ddd'}`,
+            borderRadius: '20px',
+            backgroundColor: value === slot ? '#9B7DB5' : 'white',
+            color: value === slot ? 'white' : '#555',
+            cursor: 'pointer', fontSize: '13px',
+            fontWeight: value === slot ? 'bold' : 'normal',
+          }}>{slot}</button>
+        ))}
+        <button type="button" onClick={() => setShowCustom(true)} style={{
           padding: '6px 12px',
-          border: `1.5px solid ${value === slot ? '#9B7DB5' : '#ddd'}`,
+          border: `1.5px solid ${showCustom ? '#9B7DB5' : '#ddd'}`,
           borderRadius: '20px',
-          backgroundColor: value === slot ? '#9B7DB5' : 'white',
-          color: value === slot ? 'white' : '#555',
+          backgroundColor: showCustom ? '#f3eef9' : 'white',
+          color: showCustom ? '#9B7DB5' : '#999',
           cursor: 'pointer', fontSize: '13px',
-          fontWeight: value === slot ? 'bold' : 'normal',
-        }}>{slot}</button>
-      ))}
+        }}>其他 Other…</button>
+      </div>
+      {showCustom && (
+        <input
+          type="time" value={isCustom ? value : ''}
+          onChange={(e) => onChange(e.target.value)}
+          autoFocus
+          style={{
+            padding: '8px 12px', border: '1.5px solid #9B7DB5',
+            borderRadius: '8px', fontSize: '14px', width: '160px',
+          }}
+        />
+      )}
     </div>
   )
 }
