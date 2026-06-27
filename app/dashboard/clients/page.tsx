@@ -30,6 +30,8 @@ export default function ClientListPage() {
   const [form, setForm] = useState<NewClientForm>({ name: '', email: '', password: '', phone: '' })
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [countryCode, setCountryCode] = useState('+86')
 
   useEffect(() => {
     if (!authLoading && !user) { router.push('/auth/login'); return }
@@ -67,7 +69,7 @@ export default function ClientListPage() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
+        body: JSON.stringify({ name: form.name, email: form.email, password: form.password, phone: form.phone ? `${countryCode}${form.phone}` : undefined }),
       })
       const data = await res.json()
       if (!res.ok) { setFormError(data.error || '创建失败'); return }
@@ -101,7 +103,7 @@ export default function ClientListPage() {
         <h1 style={{ margin: 0, fontSize: '18px', flex: 1 }}>学员管理 Clients</h1>
         <span style={{ fontSize: '14px', opacity: 0.85 }}>{clients.length} 人</span>
         <button
-          onClick={() => { setShowModal(true); setFormError('') }}
+          onClick={() => { setShowModal(true); setFormError(''); setShowPassword(false) }}
           style={{ backgroundColor: 'white', color: '#9B7DB5', border: 'none', borderRadius: '8px', padding: '7px 14px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
         >
           + 新建学员
@@ -165,29 +167,85 @@ export default function ClientListPage() {
                 <h2 style={{ margin: 0, fontSize: '17px' }}>新建学员</h2>
                 <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#999' }}>Create New Client</p>
               </div>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>×</button>
+              <button onClick={() => { setShowModal(false); setShowPassword(false) }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>×</button>
             </div>
 
-            {[
-              { field: 'name', label: '姓名', en: 'Name', type: 'text', placeholder: '学员姓名', required: true },
-              { field: 'email', label: '邮箱', en: 'Email', type: 'email', placeholder: 'example@email.com', required: true },
-              { field: 'password', label: '密码', en: 'Password', type: 'password', placeholder: '至少 6 位 / Min 6 chars', required: true },
-              { field: 'phone', label: '手机号', en: 'Phone', type: 'tel', placeholder: '选填 Optional', required: false },
-            ].map(f => (
-              <div key={f.field} style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#555' }}>
-                  {f.label} <span style={{ color: '#bbb', fontSize: '11px' }}>{f.en}</span>
-                  {f.required && <span style={{ color: '#F1948A', marginLeft: '3px' }}>*</span>}
-                </label>
+            {/* 姓名 */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#555' }}>
+                姓名 <span style={{ color: '#bbb', fontSize: '11px' }}>Name</span> <span style={{ color: '#F1948A' }}>*</span>
+              </label>
+              <input type="text" placeholder="学员姓名" value={form.name}
+                onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }} />
+            </div>
+
+            {/* 邮箱 */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#555' }}>
+                邮箱 <span style={{ color: '#bbb', fontSize: '11px' }}>Email</span> <span style={{ color: '#F1948A' }}>*</span>
+              </label>
+              <input type="email" placeholder="example@email.com" value={form.email}
+                onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }} />
+            </div>
+
+            {/* 密码（可显隐） */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#555' }}>
+                密码 <span style={{ color: '#bbb', fontSize: '11px' }}>Password</span> <span style={{ color: '#F1948A' }}>*</span>
+              </label>
+              <div style={{ position: 'relative' }}>
                 <input
-                  type={f.type}
-                  placeholder={f.placeholder}
-                  value={form[f.field as keyof NewClientForm]}
-                  onChange={e => setForm(prev => ({ ...prev, [f.field]: e.target.value }))}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="至少 6 位 / Min 6 chars"
+                  value={form.password}
+                  onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 44px 10px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#999' }}
+                >
+                  {showPassword ? '🙈' : '👁'}
+                </button>
+              </div>
+            </div>
+
+            {/* 手机号（带区号） */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#555' }}>
+                手机号 <span style={{ color: '#bbb', fontSize: '11px' }}>Phone</span> <span style={{ color: '#bbb', fontSize: '11px' }}>选填</span>
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select
+                  value={countryCode}
+                  onChange={e => setCountryCode(e.target.value)}
+                  style={{ padding: '10px 8px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '13px', backgroundColor: 'white', flexShrink: 0 }}
+                >
+                  <option value="+86">🇨🇳 +86</option>
+                  <option value="+1">🇺🇸 +1</option>
+                  <option value="+44">🇬🇧 +44</option>
+                  <option value="+81">🇯🇵 +81</option>
+                  <option value="+82">🇰🇷 +82</option>
+                  <option value="+61">🇦🇺 +61</option>
+                  <option value="+65">🇸🇬 +65</option>
+                  <option value="+852">🇭🇰 +852</option>
+                  <option value="+886">🇹🇼 +886</option>
+                  <option value="+60">🇲🇾 +60</option>
+                  <option value="+33">🇫🇷 +33</option>
+                  <option value="+49">🇩🇪 +49</option>
+                </select>
+                <input
+                  type="tel"
+                  placeholder="手机号码"
+                  value={form.phone}
+                  onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px' }}
                 />
               </div>
-            ))}
+            </div>
 
             {formError && (
               <p style={{ color: '#E8A87C', fontSize: '13px', margin: '0 0 12px 0' }}>⚠ {formError}</p>
