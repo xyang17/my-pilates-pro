@@ -266,6 +266,40 @@ export default function ClassDetailPage() {
     }
   }
 
+  const handleCreateHomework = async () => {
+    if (!homeworkStudentId || homeworkSelected.size === 0) return
+    setHomeworkSubmitting(true)
+    try {
+      const exercises = Array.from(homeworkSelected).map((instanceId, i) => {
+        const ex = classData?.exercises.find(e => e.id === instanceId)
+        return {
+          exercise_id: ex?.exercise_id,
+          class_instance_id: instanceId,
+          sets: ex?.sets, reps: ex?.reps, weight: ex?.weight,
+          weight_unit: ex?.weight_unit || 'kg', notes: ex?.instance_notes || '',
+          order_num: i + 1,
+        }
+      })
+      const res = await fetch('/api/homework', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({
+          class_id: classId, student_id: homeworkStudentId,
+          title: `${classData?.name} 作业`,
+          due_date: homeworkDueDate || null, notes: homeworkNotes || null, exercises,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to create homework')
+      setShowHomework(false)
+      setHomeworkSelected(new Set())
+      setHomeworkStudentId('')
+      setHomeworkDueDate('')
+      setHomeworkNotes('')
+      alert('作业已布置！')
+    } catch (err: any) { setError(err.message) }
+    finally { setHomeworkSubmitting(false) }
+  }
+
   const handleRemoveExercise = async (instanceId: string) => {
     if (!confirm('确认移除这个动作？')) return
     try {
