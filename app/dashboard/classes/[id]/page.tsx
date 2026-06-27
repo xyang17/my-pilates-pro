@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
+import { useLang } from '@/context/LanguageContext'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -93,16 +94,17 @@ export default function ClassDetailPage() {
   const [classPhotos, setClassPhotos] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [showAddExercise, setShowAddExercise] = useState(false)
-  const [selectedExerciseId, setSelectedExerciseId] = useState('')
   const [availableExercises, setAvailableExercises] = useState<any[]>([])
-  const [exSearch, setExSearch] = useState('')
-  const [exFilterAll, setExFilterAll] = useState(false)
   const [activeTab, setActiveTab] = useState<'exercises' | 'student-notes'>('exercises')
   const [studentNotes, setStudentNotes] = useState<StudentNote[]>([])
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<{sets:string,reps:string,weight:string,weight_unit:string,duration:string,duration_unit:string,instance_notes:string}>({sets:'',reps:'',weight:'',weight_unit:'kg',duration:'',duration_unit:'minutes',instance_notes:''})
-  const [editSaving, setEditSaving] = useState(false)
+  // Spreadsheet inline editing
+  const [localParams, setLocalParams] = useState<Record<string, {sets:string,reps:string,weight:string,weight_unit:string,duration:string,duration_unit:string,instance_notes:string}>>({})
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
+  // Quick-add search
+  const [addSearch, setAddSearch] = useState('')
+  const [addFilterAll, setAddFilterAll] = useState(false)
+  const [adding, setAdding] = useState(false)
+  // Homework modal
   const [showHomework, setShowHomework] = useState(false)
   const [homeworkSelected, setHomeworkSelected] = useState<Set<string>>(new Set())
   const [homeworkDueDate, setHomeworkDueDate] = useState('')
@@ -110,6 +112,7 @@ export default function ClassDetailPage() {
   const [homeworkStudentId, setHomeworkStudentId] = useState('')
   const [homeworkSubmitting, setHomeworkSubmitting] = useState(false)
 
+  const { lang, t } = useLang()
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
   const isGroupClass = classData?.class_type === 'group'
 
@@ -191,97 +194,75 @@ export default function ClassDetailPage() {
     } catch { /* non-critical */ }
   }
 
-  const startEdit = (ex: ClassExercise) => {
-    setEditingId(ex.id)
-    setEditForm({
-      sets: ex.sets?.toString() || '',
-      reps: ex.reps?.toString() || '',
-      weight: ex.weight?.toString() || '',
-      weight_unit: ex.weight_unit || 'kg',
-      duration: ex.duration?.toString() || '',
-      duration_unit: ex.duration_unit || 'minutes',
-      instance_notes: ex.instance_notes || '',
-    })
+  // Spreadsheet helpers
+  const getLocal = (ex: ClassExercise) => localParams[ex.id] || {
+    sets: ex.sets?.toString() || '',
+    reps: ex.reps?.toString() || '',
+    weight: ex.weight?.toString() || '',
+    weight_unit: ex.weight_unit || 'kg',
+    duration: ex.duration?.toString() || '',
+    duration_unit: ex.duration_unit || 'minutes',
+    instance_notes: ex.instance_notes || '',
   }
 
-  const handleSaveEdit = async (instanceId: string) => {
-    setEditSaving(true)
+  const updateLocal = (id: string, field: string, value: string) => {
+    setLocalParams(prev => ({
+      ...prev,
+      [id]: { ...((prev[id]) || {}), [field]: value } as any
+    }))
+  }
+
+  const saveField = async (ex: ClassExercise) => {
+    const p = getLocal(ex)
+    // Skip if nothing changed
+    if (
+      (p.sets === (ex.sets?.toString() || '')) &&
+      (p.reps === (ex.reps?.toString() || '')) &&
+      (p.weight === (ex.weight?.toString() || '')) &&
+      (p.weight_unit === (ex.weight_unit || 'kg')) &&
+      (p.duration === (ex.duration?.toString() || '')) &&
+      (p.duration_unit === (ex.duration_unit || 'minutes')) &&
+      (p.instance_notes === (ex.instance_notes || ''))
+    ) return
+
+    setSavingIds(prev => new Set(prev).add(ex.id))
     try {
-      const body: Record<string, unknown> = {
-        sets: editForm.sets ? parseInt(editForm.sets) : null,
-        reps: editForm.reps ? parseInt(editForm.reps) : null,
-        weight: editForm.weight ? parseFloat(editForm.weight) : null,
-        weight_unit: editForm.weight_unit,
-        duration: editForm.duration ? parseInt(editForm.duration) : null,
-        duration_unit: editForm.duration_unit,
-        instance_notes: editForm.instance_notes || null,
-      }
-      const res = await fetch(`/api/classes/${classId}/exercises/${instanceId}`, {
+      await fetch(`/api/classes/${classId}/exercises/${ex.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) throw new Error('Save failed')
-      setEditingId(null)
-      fetchClassData()
-    } catch (err: any) { setError(err.message) }
-    finally { setEditSaving(false) }
-  }
-
-  const handleCreateHomework = async () => {
-    if (!homeworkStudentId || homeworkSelected.size === 0) return
-    setHomeworkSubmitting(true)
-    try {
-      const exercises = Array.from(homeworkSelected).map((instanceId, i) => {
-        const ex = classData?.exercises.find(e => e.id === instanceId)
-        return {
-          exercise_id: ex?.exercise_id,
-          class_instance_id: instanceId,
-          sets: ex?.sets, reps: ex?.reps, weight: ex?.weight,
-          weight_unit: ex?.weight_unit || 'kg', notes: ex?.instance_notes || '',
-          order_num: i + 1,
-        }
-      })
-      const res = await fetch('/api/homework', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
         body: JSON.stringify({
-          class_id: classId,
-          student_id: homeworkStudentId,
-          title: `${classData?.name} 作业`,
-          due_date: homeworkDueDate || null,
-          notes: homeworkNotes || null,
-          exercises,
+          sets: p.sets ? parseInt(p.sets) : null,
+          reps: p.reps ? parseInt(p.reps) : null,
+          weight: p.weight ? parseFloat(p.weight) : null,
+          weight_unit: p.weight_unit,
+          duration: p.duration ? parseInt(p.duration) : null,
+          duration_unit: p.duration_unit,
+          instance_notes: p.instance_notes || null,
         }),
       })
-      if (!res.ok) throw new Error('Failed to create homework')
-      setShowHomework(false)
-      setHomeworkSelected(new Set())
-      setHomeworkStudentId('')
-      setHomeworkDueDate('')
-      setHomeworkNotes('')
-      alert('作业已布置！')
-    } catch (err: any) { setError(err.message) }
-    finally { setHomeworkSubmitting(false) }
+      // Refresh silently
+      const res = await fetch(`/api/classes/${classId}`, { headers: { 'x-user-id': user?.id || '' } })
+      if (res.ok) { const d = await res.json(); setClassData(d) }
+    } catch { /* non-critical */ }
+    finally { setSavingIds(prev => { const s = new Set(prev); s.delete(ex.id); return s }) }
   }
 
-  const handleAddExercise = async () => {
-    if (!selectedExerciseId) return
+  const handleAddExercise = async (exerciseId: string) => {
+    if (!exerciseId || adding) return
+    setAdding(true)
     try {
       const res = await fetch(`/api/classes/${classId}/exercises`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user?.id || '',
-        },
-        body: JSON.stringify({ exercise_id: selectedExerciseId }),
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        body: JSON.stringify({ exercise_id: exerciseId }),
       })
       if (!res.ok) throw new Error('Failed to add exercise')
-      setShowAddExercise(false)
-      setSelectedExerciseId('')
+      setAddSearch('')
       fetchClassData()
     } catch (err: any) {
       setError(err.message)
+    } finally {
+      setAdding(false)
     }
   }
 
@@ -541,253 +522,195 @@ export default function ClassDetailPage() {
 
         {/* Exercise List */}
         {activeTab === 'exercises' && (
-          <div style={{ backgroundColor: 'white', borderRadius: isTrainer && isGroupClass ? '0 0 8px 8px' : '8px', overflow: 'hidden' }}>
-            {isTrainer && classData.status !== 'completed' && (
-              <div style={{
-                padding: '12px 20px',
-                borderBottom: '1px solid #eee',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}>
-                <span style={{ fontWeight: 'bold', color: '#444' }}>动作列表</span>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                {classData.exercises.length > 0 && (
-                  <button onClick={() => setShowHomework(true)}
-                    style={{ padding: '6px 14px', backgroundColor: '#E8A87C', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
-                    📋 布置作业
-                  </button>
-                )}
-                <button
-                  onClick={() => setShowAddExercise(!showAddExercise)}
-                  style={{
-                    padding: '6px 14px',
-                    backgroundColor: showAddExercise ? '#eee' : '#9B7DB5',
-                    color: showAddExercise ? '#333' : 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                  }}
-                >
-                  {showAddExercise ? '✕ 取消' : '+ 添加动作'}
+          <div style={{ backgroundColor: 'white', borderRadius: isTrainer && isGroupClass ? '0 0 10px 10px' : '10px', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 'bold', color: '#444', fontSize: '14px' }}>
+                {t('动作列表', 'Exercises')}
+                {classData.exercises.length > 0 && <span style={{ color: '#bbb', fontWeight: 'normal', marginLeft: '6px' }}>({classData.exercises.length})</span>}
+              </span>
+              {isTrainer && classData.exercises.length > 0 && (
+                <button onClick={() => setShowHomework(true)}
+                  style={{ padding: '5px 12px', backgroundColor: '#E8A87C', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                  📋 {t('布置作业', 'Assign HW')}
                 </button>
-                </div>
+              )}
+            </div>
+
+            {/* Spreadsheet header row */}
+            {classData.exercises.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: '24px 1fr 56px 56px 90px 1fr 28px', gap: '6px', padding: '6px 14px', backgroundColor: '#faf8fd', borderBottom: '1px solid #f0f0f0' }}>
+                <div />
+                <div style={{ fontSize: '11px', color: '#aaa' }}>{t('动作', 'Exercise')}</div>
+                <div style={{ fontSize: '11px', color: '#aaa', textAlign: 'center' }}>{t('组', 'Sets')}</div>
+                <div style={{ fontSize: '11px', color: '#aaa', textAlign: 'center' }}>{t('次', 'Reps')}</div>
+                <div style={{ fontSize: '11px', color: '#aaa', textAlign: 'center' }}>{t('配重', 'Weight')}</div>
+                <div style={{ fontSize: '11px', color: '#aaa' }}>{t('备注', 'Notes')}</div>
+                <div />
               </div>
             )}
 
-            {showAddExercise && (() => {
-              // Discipline → exercise type matching
+            {/* Exercise rows */}
+            {classData.exercises.length === 0 ? (
+              <div style={{ padding: '32px', textAlign: 'center', color: '#bbb', fontSize: '14px' }}>
+                {t('暂无动作，在下方搜索添加', 'No exercises yet. Search below to add.')}
+              </div>
+            ) : (
+              classData.exercises.map((ex, i) => {
+                const p = getLocal(ex)
+                const isSaving = savingIds.has(ex.id)
+                return (
+                  <div key={ex.id} style={{ display: 'grid', gridTemplateColumns: '24px 1fr 56px 56px 90px 1fr 28px', gap: '6px', padding: '8px 14px', borderBottom: i < classData.exercises.length - 1 ? '1px solid #f8f8f8' : 'none', alignItems: 'center', backgroundColor: isSaving ? '#fffef5' : 'white' }}>
+                    {/* Index */}
+                    <div style={{ width: '22px', height: '22px', backgroundColor: '#9B7DB5', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                      {i + 1}
+                    </div>
+
+                    {/* Name */}
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: 0, fontWeight: 'bold', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
+                      </p>
+                      {(ex.actual_sets != null || ex.actual_weight != null) && (
+                        <p style={{ margin: '1px 0 0 0', fontSize: '11px', color: '#4CAF50' }}>
+                          ✓ {[ex.actual_sets && `${ex.actual_sets}组`, ex.actual_reps && `×${ex.actual_reps}`, ex.actual_weight && `${ex.actual_weight}kg`].filter(Boolean).join(' ')}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Sets */}
+                    <input
+                      type="number" min="0" max="99" value={p.sets}
+                      disabled={!isTrainer || classData.status === 'completed'}
+                      onChange={e => updateLocal(ex.id, 'sets', e.target.value)}
+                      onBlur={() => saveField(ex)}
+                      style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer && classData.status !== 'completed' ? 'white' : '#f9f9f9', color: '#333' }}
+                    />
+
+                    {/* Reps */}
+                    <input
+                      type="number" min="0" max="999" value={p.reps}
+                      disabled={!isTrainer || classData.status === 'completed'}
+                      onChange={e => updateLocal(ex.id, 'reps', e.target.value)}
+                      onBlur={() => saveField(ex)}
+                      style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer && classData.status !== 'completed' ? 'white' : '#f9f9f9', color: '#333' }}
+                    />
+
+                    {/* Weight + unit */}
+                    <div style={{ display: 'flex', gap: '2px' }}>
+                      <input
+                        type="number" min="0" step="0.5" value={p.weight}
+                        disabled={!isTrainer || classData.status === 'completed'}
+                        onChange={e => updateLocal(ex.id, 'weight', e.target.value)}
+                        onBlur={() => saveField(ex)}
+                        style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px 0 0 6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer && classData.status !== 'completed' ? 'white' : '#f9f9f9', color: '#333' }}
+                      />
+                      <select value={p.weight_unit} disabled={!isTrainer || classData.status === 'completed'}
+                        onChange={e => { updateLocal(ex.id, 'weight_unit', e.target.value); }}
+                        onBlur={() => saveField(ex)}
+                        style={{ padding: '5px 2px', border: '1px solid #e8e0f0', borderLeft: 'none', borderRadius: '0 6px 6px 0', fontSize: '11px', backgroundColor: '#f9f9f9', color: '#666', cursor: 'pointer' }}>
+                        <option value="kg">kg</option>
+                        <option value="lb">lb</option>
+                      </select>
+                    </div>
+
+                    {/* Notes */}
+                    <input
+                      type="text" value={p.instance_notes}
+                      disabled={!isTrainer || classData.status === 'completed'}
+                      onChange={e => updateLocal(ex.id, 'instance_notes', e.target.value)}
+                      onBlur={() => saveField(ex)}
+                      placeholder={t('备注...', 'Notes...')}
+                      style={{ width: '100%', padding: '5px 8px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box', backgroundColor: isTrainer && classData.status !== 'completed' ? 'white' : '#f9f9f9', color: '#333' }}
+                    />
+
+                    {/* Remove */}
+                    {isTrainer && classData.status !== 'completed' ? (
+                      <button onClick={() => handleRemoveExercise(ex.id)}
+                        style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#fee', border: 'none', color: '#c62828', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        ✕
+                      </button>
+                    ) : <div />}
+                  </div>
+                )
+              })
+            )}
+
+            {/* Quick-add search bar (trainer only, not completed) */}
+            {isTrainer && classData.status !== 'completed' && (() => {
               const discipline = classData.discipline || ''
-              const filtered = availableExercises.filter(ex => {
-                const matchDiscipline = exFilterAll || !discipline ||
+              const alreadyAdded = new Set(classData.exercises.map(e => e.exercise_id))
+              const suggestions = availableExercises.filter(ex => {
+                if (alreadyAdded.has(ex.id)) return false
+                const matchDiscipline = addFilterAll || !discipline ||
                   (ex.type_en || '').toLowerCase().includes(discipline.toLowerCase()) ||
                   discipline.toLowerCase().includes((ex.type_en || '').toLowerCase())
-                const matchSearch = !exSearch ||
-                  (ex.name_cn || '').includes(exSearch) ||
-                  (ex.name_en || '').toLowerCase().includes(exSearch.toLowerCase()) ||
-                  (ex.target_muscles_cn || '').includes(exSearch) ||
-                  (ex.target_muscles_en || '').toLowerCase().includes(exSearch.toLowerCase())
-                return matchDiscipline && matchSearch
-              })
+                if (!addSearch) return matchDiscipline
+                return matchDiscipline && (
+                  (ex.name_cn || '').includes(addSearch) ||
+                  (ex.name_en || '').toLowerCase().includes(addSearch.toLowerCase()) ||
+                  (ex.target_muscles_cn || '').includes(addSearch)
+                )
+              }).slice(0, 12)
 
               return (
-                <div style={{ borderBottom: '1px solid #eee', backgroundColor: '#fafafa' }}>
-                  {/* Search bar */}
-                  <div style={{ padding: '12px 16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ borderTop: '2px dashed #e8dff5', padding: '10px 14px', backgroundColor: '#faf8fd' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: suggestions.length > 0 || addSearch ? '8px' : '0' }}>
+                    <span style={{ fontSize: '16px' }}>🔍</span>
                     <input
                       type="text"
-                      placeholder="搜索动作名称或肌群... Search"
-                      value={exSearch}
-                      onChange={e => { setExSearch(e.target.value); setSelectedExerciseId('') }}
-                      autoFocus
-                      style={{ flex: 1, padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px' }}
+                      placeholder={t(`搜索添加动作${discipline ? `（仅 ${discipline}）` : ''}...`, `Search exercises to add${discipline ? ` (${discipline} only)` : ''}...`)}
+                      value={addSearch}
+                      onChange={e => setAddSearch(e.target.value)}
+                      style={{ flex: 1, padding: '7px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
                     />
                     {discipline && (
-                      <button
-                        onClick={() => setExFilterAll(v => !v)}
-                        style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', backgroundColor: exFilterAll ? '#f0f0f0' : '#f3eef9', color: exFilterAll ? '#666' : '#9B7DB5', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                      >
-                        {exFilterAll ? '全部动作' : `仅 ${discipline}`}
+                      <button onClick={() => setAddFilterAll(v => !v)}
+                        style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: addFilterAll ? 'white' : '#f0eaf8', color: addFilterAll ? '#999' : '#9B7DB5', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        {addFilterAll ? t('全部', 'All') : discipline}
                       </button>
                     )}
                   </div>
-
-                  {/* Exercise list */}
-                  <div style={{ maxHeight: '240px', overflowY: 'auto', borderTop: '1px solid #eee' }}>
-                    {filtered.length === 0 ? (
-                      <p style={{ padding: '20px', textAlign: 'center', color: '#bbb', fontSize: '13px', margin: 0 }}>
-                        没有匹配动作
-                        {!exFilterAll && discipline && <span> · <button onClick={() => setExFilterAll(true)} style={{ background: 'none', border: 'none', color: '#9B7DB5', cursor: 'pointer', fontSize: '13px' }}>查看全部</button></span>}
-                      </p>
-                    ) : filtered.map(ex => (
-                      <div
-                        key={ex.id}
-                        onClick={() => setSelectedExerciseId(ex.id === selectedExerciseId ? '' : ex.id)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px',
-                          cursor: 'pointer', borderBottom: '1px solid #f5f5f5',
-                          backgroundColor: selectedExerciseId === ex.id ? '#f3eef9' : 'white',
-                        }}
-                      >
-                        <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${selectedExerciseId === ex.id ? '#9B7DB5' : '#ddd'}`, backgroundColor: selectedExerciseId === ex.id ? '#9B7DB5' : 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {selectedExerciseId === ex.id && <span style={{ color: 'white', fontSize: '11px' }}>✓</span>}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: '0 0 1px 0', fontSize: '13px', fontWeight: 'bold' }}>{ex.name_cn || ex.name_en}</p>
-                          <p style={{ margin: 0, fontSize: '11px', color: '#999' }}>
-                            {ex.name_en}
-                            {ex.target_muscles_cn && ` · ${ex.target_muscles_cn}`}
-                          </p>
-                        </div>
-                        {ex.type_cn && <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '8px', backgroundColor: '#f0eaf8', color: '#9B7DB5', flexShrink: 0 }}>{ex.type_cn}</span>}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Add button */}
-                  <div style={{ padding: '10px 16px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button onClick={() => { setShowAddExercise(false); setSelectedExerciseId(''); setExSearch('') }}
-                      style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontSize: '13px' }}>
-                      取消
-                    </button>
-                    <button
-                      onClick={() => { handleAddExercise(); setExSearch(''); setSelectedExerciseId('') }}
-                      disabled={!selectedExerciseId}
-                      style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', backgroundColor: '#9B7DB5', color: 'white', cursor: selectedExerciseId ? 'pointer' : 'not-allowed', opacity: selectedExerciseId ? 1 : 0.5, fontWeight: 'bold', fontSize: '13px' }}
-                    >
-                      + 添加动作
-                    </button>
-                  </div>
+                  {suggestions.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {suggestions.map(ex => (
+                        <button
+                          key={ex.id}
+                          onClick={() => handleAddExercise(ex.id)}
+                          disabled={adding}
+                          style={{
+                            padding: '5px 12px', borderRadius: '16px', border: '1px solid #ddd',
+                            backgroundColor: 'white', cursor: adding ? 'wait' : 'pointer', fontSize: '12px', color: '#444',
+                            display: 'flex', alignItems: 'center', gap: '4px',
+                            transition: 'all 0.1s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f0eaf8'; e.currentTarget.style.borderColor = '#9B7DB5'; e.currentTarget.style.color = '#9B7DB5' }}
+                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.borderColor = '#ddd'; e.currentTarget.style.color = '#444' }}
+                        >
+                          <span>+</span>
+                          <span>{lang === 'zh' ? (ex.name_cn || ex.name_en) : (ex.name_en || ex.name_cn)}</span>
+                          {(ex.default_sets || ex.default_reps) && (
+                            <span style={{ color: '#bbb', fontSize: '10px' }}>
+                              {[ex.default_sets && `${ex.default_sets}×`, ex.default_reps].filter(Boolean).join('')}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {addSearch && suggestions.length === 0 && (
+                    <p style={{ margin: 0, fontSize: '12px', color: '#bbb', paddingLeft: '4px' }}>
+                      {t('没有匹配动作', 'No matches')}
+                      {!addFilterAll && discipline && <button onClick={() => setAddFilterAll(true)} style={{ background: 'none', border: 'none', color: '#9B7DB5', cursor: 'pointer', fontSize: '12px', marginLeft: '4px' }}>{t('查看全部', 'Show all')}</button>}
+                    </p>
+                  )}
                 </div>
               )
             })()}
-
-            {classData.exercises.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-                暂无动作。{isTrainer ? '点击上方"添加动作"开始计划课程。' : ''}
-              </div>
-            ) : (
-              classData.exercises.map((ex, i) => (
-                <div key={ex.id} style={{ borderBottom: i < classData.exercises.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
-                  {editingId === ex.id ? (
-                    /* ── EDIT MODE ── */
-                    <div style={{ padding: '16px 20px', backgroundColor: '#faf8fd' }}>
-                      <p style={{ margin: '0 0 12px 0', fontWeight: 'bold', color: '#9B7DB5' }}>
-                        {ex.master_exercise.name_cn || ex.master_exercise.name_en}
-                      </p>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '10px' }}>
-                        <label style={{ fontSize: '12px', color: '#666' }}>
-                          组数 Sets
-                          <input type="number" min="0" value={editForm.sets}
-                            onChange={e => setEditForm(f => ({...f, sets: e.target.value}))}
-                            style={{ display: 'block', width: '100%', marginTop: '4px', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
-                          />
-                        </label>
-                        <label style={{ fontSize: '12px', color: '#666' }}>
-                          次数 Reps
-                          <input type="number" min="0" value={editForm.reps}
-                            onChange={e => setEditForm(f => ({...f, reps: e.target.value}))}
-                            style={{ display: 'block', width: '100%', marginTop: '4px', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
-                          />
-                        </label>
-                        <label style={{ fontSize: '12px', color: '#666' }}>
-                          配重 Weight
-                          <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                            <input type="number" min="0" step="0.5" value={editForm.weight}
-                              onChange={e => setEditForm(f => ({...f, weight: e.target.value}))}
-                              style={{ flex: 1, padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
-                            />
-                            <select value={editForm.weight_unit} onChange={e => setEditForm(f => ({...f, weight_unit: e.target.value}))}
-                              style={{ padding: '7px 4px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '12px' }}>
-                              <option value="kg">kg</option>
-                              <option value="lb">lb</option>
-                            </select>
-                          </div>
-                        </label>
-                        <label style={{ fontSize: '12px', color: '#666' }}>
-                          时长 Duration
-                          <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                            <input type="number" min="0" value={editForm.duration}
-                              onChange={e => setEditForm(f => ({...f, duration: e.target.value}))}
-                              style={{ flex: 1, padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
-                            />
-                            <select value={editForm.duration_unit} onChange={e => setEditForm(f => ({...f, duration_unit: e.target.value}))}
-                              style={{ padding: '7px 4px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '12px' }}>
-                              <option value="seconds">秒</option>
-                              <option value="minutes">分</option>
-                            </select>
-                          </div>
-                        </label>
-                        <label style={{ fontSize: '12px', color: '#666', gridColumn: 'span 2' }}>
-                          备注 Notes
-                          <input type="text" value={editForm.instance_notes}
-                            onChange={e => setEditForm(f => ({...f, instance_notes: e.target.value}))}
-                            placeholder="教练提示、注意事项..."
-                            style={{ display: 'block', width: '100%', marginTop: '4px', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
-                          />
-                        </label>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <button onClick={() => setEditingId(null)} style={{ padding: '7px 16px', borderRadius: '6px', border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontSize: '13px' }}>取消</button>
-                        <button onClick={() => handleSaveEdit(ex.id)} disabled={editSaving}
-                          style={{ padding: '7px 20px', borderRadius: '6px', border: 'none', backgroundColor: '#9B7DB5', color: 'white', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', opacity: editSaving ? 0.6 : 1 }}>
-                          {editSaving ? '保存中...' : '✓ 保存'}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* ── VIEW MODE ── */
-                    <div style={{ padding: '14px 20px', display: 'grid', gridTemplateColumns: '28px 1fr auto', gap: '12px', alignItems: 'start' }}>
-                      <div style={{ width: '28px', height: '28px', backgroundColor: '#9B7DB5', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold', flexShrink: 0 }}>
-                        {i + 1}
-                      </div>
-                      <div>
-                        <p style={{ margin: '0 0 5px 0', fontWeight: 'bold', fontSize: '14px' }}>
-                          {ex.master_exercise.name_cn || ex.master_exercise.name_en}
-                          <span style={{ color: '#bbb', fontSize: '12px', marginLeft: '8px', fontWeight: 'normal' }}>{ex.master_exercise.name_en}</span>
-                        </p>
-                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '13px' }}>
-                          {ex.sets != null && <span style={{ color: '#555' }}>{ex.sets} 组</span>}
-                          {ex.reps != null && <span style={{ color: '#555' }}>× {ex.reps} 次</span>}
-                          {ex.weight != null && <span style={{ color: '#555' }}>{ex.weight} {ex.weight_unit}</span>}
-                          {ex.duration != null && <span style={{ color: '#555' }}>{ex.duration} {ex.duration_unit === 'seconds' ? '秒' : '分'}</span>}
-                          {!ex.sets && !ex.reps && !ex.weight && !ex.duration && (
-                            <span style={{ color: '#ccc', fontSize: '12px' }}>未设置参数</span>
-                          )}
-                        </div>
-                        {(ex.actual_sets != null || ex.actual_reps != null || ex.actual_weight != null) && (
-                          <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: '#4CAF50', marginTop: '3px' }}>
-                            <span>✓ 实际：</span>
-                            {ex.actual_sets != null && <span>{ex.actual_sets} 组</span>}
-                            {ex.actual_reps != null && <span>× {ex.actual_reps} 次</span>}
-                            {ex.actual_weight != null && <span>{ex.actual_weight} kg</span>}
-                          </div>
-                        )}
-                        {ex.instance_notes && <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#888', fontStyle: 'italic' }}>📌 {ex.instance_notes}</p>}
-                        {ex.post_note && <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#9B7DB5', fontStyle: 'italic' }}>💬 {ex.post_note}</p>}
-                      </div>
-                      {isTrainer && classData.status !== 'completed' && (
-                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                          <button onClick={() => startEdit(ex)}
-                            style={{ padding: '4px 10px', backgroundColor: '#f0eaf8', color: '#9B7DB5', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
-                            编辑
-                          </button>
-                          <button onClick={() => handleRemoveExercise(ex.id)}
-                            style={{ padding: '4px 10px', backgroundColor: '#ffebee', color: '#c62828', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
-                            移除
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
           </div>
         )}
 
-        {/* Student Notes Tab (trainer view of group class) */}
+                {/* Student Notes Tab (trainer view of group class) */}
         {activeTab === 'student-notes' && (
           <div style={{ backgroundColor: 'white', borderRadius: '0 0 8px 8px', padding: '20px' }}>
             {studentNotes.length === 0 ? (

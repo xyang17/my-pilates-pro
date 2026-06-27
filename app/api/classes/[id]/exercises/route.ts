@@ -56,17 +56,28 @@ export async function POST(
 
     const nextOrder = existing && existing.length > 0 ? existing[0].order + 1 : 1
 
+    // Auto-fill defaults from master_exercise if not provided
+    let defaults: any = {}
+    if (body.exercise_id && body.sets == null && body.reps == null && body.weight == null) {
+      const { data: master } = await supabaseAdmin
+        .from('master_exercise')
+        .select('default_sets, default_reps, default_weight, default_weight_unit, default_duration, default_duration_unit')
+        .eq('id', body.exercise_id)
+        .single()
+      if (master) defaults = master
+    }
+
     const { data, error } = await supabaseAdmin
       .from('class_exercise_instance')
       .insert([{
         class_id: id,
         exercise_id: body.exercise_id,
-        sets: body.sets || null,
-        reps: body.reps || null,
-        weight: body.weight || null,
-        weight_unit: body.weight_unit || 'kg',
-        duration: body.duration || null,
-        duration_unit: body.duration_unit || 'minutes',
+        sets: body.sets ?? defaults.default_sets ?? null,
+        reps: body.reps ?? defaults.default_reps ?? null,
+        weight: body.weight ?? defaults.default_weight ?? null,
+        weight_unit: body.weight_unit || defaults.default_weight_unit || 'kg',
+        duration: body.duration ?? defaults.default_duration ?? null,
+        duration_unit: body.duration_unit || defaults.default_duration_unit || 'minutes',
         order: body.order || nextOrder,
         instance_notes: body.instance_notes || null,
       }])
