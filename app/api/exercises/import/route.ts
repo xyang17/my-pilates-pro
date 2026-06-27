@@ -42,17 +42,23 @@ export async function POST(req: NextRequest) {
       created_by: userId,
     }))
 
-    const { data, error } = await supabaseAdmin
-      .from('master_exercise')
-      .insert(rows)
-      .select()
+    // Insert one by one to collect per-row errors
+    let created = 0
+    const errors: { exercise: string; error: string }[] = []
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    for (const row of rows) {
+      const { error } = await supabaseAdmin.from('master_exercise').insert([row])
+      if (error) {
+        errors.push({ exercise: row.name_en || row.name_cn || 'Unknown', error: error.message })
+      } else {
+        created++
+      }
+    }
 
     return NextResponse.json({
-      message: `Imported ${data.length} exercises`,
-      count: data.length,
-      exercises: data,
+      created,
+      failed: errors.length,
+      errors,
     }, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
