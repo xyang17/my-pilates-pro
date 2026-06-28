@@ -5,11 +5,18 @@ import { useAuth } from '@/context/AuthContext'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 
-const NAV_ITEMS = [
+const TRAINER_NAV = [
   { href: '/dashboard/calendar', icon: '📅', zh: '课表', en: 'Schedule', matchPaths: ['/dashboard/calendar', '/dashboard/schedule', '/dashboard/classes'] },
-  { href: '/dashboard/clients', icon: '👥', zh: '学员', en: 'Clients', matchPaths: ['/dashboard/clients'], trainerOnly: true },
+  { href: '/dashboard/clients', icon: '👥', zh: '学员', en: 'Clients', matchPaths: ['/dashboard/clients'] },
   { href: '/dashboard/exercises', icon: '💪', zh: '动作库', en: 'Exercises', matchPaths: ['/dashboard/exercises'] },
   { href: '/dashboard/workouts', icon: '📋', zh: '作业', en: 'Homework', matchPaths: ['/dashboard/workouts'] },
+  { href: '/dashboard/profile', icon: '👤', zh: '我的', en: 'Profile', matchPaths: ['/dashboard/profile'] },
+]
+
+const CLIENT_NAV = [
+  { href: '/dashboard/calendar', icon: '📅', zh: '我的课程', en: 'My Classes', matchPaths: ['/dashboard/calendar', '/dashboard/schedule', '/dashboard/classes'] },
+  { href: '/dashboard/workouts', icon: '📋', zh: '我的作业', en: 'My Homework', matchPaths: ['/dashboard/workouts'] },
+  { href: '/dashboard/exercises', icon: '💪', zh: '动作库', en: 'Exercises', matchPaths: ['/dashboard/exercises'] },
   { href: '/dashboard/profile', icon: '👤', zh: '我的', en: 'Profile', matchPaths: ['/dashboard/profile'] },
 ]
 
@@ -18,7 +25,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { userRole } = useAuth()
   const pathname = usePathname()
 
-  const visibleItems = NAV_ITEMS.filter(item => !item.trainerOnly || userRole === 'ADMIN' || userRole === 'TRAINER')
+  const isClient = userRole === 'CLIENT'
+  const navItems = isClient ? CLIENT_NAV : TRAINER_NAV
 
   return (
     <>
@@ -37,7 +45,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         height: '60px',
         boxShadow: '0 -2px 8px rgba(0,0,0,0.06)',
       }}>
-        {visibleItems.map(item => {
+        {navItems.map(item => {
           const isActive = item.matchPaths.some(p => pathname.startsWith(p))
           return (
             <Link
@@ -64,7 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )
         })}
 
-        {/* Language toggle — compact slot on the right */}
+        {/* Language toggle */}
         <button
           onClick={toggleLang}
           title={lang === 'zh' ? 'Switch to English' : '切换中文'}

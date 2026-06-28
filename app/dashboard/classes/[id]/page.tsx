@@ -128,6 +128,8 @@ export default function ClassDetailPage() {
   const [libFilterType, setLibFilterType] = useState('')
   const [libFilterDiff, setLibFilterDiff] = useState('')
   const [libFilterMuscle, setLibFilterMuscle] = useState('')
+  // Class copy
+  const [copying, setCopying] = useState(false)
 
   const { lang, t } = useLang()
   const { showToast } = useToast()
@@ -349,6 +351,62 @@ export default function ClassDetailPage() {
     finally { setHomeworkSubmitting(false) }
   }
 
+  const handleCopyClass = async () => {
+    if (!classData || copying) return
+    setCopying(true)
+    try {
+      // Step 1: create new class with same metadata, today's date as placeholder
+      const today = new Date().toISOString().split('T')[0]
+      const res = await fetch('/api/classes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({
+          name: `${classData.name} (复制)`,
+          date: today,
+          start_time: classData.start_time || null,
+          duration: classData.duration,
+          discipline: classData.discipline || classData.type,
+          class_type: classData.class_type,
+          level: classData.level || 'beginner',
+          description: classData.description || null,
+          max_capacity: classData.max_capacity || null,
+          price: classData.price || null,
+          color: classData.color || null,
+          trainer_id: classData.trainer_id || null,
+          assigned_to: classData.assigned_to || null,
+          notes: classData.notes || null,
+        }),
+      })
+      if (!res.ok) throw new Error('复制课程失败')
+      const newClass = await res.json()
+
+      // Step 2: copy all exercises to new class
+      for (const ex of classData.exercises) {
+        await fetch(`/api/classes/${newClass.id}/exercises`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+          body: JSON.stringify({
+            exercise_id: ex.exercise_id,
+            sets: ex.sets || null,
+            reps: ex.reps || null,
+            weight: ex.weight || null,
+            weight_unit: ex.weight_unit || 'kg',
+            duration: ex.duration || null,
+            duration_unit: ex.duration_unit || 'minutes',
+            instance_notes: ex.instance_notes || null,
+          }),
+        })
+      }
+
+      showToast(t('课程已复制！正在跳转…', 'Class copied! Redirecting…'))
+      setTimeout(() => router.push(`/dashboard/classes/${newClass.id}`), 800)
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setCopying(false)
+    }
+  }
+
   const handleRemoveExercise = async (instanceId: string) => {
     if (!confirm('确认移除这个动作？')) return
     try {
@@ -443,7 +501,26 @@ export default function ClassDetailPage() {
             记录笔记 ✍️
           </Link>
         )}
-        {!canReview && !canAddStudentNote && <div style={{ width: 80 }} />}
+        {isTrainer && (
+          <button
+            onClick={handleCopyClass}
+            disabled={copying}
+            title={t('复制此课程计划', 'Copy class plan')}
+            style={{
+              padding: '6px 14px',
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.4)',
+              borderRadius: '6px',
+              fontSize: '13px',
+              cursor: copying ? 'wait' : 'pointer',
+              opacity: copying ? 0.7 : 1,
+            }}
+          >
+            {copying ? '…' : t('复制计划', 'Copy')}
+          </button>
+        )}
+        {!isTrainer && !canAddStudentNote && <div style={{ width: 80 }} />}
       </header>
 
       <main style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
@@ -663,31 +740,31 @@ export default function ClassDetailPage() {
                     {/* Sets */}
                     <input
                       type="number" min="0" max="99" value={p.sets}
-                      disabled={!isTrainer || classData.status === 'completed'}
+                      disabled={!isTrainer}
                       onChange={e => updateLocal(ex.id, 'sets', e.target.value)}
                       onBlur={() => saveField(ex)}
-                      style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer && classData.status !== 'completed' ? 'white' : '#f9f9f9', color: '#333' }}
+                      style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer ? 'white' : '#f9f9f9', color: '#333' }}
                     />
 
                     {/* Reps */}
                     <input
                       type="number" min="0" max="999" value={p.reps}
-                      disabled={!isTrainer || classData.status === 'completed'}
+                      disabled={!isTrainer}
                       onChange={e => updateLocal(ex.id, 'reps', e.target.value)}
                       onBlur={() => saveField(ex)}
-                      style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer && classData.status !== 'completed' ? 'white' : '#f9f9f9', color: '#333' }}
+                      style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer ? 'white' : '#f9f9f9', color: '#333' }}
                     />
 
                     {/* Weight + unit */}
                     <div style={{ display: 'flex', gap: '2px' }}>
                       <input
                         type="number" min="0" step="0.5" value={p.weight}
-                        disabled={!isTrainer || classData.status === 'completed'}
+                        disabled={!isTrainer}
                         onChange={e => updateLocal(ex.id, 'weight', e.target.value)}
                         onBlur={() => saveField(ex)}
-                        style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px 0 0 6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer && classData.status !== 'completed' ? 'white' : '#f9f9f9', color: '#333' }}
+                        style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px 0 0 6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer ? 'white' : '#f9f9f9', color: '#333' }}
                       />
-                      <select value={p.weight_unit} disabled={!isTrainer || classData.status === 'completed'}
+                      <select value={p.weight_unit} disabled={!isTrainer}
                         onChange={e => { updateLocal(ex.id, 'weight_unit', e.target.value); }}
                         onBlur={() => saveField(ex)}
                         style={{ padding: '5px 2px', border: '1px solid #e8e0f0', borderLeft: 'none', borderRadius: '0 6px 6px 0', fontSize: '11px', backgroundColor: '#f9f9f9', color: '#666', cursor: 'pointer' }}>
@@ -699,15 +776,15 @@ export default function ClassDetailPage() {
                     {/* Notes */}
                     <input
                       type="text" value={p.instance_notes}
-                      disabled={!isTrainer || classData.status === 'completed'}
+                      disabled={!isTrainer}
                       onChange={e => updateLocal(ex.id, 'instance_notes', e.target.value)}
                       onBlur={() => saveField(ex)}
                       placeholder={t('备注...', 'Notes...')}
-                      style={{ width: '100%', padding: '5px 8px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box', backgroundColor: isTrainer && classData.status !== 'completed' ? 'white' : '#f9f9f9', color: '#333' }}
+                      style={{ width: '100%', padding: '5px 8px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box', backgroundColor: isTrainer ? 'white' : '#f9f9f9', color: '#333' }}
                     />
 
                     {/* Remove */}
-                    {isTrainer && classData.status !== 'completed' ? (
+                    {isTrainer ? (
                       <button onClick={() => handleRemoveExercise(ex.id)}
                         style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#fee', border: 'none', color: '#c62828', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         ✕
@@ -718,8 +795,8 @@ export default function ClassDetailPage() {
               })
             )}
 
-            {/* Inline exercise library (trainer only, not completed) */}
-            {isTrainer && classData.status !== 'completed' && (() => {
+            {/* Inline exercise library (trainer only) */}
+            {isTrainer && (() => {
               const alreadyAdded = new Set(classData.exercises.map(e => e.exercise_id))
               const allTypes = [...new Set(availableExercises.map(e => e.type_en).filter(Boolean))].sort() as string[]
               const allDiffs = [...new Set(availableExercises.map(e => e.difficulty_en).filter(Boolean))].sort() as string[]

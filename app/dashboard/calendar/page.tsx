@@ -18,6 +18,7 @@ interface CalendarClass {
   status: string
   color?: string
   trainer_id?: string
+  assigned_user?: { id: string; name: string } | null
 }
 
 const DAY_NAMES_CN = ['日', '一', '二', '三', '四', '五', '六']
@@ -91,10 +92,12 @@ export default function CalendarPage() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <header style={{ backgroundColor: '#9B7DB5', color: 'white', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
         <Link href="/dashboard" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>← 返回 Back</Link>
-        <h1 style={{ margin: 0, fontSize: '18px', flex: 1 }}>{t('课程日历', 'Calendar')}</h1>
-        <Link href="/dashboard/classes/new" style={{ backgroundColor: 'white', color: '#9B7DB5', padding: '6px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '13px', fontWeight: 'bold' }}>
-          + 新建课程
-        </Link>
+        <h1 style={{ margin: 0, fontSize: '18px', flex: 1 }}>{userRole === 'CLIENT' ? t('我的课程', 'My Classes') : t('课程日历', 'Calendar')}</h1>
+        {userRole !== 'CLIENT' && (
+          <Link href="/dashboard/classes/new" style={{ backgroundColor: 'white', color: '#9B7DB5', padding: '6px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '13px', fontWeight: 'bold' }}>
+            + 新建
+          </Link>
+        )}
       </header>
 
       <main style={{ padding: '16px', maxWidth: '700px', margin: '0 auto' }}>
@@ -239,6 +242,9 @@ function CalendarClassCard({ c, showDate }: { c: CalendarClass; showDate?: boole
             {c.start_time && `${c.start_time.slice(0, 5)} · `}
             {c.duration}{t('分钟', 'min')}
             {c.discipline && ` · ${c.discipline}`}
+            {c.class_type === 'private' && c.assigned_user && (
+              <span style={{ color: '#9B7DB5', marginLeft: '4px' }}>· 👤 {c.assigned_user.name}</span>
+            )}
           </p>
         </div>
         <span style={{ fontSize: '12px', color: '#9B7DB5' }}>→</span>

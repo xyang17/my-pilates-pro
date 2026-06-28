@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     let query = supabaseAdmin
       .from('class')
-      .select('*')
+      .select('*, assigned_user:assigned_to(id, name)')
       .order('date', { ascending: false })
 
     // ADMIN sees all classes; TRAINERs see classes they created; clients see their own

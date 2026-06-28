@@ -26,7 +26,13 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (userRole === 'ADMIN' || userRole === 'TRAINER') {
-      query = query.eq('created_by', userId)
+      // Allow trainers to filter by student_id (for client profile page)
+      const studentId = req.nextUrl.searchParams.get('student_id')
+      if (studentId) {
+        query = query.eq('student_id', studentId)
+      } else {
+        query = query.eq('created_by', userId)
+      }
     } else {
       query = query.eq('student_id', userId)
     }
