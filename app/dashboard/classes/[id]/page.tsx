@@ -128,7 +128,9 @@ export default function ClassDetailPage() {
   const [libFilterType, setLibFilterType] = useState('')
   const [libFilterDiff, setLibFilterDiff] = useState('')
   const [libFilterMuscle, setLibFilterMuscle] = useState('')
-  // Class copy
+  // Class copy modal
+  const [showCopyModal, setShowCopyModal] = useState(false)
+  const [copyForm, setCopyForm] = useState({ name: '', date: '', start_time: '', assigned_to: '' })
   const [copying, setCopying] = useState(false)
 
   const { lang, t } = useLang()
@@ -351,19 +353,31 @@ export default function ClassDetailPage() {
     finally { setHomeworkSubmitting(false) }
   }
 
+  const openCopyModal = () => {
+    if (!classData) return
+    // Strip existing " (复制)" suffix to avoid stacking
+    const baseName = classData.name.replace(/\s*\(复制\)+$/, '')
+    fetchClients()
+    setCopyForm({
+      name: baseName,
+      date: '',
+      start_time: classData.start_time?.slice(0, 5) || '',
+      assigned_to: classData.assigned_to || '',
+    })
+    setShowCopyModal(true)
+  }
+
   const handleCopyClass = async () => {
-    if (!classData || copying) return
+    if (!classData || copying || !copyForm.date) return
     setCopying(true)
     try {
-      // Step 1: create new class with same metadata, today's date as placeholder
-      const today = new Date().toISOString().split('T')[0]
       const res = await fetch('/api/classes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
         body: JSON.stringify({
-          name: `${classData.name} (复制)`,
-          date: today,
-          start_time: classData.start_time || null,
+          name: copyForm.name || classData.name,
+          date: copyForm.date,
+          start_time: copyForm.start_time || null,
           duration: classData.duration,
           discipline: classData.discipline || classData.type,
           class_type: classData.class_type,
@@ -373,14 +387,14 @@ export default function ClassDetailPage() {
           price: classData.price || null,
           color: classData.color || null,
           trainer_id: classData.trainer_id || null,
-          assigned_to: classData.assigned_to || null,
+          assigned_to: copyForm.assigned_to || null,
           notes: classData.notes || null,
         }),
       })
       if (!res.ok) throw new Error('复制课程失败')
       const newClass = await res.json()
 
-      // Step 2: copy all exercises to new class
+      // Copy all exercises
       for (const ex of classData.exercises) {
         await fetch(`/api/classes/${newClass.id}/exercises`, {
           method: 'POST',
@@ -398,8 +412,9 @@ export default function ClassDetailPage() {
         })
       }
 
-      showToast(t('课程已复制！正在跳转…', 'Class copied! Redirecting…'))
-      setTimeout(() => router.push(`/dashboard/classes/${newClass.id}`), 800)
+      setShowCopyModal(false)
+      showToast(t('课程已复制！', 'Class copied!'))
+      setTimeout(() => router.push(`/dashboard/classes/${newClass.id}`), 600)
     } catch (err: any) {
       showToast(err.message, 'error')
     } finally {
@@ -503,8 +518,7 @@ export default function ClassDetailPage() {
         )}
         {isTrainer && (
           <button
-            onClick={handleCopyClass}
-            disabled={copying}
+            onClick={openCopyModal}
             title={t('复制此课程计划', 'Copy class plan')}
             style={{
               padding: '6px 14px',
@@ -513,11 +527,10 @@ export default function ClassDetailPage() {
               border: '1px solid rgba(255,255,255,0.4)',
               borderRadius: '6px',
               fontSize: '13px',
-              cursor: copying ? 'wait' : 'pointer',
-              opacity: copying ? 0.7 : 1,
+              cursor: 'pointer',
             }}
           >
-            {copying ? '…' : t('复制计划', 'Copy')}
+            {t('复制计划', 'Copy')}
           </button>
         )}
         {!isTrainer && !canAddStudentNote && <div style={{ width: 80 }} />}
@@ -1039,6 +1052,111 @@ export default function ClassDetailPage() {
           </div>
         )
       })()}
+
+      {/* Copy Class Modal */}
+      {showCopyModal && classData && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 700, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            {/* Header */}
+            <div style={{ padding: '20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ margin: '0 0 2px 0', fontSize: '17px' }}>📋 {t('复制课程计划', 'Copy Class Plan')}</h2>
+                <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>{t('确认动作列表，设置新课时间后发布', 'Confirm exercises, then set the date to publish')}</p>
+              </div>
+              <button onClick={() => setShowCopyModal(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>✕</button>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, padding: '20px' }}>
+              {/* Course name */}
+              <label style={{ fontSize: '13px', color: '#666', display: 'block', marginBottom: '16px' }}>
+                {t('课程名称', 'Class Name')}
+                <input
+                  value={copyForm.name}
+                  onChange={e => setCopyForm(p => ({ ...p, name: e.target.value }))}
+                  style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </label>
+
+              {/* Date (required) */}
+              <label style={{ fontSize: '13px', color: '#666', display: 'block', marginBottom: '16px' }}>
+                <span>{t('上课日期', 'Date')} <span style={{ color: '#E74C3C' }}>*</span></span>
+                <input
+                  type="date"
+                  value={copyForm.date}
+                  onChange={e => setCopyForm(p => ({ ...p, date: e.target.value }))}
+                  style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: `1px solid ${copyForm.date ? '#ddd' : '#E8A87C'}`, borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+                {!copyForm.date && <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#E8A87C' }}>请选择日期</p>}
+              </label>
+
+              {/* Time */}
+              <label style={{ fontSize: '13px', color: '#666', display: 'block', marginBottom: '16px' }}>
+                {t('开始时间', 'Start Time')}
+                <input
+                  type="time"
+                  value={copyForm.start_time}
+                  onChange={e => setCopyForm(p => ({ ...p, start_time: e.target.value }))}
+                  style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </label>
+
+              {/* Student (private class only) */}
+              {classData.class_type === 'private' && (
+                <label style={{ fontSize: '13px', color: '#666', display: 'block', marginBottom: '16px' }}>
+                  {t('分配学员', 'Assign Student')}
+                  <select
+                    value={copyForm.assigned_to}
+                    onChange={e => setCopyForm(p => ({ ...p, assigned_to: e.target.value }))}
+                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', backgroundColor: 'white' }}
+                  >
+                    <option value="">{t('不指定学员', 'No student assigned')}</option>
+                    {clientList.map(c => (
+                      <option key={c.id} value={c.id}>{c.name || c.email}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {/* Exercise preview */}
+              <div style={{ marginBottom: '8px' }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#888', fontWeight: '600' }}>
+                  {t('动作列表', 'Exercises')} ({classData.exercises.length})
+                  <span style={{ fontWeight: 'normal', color: '#bbb', marginLeft: '6px', fontSize: '12px' }}>{t('创建后可修改', 'Editable after creation')}</span>
+                </p>
+                <div style={{ backgroundColor: '#f9f6fc', borderRadius: '10px', overflow: 'hidden' }}>
+                  {classData.exercises.map((ex, i) => (
+                    <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: i < classData.exercises.length - 1 ? '1px solid #eee' : 'none' }}>
+                      <span style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#9B7DB5', color: 'white', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 'bold' }}>
+                          {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
+                        </p>
+                        <p style={{ margin: 0, fontSize: '11px', color: '#999' }}>
+                          {[ex.sets && `${ex.sets}组`, ex.reps && `×${ex.reps}次`, ex.weight && `${ex.weight}${ex.weight_unit}`].filter(Boolean).join(' · ') || t('未设置参数', 'No params')}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 20px', borderTop: '1px solid #eee', display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowCopyModal(false)}
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontSize: '14px' }}>
+                {t('取消', 'Cancel')}
+              </button>
+              <button
+                onClick={handleCopyClass}
+                disabled={!copyForm.date || copying}
+                style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: '#9B7DB5', color: 'white', fontWeight: 'bold', fontSize: '14px', cursor: !copyForm.date || copying ? 'not-allowed' : 'pointer', opacity: !copyForm.date || copying ? 0.5 : 1 }}>
+                {copying ? t('创建中…', 'Creating…') : t('确认创建', 'Confirm & Create')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hw Library Sub-dialog */}
       {showHwLibrary && classData && (() => {
