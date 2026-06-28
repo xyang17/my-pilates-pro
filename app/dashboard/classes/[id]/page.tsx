@@ -883,100 +883,108 @@ export default function ClassDetailPage() {
               )}
             </div>
 
-            {/* Spreadsheet header row */}
-            {classData.exercises.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: '24px 1fr 56px 56px 90px 1fr 28px', gap: '6px', padding: '6px 14px', backgroundColor: '#faf8fd', borderBottom: '1px solid #f0f0f0' }}>
-                <div />
-                <div style={{ fontSize: '11px', color: '#aaa' }}>{t('动作', 'Exercise')}</div>
-                <div style={{ fontSize: '11px', color: '#aaa', textAlign: 'center' }}>{t('组', 'Sets')}</div>
-                <div style={{ fontSize: '11px', color: '#aaa', textAlign: 'center' }}>{t('次', 'Reps')}</div>
-                <div style={{ fontSize: '11px', color: '#aaa', textAlign: 'center' }}>{t('配重', 'Weight')}</div>
-                <div style={{ fontSize: '11px', color: '#aaa' }}>{t('备注', 'Notes')}</div>
-                <div />
-              </div>
-            )}
-
-            {/* Exercise rows */}
+            {/* Exercise rows — 2-row card layout */}
             {classData.exercises.length === 0 ? (
-              <div style={{ padding: '32px', textAlign: 'center', color: '#bbb', fontSize: '14px' }}>
+              <div style={{ padding: '32px', textAlign: 'center', color: 'var(--c-text-hint)', fontSize: 'var(--text-sm)' }}>
                 {t('暂无动作，在下方搜索添加', 'No exercises yet. Search below to add.')}
               </div>
             ) : (
               classData.exercises.map((ex, i) => {
                 const p = getLocal(ex)
                 const isSaving = savingIds.has(ex.id)
+                const inputBase: React.CSSProperties = {
+                  padding: '6px 6px',
+                  border: '1px solid var(--c-border)',
+                  borderRadius: 'var(--r-sm)',
+                  fontSize: 'var(--text-sm)',
+                  textAlign: 'center' as const,
+                  boxSizing: 'border-box' as const,
+                  background: isTrainer ? 'var(--c-card-bg)' : 'var(--c-fill-light)',
+                  color: 'var(--c-text-primary)',
+                  width: '100%',
+                }
                 return (
-                  <div key={ex.id} style={{ display: 'grid', gridTemplateColumns: '24px 1fr 56px 56px 90px 1fr 28px', gap: '6px', padding: '8px 14px', borderBottom: i < classData.exercises.length - 1 ? '1px solid #f8f8f8' : 'none', alignItems: 'center', backgroundColor: isSaving ? '#fffef5' : 'white' }}>
-                    {/* Index */}
-                    <div style={{ width: '22px', height: '22px', backgroundColor: 'var(--c-brand)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', flexShrink: 0 }}>
-                      {i + 1}
-                    </div>
-
-                    {/* Name */}
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ margin: 0, fontWeight: 'bold', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
-                      </p>
-                      {(ex.actual_sets != null || ex.actual_weight != null) && (
-                        <p style={{ margin: '1px 0 0 0', fontSize: '11px', color: '#4CAF50' }}>
-                          ✓ {[ex.actual_sets && `${ex.actual_sets}组`, ex.actual_reps && `×${ex.actual_reps}`, ex.actual_weight && `${ex.actual_weight}kg`].filter(Boolean).join(' ')}
+                  <div key={ex.id} style={{
+                    padding: '10px 14px',
+                    borderBottom: i < classData.exercises.length - 1 ? '1px solid var(--c-border)' : 'none',
+                    background: isSaving ? 'var(--c-fill-light)' : 'var(--c-card-bg)',
+                  }}>
+                    {/* Row 1: Number + Name + Remove */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{ width: 22, height: 22, background: 'var(--c-lavender)', color: 'var(--c-text-primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>
+                        {i + 1}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--c-text-primary)' }}>
+                          {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
                         </p>
-                      )}
+                        {(ex.actual_sets != null || ex.actual_weight != null) && (
+                          <p style={{ margin: '2px 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-brand)' }}>
+                            ✓ {[ex.actual_sets && `${ex.actual_sets}${t('组','sets')}`, ex.actual_reps && `×${ex.actual_reps}`, ex.actual_weight && `${ex.actual_weight}kg`].filter(Boolean).join(' ')}
+                          </p>
+                        )}
+                      </div>
+                      {isTrainer ? (
+                        <button onClick={() => handleRemoveExercise(ex.id)}
+                          style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--c-error-bg)', border: '1px solid var(--c-error)', color: 'var(--c-error)', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          ✕
+                        </button>
+                      ) : null}
                     </div>
 
-                    {/* Sets */}
-                    <input
-                      type="number" min="0" max="99" value={p.sets}
-                      disabled={!isTrainer}
-                      onChange={e => updateLocal(ex.id, 'sets', e.target.value)}
-                      onBlur={() => saveField(ex)}
-                      style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer ? 'white' : '#f9f9f9', color: '#333' }}
-                    />
-
-                    {/* Reps */}
-                    <input
-                      type="number" min="0" max="999" value={p.reps}
-                      disabled={!isTrainer}
-                      onChange={e => updateLocal(ex.id, 'reps', e.target.value)}
-                      onBlur={() => saveField(ex)}
-                      style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer ? 'white' : '#f9f9f9', color: '#333' }}
-                    />
-
-                    {/* Weight + unit */}
-                    <div style={{ display: 'flex', gap: '2px' }}>
-                      <input
-                        type="number" min="0" step="0.5" value={p.weight}
-                        disabled={!isTrainer}
-                        onChange={e => updateLocal(ex.id, 'weight', e.target.value)}
-                        onBlur={() => saveField(ex)}
-                        style={{ width: '100%', padding: '5px 4px', border: '1px solid #e8e0f0', borderRadius: '6px 0 0 6px', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box', backgroundColor: isTrainer ? 'white' : '#f9f9f9', color: '#333' }}
-                      />
-                      <select value={p.weight_unit} disabled={!isTrainer}
-                        onChange={e => { updateLocal(ex.id, 'weight_unit', e.target.value); }}
-                        onBlur={() => saveField(ex)}
-                        style={{ padding: '5px 2px', border: '1px solid #e8e0f0', borderLeft: 'none', borderRadius: '0 6px 6px 0', fontSize: '11px', backgroundColor: '#f9f9f9', color: '#666', cursor: 'pointer' }}>
-                        <option value="kg">kg</option>
-                        <option value="lb">lb</option>
-                      </select>
+                    {/* Row 2: Sets | Reps | Weight | Notes */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr 3fr', gap: '6px', alignItems: 'end' }}>
+                      {/* Sets */}
+                      <div>
+                        <div style={{ fontSize: '10px', color: 'var(--c-text-hint)', marginBottom: '3px', textAlign: 'center' }}>{t('组', 'Sets')}</div>
+                        <input type="number" min="0" max="99" value={p.sets}
+                          disabled={!isTrainer}
+                          onChange={e => updateLocal(ex.id, 'sets', e.target.value)}
+                          onBlur={() => saveField(ex)}
+                          style={inputBase}
+                        />
+                      </div>
+                      {/* Reps */}
+                      <div>
+                        <div style={{ fontSize: '10px', color: 'var(--c-text-hint)', marginBottom: '3px', textAlign: 'center' }}>{t('次', 'Reps')}</div>
+                        <input type="number" min="0" max="999" value={p.reps}
+                          disabled={!isTrainer}
+                          onChange={e => updateLocal(ex.id, 'reps', e.target.value)}
+                          onBlur={() => saveField(ex)}
+                          style={inputBase}
+                        />
+                      </div>
+                      {/* Weight + unit */}
+                      <div>
+                        <div style={{ fontSize: '10px', color: 'var(--c-text-hint)', marginBottom: '3px', textAlign: 'center' }}>{t('配重', 'Weight')}</div>
+                        <div style={{ display: 'flex' }}>
+                          <input type="number" min="0" step="0.5" value={p.weight}
+                            disabled={!isTrainer}
+                            onChange={e => updateLocal(ex.id, 'weight', e.target.value)}
+                            onBlur={() => saveField(ex)}
+                            style={{ ...inputBase, borderRadius: 'var(--r-sm) 0 0 var(--r-sm)', flex: 1 }}
+                          />
+                          <select value={p.weight_unit} disabled={!isTrainer}
+                            onChange={e => { updateLocal(ex.id, 'weight_unit', e.target.value) }}
+                            onBlur={() => saveField(ex)}
+                            style={{ padding: '6px 4px', border: '1px solid var(--c-border)', borderLeft: 'none', borderRadius: '0 var(--r-sm) var(--r-sm) 0', fontSize: '11px', background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', cursor: 'pointer' }}>
+                            <option value="kg">kg</option>
+                            <option value="lb">lb</option>
+                          </select>
+                        </div>
+                      </div>
+                      {/* Notes */}
+                      <div>
+                        <div style={{ fontSize: '10px', color: 'var(--c-text-hint)', marginBottom: '3px' }}>{t('备注', 'Notes')}</div>
+                        <input type="text" value={p.instance_notes}
+                          disabled={!isTrainer}
+                          onChange={e => updateLocal(ex.id, 'instance_notes', e.target.value)}
+                          onBlur={() => saveField(ex)}
+                          placeholder={t('选填…', 'Optional…')}
+                          style={{ ...inputBase, textAlign: 'left' }}
+                        />
+                      </div>
                     </div>
-
-                    {/* Notes */}
-                    <input
-                      type="text" value={p.instance_notes}
-                      disabled={!isTrainer}
-                      onChange={e => updateLocal(ex.id, 'instance_notes', e.target.value)}
-                      onBlur={() => saveField(ex)}
-                      placeholder={t('备注...', 'Notes...')}
-                      style={{ width: '100%', padding: '5px 8px', border: '1px solid #e8e0f0', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box', backgroundColor: isTrainer ? 'white' : '#f9f9f9', color: '#333' }}
-                    />
-
-                    {/* Remove */}
-                    {isTrainer ? (
-                      <button onClick={() => handleRemoveExercise(ex.id)}
-                        style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#fee', border: 'none', color: '#c62828', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        ✕
-                      </button>
-                    ) : <div />}
                   </div>
                 )
               })

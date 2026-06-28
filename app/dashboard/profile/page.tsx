@@ -1,14 +1,14 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
-import { useLang } from '@/context/LanguageContext'
+import { useLang, FontSize } from '@/context/LanguageContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import Link from 'next/link'
 
 export default function ProfilePage() {
   const { user, userRole, loading, logout } = useAuth()
-  const { lang, t } = useLang()
+  const { lang, setLang, fontSize, setFontSize, t } = useLang()
   const router = useRouter()
 
   useEffect(() => {
@@ -20,10 +20,49 @@ export default function ProfilePage() {
     router.push('/')
   }
 
-  if (loading || !user) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
+  if (loading || !user) return (
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>加载中…</span>
+    </div>
+  )
 
   const name = user.user_metadata?.name || user.email?.split('@')[0] || '—'
-  const ROLE_LABEL: Record<string, string> = lang === 'zh' ? { ADMIN: '管理员', TRAINER: '教练', CLIENT: '学员' } : { ADMIN: 'Admin', TRAINER: 'Trainer', CLIENT: 'Client' }
+  const ROLE_LABEL: Record<string, string> = lang === 'zh'
+    ? { ADMIN: '管理员', TRAINER: '教练', CLIENT: '学员' }
+    : { ADMIN: 'Admin', TRAINER: 'Trainer', CLIENT: 'Client' }
+
+  // Pill toggle helper
+  const PillToggle = ({ value, options, onChange }: {
+    value: string
+    options: { key: string; label: string }[]
+    onChange: (k: string) => void
+  }) => (
+    <div style={{ display: 'flex', gap: 3, background: 'var(--c-fill-light)', borderRadius: 'var(--r-full)', padding: '3px' }}>
+      {options.map(o => (
+        <button key={o.key} onClick={() => onChange(o.key)} style={{
+          padding: '4px 12px',
+          borderRadius: 'var(--r-full)',
+          border: 'none',
+          background: value === o.key ? 'var(--c-card-bg)' : 'transparent',
+          color: value === o.key ? 'var(--c-brand)' : 'var(--c-text-hint)',
+          fontSize: 'var(--text-xs)',
+          fontWeight: value === o.key ? 600 : 400,
+          cursor: 'pointer',
+          transition: 'all 0.12s',
+          boxShadow: value === o.key ? 'var(--shadow-sm)' : 'none',
+        }}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+
+  const SettingRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--sp-4) 0' }}>
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)' }}>{label}</span>
+      {children}
+    </div>
+  )
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
@@ -44,7 +83,7 @@ export default function ProfilePage() {
           {t('← 返回', '← Back')}
         </Link>
         <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', flex: 1 }}>
-          {t('我的主页', 'My Profile')}
+          {t('我的', 'Profile')}
         </h1>
       </header>
 
@@ -83,7 +122,7 @@ export default function ProfilePage() {
           </span>
         </div>
 
-        {/* Info */}
+        {/* Account info */}
         <div style={{
           background: 'var(--c-card-bg)',
           border: '1px solid var(--c-border)',
@@ -91,9 +130,11 @@ export default function ProfilePage() {
           padding: '0 var(--sp-5)',
           marginBottom: 'var(--sp-4)',
         }}>
+          <p style={{ margin: '0', padding: 'var(--sp-4) 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            {t('账号信息', 'Account')}
+          </p>
           {[
             { label: t('邮箱', 'Email'), val: user.email },
-            { label: t('账号ID', 'User ID'), val: user.id },
             { label: t('注册时间', 'Joined'), val: new Date(user.created_at).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US') },
           ].map((row, i, arr) => (
             <div key={i} style={{
@@ -102,9 +143,53 @@ export default function ProfilePage() {
               borderBottom: i < arr.length - 1 ? '1px solid var(--c-border)' : 'none',
             }}>
               <span style={{ color: 'var(--c-text-secondary)', fontSize: 'var(--text-sm)' }}>{row.label}</span>
-              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)', maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all' }}>{row.val}</span>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)', maxWidth: '65%', textAlign: 'right', wordBreak: 'break-all' }}>{row.val}</span>
             </div>
           ))}
+        </div>
+
+        {/* Settings section */}
+        <div style={{
+          background: 'var(--c-card-bg)',
+          border: '1px solid var(--c-border)',
+          borderRadius: 'var(--r-lg)',
+          padding: '0 var(--sp-5)',
+          marginBottom: 'var(--sp-4)',
+        }}>
+          <p style={{ margin: '0', padding: 'var(--sp-4) 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            {t('偏好设置', 'Preferences')}
+          </p>
+
+          {/* Language */}
+          <div style={{ borderBottom: '1px solid var(--c-border)' }}>
+            <SettingRow label={t('语言', 'Language')}>
+              <PillToggle
+                value={lang}
+                options={[{ key: 'zh', label: '中文' }, { key: 'en', label: 'English' }]}
+                onChange={k => setLang(k as 'zh' | 'en')}
+              />
+            </SettingRow>
+          </div>
+
+          {/* Font size */}
+          <div style={{ borderBottom: '1px solid var(--c-border)' }}>
+            <SettingRow label={t('字体大小', 'Text Size')}>
+              <PillToggle
+                value={fontSize}
+                options={[
+                  { key: 'sm', label: t('小', 'S') },
+                  { key: 'md', label: t('中', 'M') },
+                  { key: 'lg', label: t('大', 'L') },
+                ]}
+                onChange={k => setFontSize(k as FontSize)}
+              />
+            </SettingRow>
+          </div>
+
+          {/* About */}
+          <SettingRow label={t('版本', 'Version')}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)' }}>v1.0</span>
+          </SettingRow>
         </div>
 
         {/* Logout */}

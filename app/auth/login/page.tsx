@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useLang } from '@/context/LanguageContext'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
+  const { lang, setLang, t } = useLang()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,7 +39,14 @@ export default function LoginPage() {
       alignItems: 'center',
       justifyContent: 'center',
       padding: 'var(--sp-5)',
+      position: 'relative',
     }}>
+      {/* Language toggle */}
+      <div style={{ position: 'absolute', top: 'var(--sp-5)', right: 'var(--sp-5)', display: 'flex', gap: 4, background: 'var(--c-card-bg)', borderRadius: 'var(--r-full)', border: '1px solid var(--c-border)', padding: '4px 6px' }}>
+        <button onClick={() => setLang('zh')} style={{ padding: '3px 10px', borderRadius: 'var(--r-full)', border: 'none', background: lang === 'zh' ? 'var(--c-fill-mid)' : 'transparent', color: lang === 'zh' ? 'var(--c-brand)' : 'var(--c-text-hint)', fontSize: 'var(--text-xs)', fontWeight: lang === 'zh' ? 600 : 400, cursor: 'pointer' }}>中</button>
+        <button onClick={() => setLang('en')} style={{ padding: '3px 10px', borderRadius: 'var(--r-full)', border: 'none', background: lang === 'en' ? 'var(--c-fill-mid)' : 'transparent', color: lang === 'en' ? 'var(--c-brand)' : 'var(--c-text-hint)', fontSize: 'var(--text-xs)', fontWeight: lang === 'en' ? 600 : 400, cursor: 'pointer' }}>EN</button>
+      </div>
+
       {/* Logo 区域 */}
       <div style={{ textAlign: 'center', marginBottom: 'var(--sp-8)' }}>
         <div style={{
@@ -87,7 +96,7 @@ export default function LoginPage() {
           fontWeight: 600,
           color: 'var(--c-text-primary)',
         }}>
-          登录
+          {t('登录', 'Sign In')}
         </h2>
 
         <form onSubmit={handleLogin}>

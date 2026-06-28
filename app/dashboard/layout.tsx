@@ -21,7 +21,7 @@ const CLIENT_NAV = [
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { lang, toggleLang } = useLang()
+  const { lang } = useLang()
   const { userRole } = useAuth()
   const pathname = usePathname()
 
@@ -30,20 +30,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      {/* Page content — bottom padding so nav doesn't cover content */}
-      <div style={{ paddingBottom: '64px' }}>
+      {/* Page content — bottom padding accounts for nav + iOS safe area */}
+      <div style={{ paddingBottom: 'calc(60px + env(safe-area-inset-bottom, 0px))' }}>
         {children}
       </div>
 
       {/* Bottom navigation bar */}
       <nav style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
-        backgroundColor: 'white',
-        borderTop: '1px solid #eee',
+        background: 'var(--c-card-bg)',
+        borderTop: '1px solid var(--c-border)',
         display: 'flex',
         zIndex: 200,
-        height: '60px',
-        boxShadow: '0 -2px 8px rgba(0,0,0,0.06)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        boxShadow: '0 -2px 8px rgba(152,128,184,0.08)',
       }}>
         {navItems.map(item => {
           const isActive = item.matchPaths.some(p => pathname.startsWith(p))
@@ -53,48 +53,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               href={item.href}
               style={{
                 flex: 1,
+                height: 60,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '2px',
+                gap: '3px',
                 textDecoration: 'none',
-                color: isActive ? '#9B7DB5' : '#bbb',
-                borderTop: `2px solid ${isActive ? '#9B7DB5' : 'transparent'}`,
+                color: isActive ? 'var(--c-brand)' : 'var(--c-text-hint)',
+                borderTop: `2px solid ${isActive ? 'var(--c-brand)' : 'transparent'}`,
                 transition: 'color 0.15s',
               }}
             >
               <span style={{ fontSize: '20px', lineHeight: 1 }}>{item.icon}</span>
-              <span style={{ fontSize: '10px', fontWeight: isActive ? '700' : '400' }}>
+              <span style={{ fontSize: '10px', fontWeight: isActive ? 700 : 400 }}>
                 {lang === 'zh' ? item.zh : item.en}
               </span>
             </Link>
           )
         })}
-
-        {/* Language toggle */}
-        <button
-          onClick={toggleLang}
-          title={lang === 'zh' ? 'Switch to English' : '切换中文'}
-          style={{
-            width: '48px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '2px',
-            border: 'none',
-            borderTop: '2px solid transparent',
-            backgroundColor: 'white',
-            cursor: 'pointer',
-            color: '#bbb',
-            padding: 0,
-            flexShrink: 0,
-          }}
-        >
-          <span style={{ fontSize: '16px', lineHeight: 1 }}>🌐</span>
-          <span style={{ fontSize: '9px', fontWeight: '500' }}>{lang === 'zh' ? 'EN' : '中'}</span>
-        </button>
       </nav>
     </>
   )
