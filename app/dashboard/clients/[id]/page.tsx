@@ -142,26 +142,26 @@ export default function ClientDetailPage() {
   const hwDone = homework.filter(h => h.status === 'completed').length
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      <header style={{ backgroundColor: '#9B7DB5', color: 'white', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: 'white', fontSize: '14px', cursor: 'pointer' }}>← 返回</button>
-        <h1 style={{ margin: 0, fontSize: '18px' }}>学员详情</h1>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
+      <header style={{ background: 'var(--c-card-bg)', borderBottom: '1px solid var(--c-border)', padding: '0 var(--sp-5)', height: 56, display: 'flex', alignItems: 'center', gap: 'var(--sp-4)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: 'var(--c-text-secondary)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>← 返回</button>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)' }}>学员详情</h1>
       </header>
 
-      <main style={{ padding: '20px', maxWidth: '700px', margin: '0 auto' }}>
+      <main style={{ padding: 'var(--sp-5)', maxWidth: 700, margin: '0 auto' }}>
         {/* Profile card */}
-        <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+        <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 'var(--sp-6)', marginBottom: 'var(--sp-4)' }}>
+          <div style={{ display: 'flex', gap: 'var(--sp-4)', alignItems: 'flex-start' }}>
             {client.photo_url ? (
               <img src={client.photo_url} alt={client.name}
-                style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                style={{ width: 68, height: 68, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             ) : (
-              <div style={{ width: '72px', height: '72px', borderRadius: '50%', backgroundColor: '#E8A87C', color: 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: 'bold' }}>
+              <div style={{ width: 68, height: 68, borderRadius: '50%', background: 'var(--c-fill-light)', border: '2px solid var(--c-pink-mist)', color: 'var(--c-brand)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-xl)', fontWeight: 600 }}>
                 {client.name?.[0] || '?'}
               </div>
             )}
             <div style={{ flex: 1 }}>
-              <h2 style={{ margin: '0 0 6px 0', fontSize: '20px' }}>{client.name}</h2>
+              <h2 style={{ margin: '0 0 var(--sp-1)', fontSize: 'var(--text-xl)', fontWeight: 600, color: 'var(--c-text-primary)' }}>{client.name}</h2>
               <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '13px' }}>📧 {client.email}</p>
               <p style={{ margin: 0, color: '#bbb', fontSize: '12px' }}>
                 加入时间: {new Date(client.created_at).toLocaleDateString('zh-CN')}
@@ -223,7 +223,7 @@ export default function ClientDetailPage() {
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button onClick={handleSaveNotes} disabled={savingNotes}
-                    style={{ padding: '7px 18px', backgroundColor: '#9B7DB5', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', opacity: savingNotes ? 0.7 : 1 }}>
+                    style={{ padding: '7px 18px', background: savingNotes ? 'var(--c-lavender)' : 'var(--c-brand)', color: '#fff', border: 'none', borderRadius: 'var(--r-sm)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 500 }}>
                     {savingNotes ? '保存中...' : '保存'}
                   </button>
                   <button onClick={() => setEditNotes(false)}
@@ -235,7 +235,7 @@ export default function ClientDetailPage() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: client.injury_notes && client.goals ? '1fr 1fr' : '1fr', gap: '10px' }}>
                 {client.injury_notes ? (
-                  <div style={{ backgroundColor: '#fff8f0', borderRadius: '6px', padding: '10px 12px' }}>
+                  <div style={{ background: 'var(--c-fill-light)', border: '1px solid var(--c-border-em)', borderRadius: 'var(--r-sm)', padding: '10px 12px' }}>
                     <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#E8763A', fontWeight: 'bold' }}>⚠️ 伤病 / 体态问题</p>
                     <p style={{ margin: 0, fontSize: '13px', color: '#444', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{client.injury_notes}</p>
                   </div>
@@ -243,7 +243,7 @@ export default function ClientDetailPage() {
                   <p style={{ margin: 0, fontSize: '13px', color: '#bbb' }}>暂无伤病记录</p>
                 )}
                 {client.goals && (
-                  <div style={{ backgroundColor: '#f0f9f4', borderRadius: '6px', padding: '10px 12px' }}>
+                  <div style={{ background: '#EDE6F4', border: '1px solid #C2AFCC', borderRadius: 'var(--r-sm)', padding: '10px 12px' }}>
                     <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#2E8B57', fontWeight: 'bold' }}>🎯 训练目标</p>
                     <p style={{ margin: 0, fontSize: '13px', color: '#444', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{client.goals}</p>
                   </div>
@@ -273,7 +273,7 @@ export default function ClientDetailPage() {
 
         {/* Classes tab */}
         {activeTab === 'classes' && (
-          <div style={{ backgroundColor: 'white', borderRadius: '0 0 10px 10px', overflow: 'hidden' }}>
+          <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
             {client.classes.length === 0 ? (
               <p style={{ padding: '40px', textAlign: 'center', color: '#bbb', margin: 0 }}>暂无课程记录</p>
             ) : (
@@ -298,7 +298,7 @@ export default function ClientDetailPage() {
 
         {/* Homework tab */}
         {activeTab === 'homework' && (
-          <div style={{ backgroundColor: 'white', borderRadius: '0 0 10px 10px', overflow: 'hidden' }}>
+          <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
             {hwLoading ? (
               <p style={{ padding: '40px', textAlign: 'center', color: '#bbb', margin: 0 }}>加载中…</p>
             ) : homework.length === 0 ? (
@@ -311,9 +311,9 @@ export default function ClientDetailPage() {
                 return (
                   <div key={hw.id} style={{ borderBottom: i < homework.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
                     <div onClick={() => toggleHw(hw.id)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 20px', cursor: 'pointer', backgroundColor: isExpanded ? '#faf8fd' : 'white' }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)', padding: 'var(--sp-4) var(--sp-5)', cursor: 'pointer', background: isExpanded ? 'var(--c-fill-light)' : 'var(--c-card-bg)' }}>
                       {/* Status dot */}
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: isDone ? '#4CAF50' : isOverdue ? '#E74C3C' : '#E8A87C', flexShrink: 0 }} />
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: isDone ? 'var(--c-brand)' : isOverdue ? 'var(--c-error)' : 'var(--c-lavender)', flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ margin: '0 0 3px 0', fontWeight: 'bold', fontSize: '14px', color: '#333' }}>{hw.title}</p>
                         <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
@@ -327,13 +327,13 @@ export default function ClientDetailPage() {
                           )}
                         </p>
                       </div>
-                      <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '12px', backgroundColor: isDone ? '#e8f5e9' : '#fff3e0', color: isDone ? '#4CAF50' : '#E8A87C', flexShrink: 0, fontWeight: 'bold' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', padding: '3px 8px', borderRadius: 'var(--r-full)', background: isDone ? 'var(--c-fill-light)' : '#EDE6F4', color: isDone ? 'var(--c-brand)' : 'var(--c-text-secondary)', border: isDone ? '1px solid var(--c-brand)' : '1px solid var(--c-border)', flexShrink: 0, fontWeight: 500 }}>
                         {isDone ? '✓ 已完成' : '进行中'}
                       </span>
                       <span style={{ fontSize: '12px', color: '#bbb' }}>{isExpanded ? '▲' : '▼'}</span>
                     </div>
                     {isExpanded && (
-                      <div style={{ borderTop: '1px solid #f5f5f5', backgroundColor: '#faf8fd' }}>
+                      <div style={{ borderTop: '1px solid var(--c-border)', background: 'var(--c-fill-light)' }}>
                         {hw.notes && (
                           <p style={{ margin: 0, padding: '10px 20px', fontSize: '13px', color: '#666', borderBottom: '1px solid #f0f0f0' }}>
                             💬 {hw.notes}
@@ -341,7 +341,7 @@ export default function ClientDetailPage() {
                         )}
                         {[...hw.homework_exercise].sort((a, b) => a.order_num - b.order_num).map((ex, j) => (
                           <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 20px', borderBottom: j < hw.homework_exercise.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
-                            <span style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#9B7DB5', color: 'white', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{j + 1}</span>
+                            <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--c-lavender)', color: '#fff', fontSize: 'var(--text-xs)', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{j + 1}</span>
                             <div style={{ flex: 1 }}>
                               <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 'bold' }}>{ex.master_exercise.name_cn || ex.master_exercise.name_en}</p>
                               <p style={{ margin: 0, fontSize: '11px', color: '#999' }}>
@@ -373,7 +373,7 @@ function ClassRow({ c }: { c: ClientClass }) {
   return (
     <Link href={`/dashboard/classes/${c.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f5f5f5' }}>
-        <div style={{ width: '4px', height: '40px', borderRadius: '2px', backgroundColor: c.color || '#9B7DB5', flexShrink: 0 }} />
+        <div style={{ width: 3, height: 40, borderRadius: 2, background: c.color || 'var(--c-lavender)', flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
           <p style={{ margin: '0 0 3px 0', fontWeight: 'bold', fontSize: '14px' }}>{c.name}</p>
           <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
@@ -382,7 +382,7 @@ function ClassRow({ c }: { c: ClientClass }) {
             {c.discipline && ` · ${c.discipline}`}
           </p>
         </div>
-        <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '12px', backgroundColor: STATUS_COLOR[c.status] || '#ddd', color: '#444' }}>
+        <span style={{ fontSize: 'var(--text-xs)', padding: '3px 8px', borderRadius: 'var(--r-full)', background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', border: '1px solid var(--c-border)' }}>
           {STATUS_LABEL[c.status] || c.status}
         </span>
       </div>

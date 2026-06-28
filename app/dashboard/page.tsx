@@ -35,37 +35,106 @@ export default function DashboardPage() {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      <header style={{ backgroundColor: '#9B7DB5', color: 'white', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ margin: 0, fontSize: '20px' }}>MyPilatesPro</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={{ fontSize: '14px', opacity: 0.9 }}>{user.user_metadata?.name || user.email}</span>
-          <button onClick={handleLogout} style={{ padding: '7px 14px', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
-            {t('退出', 'Logout')}
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
+      {/* Header — 白底，底部细线 */}
+      <header style={{
+        background: 'var(--c-card-bg)',
+        borderBottom: '1px solid var(--c-border)',
+        padding: '0 var(--sp-5)',
+        height: 56,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', letterSpacing: '-0.2px' }}>
+          MyPilatesPro
+        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)' }}>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>
+            {user.user_metadata?.name || user.email}
+          </span>
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: '6px 14px',
+              background: 'var(--c-fill-light)',
+              color: 'var(--c-text-primary)',
+              border: '1px solid var(--c-border)',
+              borderRadius: 'var(--r-sm)',
+              cursor: 'pointer',
+              fontSize: 'var(--text-sm)',
+              fontWeight: 500,
+            }}
+          >
+            {t('退出', '退出')}
           </button>
         </div>
       </header>
 
-      <main style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
-        <div style={{ backgroundColor: 'white', padding: '16px 20px', borderRadius: '10px', marginBottom: '20px' }}>
-          <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
-            {t('角色', 'Role')}: <strong style={{ color: '#9B7DB5' }}>{userRole}</strong>
-            <span style={{ margin: '0 12px', color: '#ddd' }}>|</span>
+      <main style={{ padding: 'var(--sp-5)', maxWidth: 960, margin: '0 auto' }}>
+        {/* 角色信息条 */}
+        <div style={{
+          background: 'var(--c-card-bg)',
+          border: '1px solid var(--c-border)',
+          borderRadius: 'var(--r-md)',
+          padding: 'var(--sp-3) var(--sp-5)',
+          marginBottom: 'var(--sp-5)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--sp-3)',
+        }}>
+          <span style={{
+            fontSize: 'var(--text-xs)',
+            fontWeight: 500,
+            background: 'var(--c-fill-light)',
+            color: 'var(--c-brand)',
+            border: '1px solid var(--c-border-em)',
+            borderRadius: 'var(--r-full)',
+            padding: '2px 10px',
+          }}>
+            {userRole}
+          </span>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>
             {user.email}
-          </p>
+          </span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+        {/* 功能卡片网格 */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--sp-4)' }}>
           {cards.map(card => (
             <Link key={card.href} href={card.href} style={{ textDecoration: 'none' }}>
-              <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', transition: 'box-shadow 0.2s', cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(155,125,181,0.15)')}
-                onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+              <div
+                style={{
+                  background: 'var(--c-card-bg)',
+                  padding: 'var(--sp-5)',
+                  borderRadius: 'var(--r-lg)',
+                  border: '1px solid var(--c-border)',
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.15s, border-color 0.15s',
+                  height: '100%',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.boxShadow = 'var(--shadow-md)'
+                  e.currentTarget.style.borderColor = 'var(--c-border-em)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.boxShadow = 'none'
+                  e.currentTarget.style.borderColor = 'var(--c-border)'
+                }}
               >
-                <div style={{ fontSize: '28px', marginBottom: '10px' }}>{card.icon}</div>
-                <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', color: '#333' }}>{card.title}</h3>
-                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#888' }}>{card.desc}</p>
-                <span style={{ color: '#9B7DB5', fontSize: '13px', fontWeight: 'bold' }}>{t('进入', 'Open')} →</span>
+                <div style={{ fontSize: 26, marginBottom: 'var(--sp-3)' }}>{card.icon}</div>
+                <h3 style={{ margin: '0 0 var(--sp-1)', fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--c-text-primary)' }}>
+                  {card.title}
+                </h3>
+                <p style={{ margin: '0 0 var(--sp-4)', fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)', lineHeight: 'var(--leading-normal)' }}>
+                  {card.desc}
+                </p>
+                <span style={{ color: 'var(--c-brand)', fontSize: 'var(--text-sm)', fontWeight: 500 }}>
+                  {t('进入', '进入')} →
+                </span>
               </div>
             </Link>
           ))}

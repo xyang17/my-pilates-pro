@@ -19,9 +19,12 @@ interface ClassItem {
   created_at: string
 }
 
-const STATUS_COLOR: Record<string, string> = { planned: '#9B7DB5', in_progress: '#FF9800', completed: '#4CAF50' }
-const STATUS_ZH: Record<string, string> = { planned: '未开始', in_progress: '进行中', completed: '已完成' }
-const STATUS_EN: Record<string, string> = { planned: 'Planned', in_progress: 'In Progress', completed: 'Completed' }
+// 单色紫系状态配置
+const STATUS_CONFIG: Record<string, { bar: string; bg: string; color: string; border: string; label: string; dot: string }> = {
+  planned:     { bar: '#C2AFCC', bg: '#EDE6F4', color: '#9888B0', border: '1px solid #C2AFCC', label: '未开始', dot: '○' },
+  in_progress: { bar: '#9880B8', bg: '#C2AFCC', color: '#fff',    border: '1px solid #9880B8', label: '进行中', dot: '●' },
+  completed:   { bar: '#9880B8', bg: '#EDE6F4', color: '#5A4878', border: '1.5px solid #9880B8', label: '已完成', dot: '✓' },
+}
 
 export default function ClassesPage() {
   const { user, userRole, loading } = useAuth()
@@ -39,8 +42,10 @@ export default function ClassesPage() {
   const fetchClasses = async () => {
     try {
       setIsLoading(true)
-      const res = await fetch('/api/classes', { headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' } })
-      if (!res.ok) throw new Error('Failed to fetch classes')
+      const res = await fetch('/api/classes', {
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (!res.ok) throw new Error('获取课程失败')
       setClasses(await res.json())
     } catch (err: any) {
       setError(err.message)
@@ -49,51 +54,141 @@ export default function ClassesPage() {
     }
   }
 
-  const statusLabel = (s: string) => lang === 'zh' ? (STATUS_ZH[s] || s) : (STATUS_EN[s] || s)
+  const S = (s: string) => STATUS_CONFIG[s] || STATUS_CONFIG.planned
 
-  if (loading || isLoading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
+  if (loading || isLoading) return (
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--sp-3)' }}>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid var(--c-fill-mid)', borderTopColor: 'var(--c-brand)', animation: 'spin 0.8s linear infinite' }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>加载中…</span>
+      </div>
+    </div>
+  )
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      <header style={{ backgroundColor: '#9B7DB5', color: 'white', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ margin: 0, fontSize: '18px' }}>{t('课程训练', 'Class Training')}</h1>
-        <Link href="/dashboard/classes/new" style={{ padding: '8px 16px', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', textDecoration: 'none', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.5)', fontSize: '13px' }}>
-          + {t('新建课程', 'New Class')}
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
+      {/* Header */}
+      <header style={{
+        background: 'var(--c-card-bg)',
+        borderBottom: '1px solid var(--c-border)',
+        padding: '0 var(--sp-5)',
+        height: 56,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--sp-4)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}>
+        <Link href="/dashboard" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>← 返回</Link>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', flex: 1 }}>
+          课程训练
+        </h1>
+        <Link href="/dashboard/classes/new" style={{
+          padding: '7px 16px',
+          background: 'var(--c-brand)',
+          color: '#fff',
+          textDecoration: 'none',
+          borderRadius: 'var(--r-sm)',
+          fontSize: 'var(--text-sm)',
+          fontWeight: 500,
+        }}>
+          + 新建
         </Link>
       </header>
 
-      <main style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
-        {error && <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px' }}>{error}</div>}
+      <main style={{ padding: 'var(--sp-5)', maxWidth: 720, margin: '0 auto' }}>
+        {error && (
+          <div style={{
+            background: 'var(--c-error-bg)',
+            border: '1px solid var(--c-error)',
+            color: '#8C4A4A',
+            padding: 'var(--sp-3) var(--sp-4)',
+            borderRadius: 'var(--r-sm)',
+            marginBottom: 'var(--sp-4)',
+            fontSize: 'var(--text-sm)',
+          }}>{error}</div>
+        )}
 
         {classes.length === 0 ? (
-          <div style={{ backgroundColor: 'white', padding: '40px', borderRadius: '10px', textAlign: 'center' }}>
-            <p style={{ color: '#999', marginBottom: '12px' }}>{t('暂无课程，点击新建开始', 'No classes yet. Create your first one!')}</p>
-            <Link href="/dashboard/classes/new" style={{ color: '#9B7DB5', fontWeight: 'bold' }}>{t('新建第一节课', 'Create First Class')} →</Link>
+          <div style={{
+            background: 'var(--c-card-bg)',
+            border: '1px solid var(--c-border)',
+            borderRadius: 'var(--r-lg)',
+            padding: 'var(--sp-10)',
+            textAlign: 'center',
+          }}>
+            <p style={{ color: 'var(--c-text-hint)', marginBottom: 'var(--sp-4)', fontSize: 'var(--text-base)' }}>
+              暂无课程
+            </p>
+            <Link href="/dashboard/classes/new" style={{ color: 'var(--c-brand)', fontWeight: 500, textDecoration: 'none', fontSize: 'var(--text-sm)' }}>
+              新建第一节课 →
+            </Link>
           </div>
         ) : (
-          <div style={{ display: 'grid', gap: '12px' }}>
-            {classes.map(cls => (
-              <Link key={cls.id} href={`/dashboard/classes/${cls.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <div style={{ backgroundColor: 'white', padding: '16px 20px', borderRadius: '10px', border: '1px solid #eee', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer' }}
-                  onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(155,125,181,0.15)')}
-                  onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
-                >
-                  <div style={{ width: '4px', height: '52px', borderRadius: '2px', backgroundColor: STATUS_COLOR[cls.status] || '#ccc', flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', fontSize: '15px' }}>{cls.name}</p>
-                    <p style={{ margin: 0, fontSize: '13px', color: '#888' }}>
-                      📅 {new Date(cls.date + 'T12:00:00').toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' })}
-                      {' · '}⏱️ {cls.duration}{t('分钟', 'min')}
-                      {cls.discipline && ` · ${cls.discipline}`}
-                    </p>
+          <div style={{ display: 'grid', gap: 'var(--sp-3)' }}>
+            {classes.map(cls => {
+              const cfg = S(cls.status)
+              return (
+                <Link key={cls.id} href={`/dashboard/classes/${cls.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                  <div
+                    style={{
+                      background: 'var(--c-card-bg)',
+                      border: '1px solid var(--c-border)',
+                      borderRadius: 'var(--r-lg)',
+                      padding: 'var(--sp-4) var(--sp-5)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--sp-4)',
+                      cursor: 'pointer',
+                      transition: 'box-shadow 0.15s, border-color 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.boxShadow = 'var(--shadow-md)'
+                      e.currentTarget.style.borderColor = 'var(--c-border-em)'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.boxShadow = 'none'
+                      e.currentTarget.style.borderColor = 'var(--c-border)'
+                    }}
+                  >
+                    {/* 状态色条 */}
+                    <div style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: cfg.bar, flexShrink: 0 }} />
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: '0 0 var(--sp-1)', fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--c-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {cls.name}
+                      </p>
+                      <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>
+                        {new Date(cls.date + 'T12:00:00').toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
+                        {' · '}{cls.duration} 分钟
+                        {cls.discipline && ` · ${cls.discipline}`}
+                      </p>
+                    </div>
+
+                    {/* 状态标签 */}
+                    <span style={{
+                      fontSize: 'var(--text-xs)',
+                      padding: '3px 10px',
+                      borderRadius: 'var(--r-full)',
+                      background: cfg.bg,
+                      color: cfg.color,
+                      border: cfg.border,
+                      fontWeight: 500,
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}>
+                      <span>{cfg.dot}</span>{cfg.label}
+                    </span>
+
+                    <span style={{ color: 'var(--c-text-hint)', fontSize: 'var(--text-base)', flexShrink: 0 }}>›</span>
                   </div>
-                  <span style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '10px', backgroundColor: STATUS_COLOR[cls.status] + '22', color: STATUS_COLOR[cls.status], fontWeight: 'bold', flexShrink: 0 }}>
-                    {statusLabel(cls.status)}
-                  </span>
-                  <span style={{ color: '#9B7DB5', fontSize: '14px' }}>→</span>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              )
+            })}
           </div>
         )}
       </main>

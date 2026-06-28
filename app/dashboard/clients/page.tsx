@@ -21,6 +21,13 @@ interface NewClientForm {
   phone: string
 }
 
+const FIELD_STYLE = {
+  width: '100%',
+  padding: '11px var(--sp-4)',
+  fontSize: 'var(--text-base)',
+  boxSizing: 'border-box' as const,
+}
+
 export default function ClientListPage() {
   const { user, userRole, loading: authLoading } = useAuth()
   const router = useRouter()
@@ -38,9 +45,7 @@ export default function ClientListPage() {
   useEffect(() => {
     if (!authLoading && !user) { router.push('/auth/login'); return }
     if (user && userRole) {
-      if (userRole !== 'ADMIN' && userRole !== 'TRAINER') {
-        router.push('/dashboard'); return
-      }
+      if (userRole !== 'ADMIN' && userRole !== 'TRAINER') { router.push('/dashboard'); return }
       fetchClients()
     }
   }, [user, userRole, authLoading])
@@ -58,14 +63,8 @@ export default function ClientListPage() {
 
   const handleCreate = async () => {
     setFormError('')
-    if (!form.name || !form.email || !form.password) {
-      setFormError('姓名、邮箱、密码为必填项')
-      return
-    }
-    if (form.password.length < 6) {
-      setFormError('密码至少 6 位')
-      return
-    }
+    if (!form.name || !form.email || !form.password) { setFormError('姓名、邮箱、密码为必填项'); return }
+    if (form.password.length < 6) { setFormError('密码至少 6 位'); return }
     setSubmitting(true)
     try {
       const res = await fetch('/api/auth/signup', {
@@ -75,12 +74,6 @@ export default function ClientListPage() {
       })
       const data = await res.json()
       if (!res.ok) { setFormError(data.error || '创建失败'); return }
-
-      // Update phone if provided
-      if (form.phone) {
-        // phone can be updated later; skip for now as signup doesn't support it
-      }
-
       setShowModal(false)
       setForm({ name: '', email: '', password: '', phone: '' })
       await fetchClients()
@@ -96,62 +89,128 @@ export default function ClientListPage() {
     c.email?.toLowerCase().includes(search.toLowerCase())
   )
 
-  if (authLoading || isLoading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
+  if (authLoading || isLoading) return (
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>加载中…</span>
+    </div>
+  )
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      <header style={{ backgroundColor: '#9B7DB5', color: 'white', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <Link href="/dashboard" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>← 返回 Back</Link>
-        <h1 style={{ margin: 0, fontSize: '18px', flex: 1 }}>学员管理 Clients</h1>
-        <span style={{ fontSize: '14px', opacity: 0.85 }}>{clients.length} 人</span>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
+      {/* Header */}
+      <header style={{
+        background: 'var(--c-card-bg)',
+        borderBottom: '1px solid var(--c-border)',
+        padding: '0 var(--sp-5)',
+        height: 56,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--sp-4)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}>
+        <Link href="/dashboard" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>← 返回</Link>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', flex: 1 }}>
+          学员管理
+          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 400, color: 'var(--c-text-hint)', marginLeft: 'var(--sp-2)' }}>
+            {clients.length} 人
+          </span>
+        </h1>
         <button
           onClick={() => { setShowModal(true); setFormError(''); setShowPassword(false) }}
-          style={{ backgroundColor: 'white', color: '#9B7DB5', border: 'none', borderRadius: '8px', padding: '7px 14px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+          style={{
+            padding: '7px 16px',
+            background: 'var(--c-brand)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 'var(--r-sm)',
+            fontSize: 'var(--text-sm)',
+            fontWeight: 500,
+            cursor: 'pointer',
+          }}
         >
           + 新建学员
         </button>
       </header>
 
-      <main style={{ padding: '16px', maxWidth: '700px', margin: '0 auto' }}>
-        <div style={{ marginBottom: '16px' }}>
+      <main style={{ padding: 'var(--sp-5)', maxWidth: 700, margin: '0 auto' }}>
+        {/* 搜索框 */}
+        <div style={{ marginBottom: 'var(--sp-4)' }}>
           <input
             type="text"
-            placeholder="搜索学员 Search clients..."
+            placeholder="搜索学员姓名或邮箱…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '11px var(--sp-4)', fontSize: 'var(--text-base)', boxSizing: 'border-box' }}
           />
         </div>
 
         {filtered.length === 0 ? (
-          <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '40px', textAlign: 'center', color: '#999' }}>
+          <div style={{
+            background: 'var(--c-card-bg)',
+            border: '1px solid var(--c-border)',
+            borderRadius: 'var(--r-lg)',
+            padding: 'var(--sp-10)',
+            textAlign: 'center',
+            color: 'var(--c-text-hint)',
+            fontSize: 'var(--text-base)',
+          }}>
             {search ? '未找到匹配学员' : '暂无学员，点击右上角新建'}
           </div>
         ) : (
-          <div style={{ backgroundColor: 'white', borderRadius: '10px', overflow: 'hidden' }}>
+          <div style={{
+            background: 'var(--c-card-bg)',
+            border: '1px solid var(--c-border)',
+            borderRadius: 'var(--r-lg)',
+            overflow: 'hidden',
+          }}>
             {filtered.map((client, idx) => (
               <Link key={client.id} href={`/dashboard/clients/${client.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px',
-                  borderBottom: idx < filtered.length - 1 ? '1px solid #f5f5f5' : 'none',
-                }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--sp-4)',
+                    padding: 'var(--sp-4) var(--sp-5)',
+                    borderBottom: idx < filtered.length - 1 ? '1px solid var(--c-border)' : 'none',
+                    transition: 'background 0.12s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--c-fill-light)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  {/* 头像 */}
                   {client.photo_url ? (
                     <img src={client.photo_url} alt={client.name}
-                      style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                      style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                   ) : (
-                    <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: '#E8A87C', color: 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold' }}>
+                    <div style={{
+                      width: 44, height: 44, borderRadius: '50%',
+                      background: 'var(--c-fill-light)',
+                      border: '1.5px solid var(--c-pink-mist)',
+                      color: 'var(--c-brand)',
+                      flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 'var(--text-lg)', fontWeight: 600,
+                    }}>
                       {client.name?.[0] || '?'}
                     </div>
                   )}
+
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: '0 0 3px 0', fontWeight: 'bold', fontSize: '15px' }}>{client.name}</p>
-                    <p style={{ margin: 0, fontSize: '12px', color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.email}</p>
+                    <p style={{ margin: '0 0 2px', fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--c-text-primary)' }}>
+                      {client.name}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {client.email}
+                    </p>
                   </div>
+
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <p style={{ margin: 0, fontSize: '11px', color: '#bbb' }}>
+                    <p style={{ margin: '0 0 2px', fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)' }}>
                       加入 {new Date(client.created_at).toLocaleDateString('zh-CN', { month: 'short', year: 'numeric' })}
                     </p>
-                    <span style={{ fontSize: '12px', color: '#9B7DB5' }}>→</span>
+                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-hint)' }}>›</span>
                   </div>
                 </div>
               </Link>
@@ -160,72 +219,77 @@ export default function ClientListPage() {
         )}
       </main>
 
-      {/* Create modal */}
+      {/* 新建学员 Modal */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '400px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '17px' }}>新建学员</h2>
-                <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#999' }}>Create New Client</p>
-              </div>
-              <button onClick={() => { setShowModal(false); setShowPassword(false) }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>×</button>
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(45, 30, 64, 0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: 'var(--sp-5)',
+        }}>
+          <div style={{
+            background: 'var(--c-card-bg)',
+            borderRadius: 'var(--r-lg)',
+            padding: 'var(--sp-6)',
+            width: '100%', maxWidth: 420,
+            boxShadow: 'var(--shadow-md)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-6)' }}>
+              <h2 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--c-text-primary)' }}>新建学员</h2>
+              <button
+                onClick={() => { setShowModal(false); setShowPassword(false) }}
+                style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--c-text-hint)', lineHeight: 1 }}
+              >×</button>
             </div>
 
             {/* 姓名 */}
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#555' }}>
-                姓名 <span style={{ color: '#bbb', fontSize: '11px' }}>Name</span> <span style={{ color: '#F1948A' }}>*</span>
+            <div style={{ marginBottom: 'var(--sp-4)' }}>
+              <label style={{ display: 'block', marginBottom: 'var(--sp-2)', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)' }}>
+                姓名 <span style={{ color: 'var(--c-error)' }}>*</span>
               </label>
               <input type="text" placeholder="学员姓名" value={form.name}
                 onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }} />
+                style={FIELD_STYLE} />
             </div>
 
             {/* 邮箱 */}
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#555' }}>
-                邮箱 <span style={{ color: '#bbb', fontSize: '11px' }}>Email</span> <span style={{ color: '#F1948A' }}>*</span>
+            <div style={{ marginBottom: 'var(--sp-4)' }}>
+              <label style={{ display: 'block', marginBottom: 'var(--sp-2)', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)' }}>
+                邮箱 <span style={{ color: 'var(--c-error)' }}>*</span>
               </label>
               <input type="email" placeholder="example@email.com" value={form.email}
                 onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }} />
+                style={FIELD_STYLE} />
             </div>
 
-            {/* 密码（可显隐） */}
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#555' }}>
-                密码 <span style={{ color: '#bbb', fontSize: '11px' }}>Password</span> <span style={{ color: '#F1948A' }}>*</span>
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="至少 6 位 / Min 6 chars"
-                  value={form.password}
-                  onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                  style={{ width: '100%', padding: '10px 44px 10px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(v => !v)}
-                  style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#999' }}
-                >
-                  {showPassword ? '🙈' : '👁'}
+            {/* 密码 */}
+            <div style={{ marginBottom: 'var(--sp-4)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-2)' }}>
+                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)' }}>
+                  密码 <span style={{ color: 'var(--c-error)' }}>*</span>
+                </label>
+                <button type="button" onClick={() => setShowPassword(v => !v)}
+                  style={{ background: 'none', border: 'none', color: 'var(--c-brand)', cursor: 'pointer', fontSize: 'var(--text-sm)', padding: 0 }}>
+                  {showPassword ? '隐藏' : '显示'}
                 </button>
               </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="至少 6 位"
+                value={form.password}
+                onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                style={FIELD_STYLE}
+              />
             </div>
 
-            {/* 手机号（带区号） */}
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#555' }}>
-                手机号 <span style={{ color: '#bbb', fontSize: '11px' }}>Phone</span> <span style={{ color: '#bbb', fontSize: '11px' }}>选填</span>
+            {/* 手机号 */}
+            <div style={{ marginBottom: 'var(--sp-4)' }}>
+              <label style={{ display: 'block', marginBottom: 'var(--sp-2)', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)' }}>
+                手机号 <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)', fontWeight: 400 }}>选填</span>
               </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <select
-                  value={countryCode}
-                  onChange={e => setCountryCode(e.target.value)}
-                  style={{ padding: '10px 8px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '13px', backgroundColor: 'white', flexShrink: 0 }}
-                >
+              <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
+                <select value={countryCode} onChange={e => setCountryCode(e.target.value)}
+                  style={{ padding: '11px var(--sp-3)', fontSize: 'var(--text-sm)', flexShrink: 0 }}>
                   <option value="+86">🇨🇳 +86</option>
                   <option value="+1">🇺🇸 +1</option>
                   <option value="+44">🇬🇧 +44</option>
@@ -236,36 +300,51 @@ export default function ClientListPage() {
                   <option value="+852">🇭🇰 +852</option>
                   <option value="+886">🇹🇼 +886</option>
                   <option value="+60">🇲🇾 +60</option>
-                  <option value="+33">🇫🇷 +33</option>
-                  <option value="+49">🇩🇪 +49</option>
                 </select>
-                <input
-                  type="tel"
-                  placeholder="手机号码"
-                  value={form.phone}
+                <input type="tel" placeholder="手机号码" value={form.phone}
                   onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-                  style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px' }}
-                />
+                  style={{ flex: 1, padding: '11px var(--sp-4)', fontSize: 'var(--text-base)' }} />
               </div>
             </div>
 
             {formError && (
-              <p style={{ color: '#E8A87C', fontSize: '13px', margin: '0 0 12px 0' }}>⚠ {formError}</p>
+              <div style={{
+                background: 'var(--c-error-bg)',
+                border: '1px solid var(--c-error)',
+                color: '#8C4A4A',
+                borderRadius: 'var(--r-sm)',
+                padding: 'var(--sp-3) var(--sp-4)',
+                marginBottom: 'var(--sp-4)',
+                fontSize: 'var(--text-sm)',
+              }}>
+                {formError}
+              </div>
             )}
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-              <button
-                onClick={() => setShowModal(false)}
-                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white', cursor: 'pointer', fontSize: '14px' }}
-              >
-                取消 Cancel
+            <div style={{ display: 'flex', gap: 'var(--sp-3)', marginTop: 'var(--sp-2)' }}>
+              <button onClick={() => setShowModal(false)} style={{
+                flex: 1, padding: '12px',
+                borderRadius: 'var(--r-md)',
+                border: '1px solid var(--c-border)',
+                background: 'var(--c-fill-light)',
+                color: 'var(--c-text-secondary)',
+                cursor: 'pointer',
+                fontSize: 'var(--text-base)',
+                fontWeight: 500,
+              }}>
+                取消
               </button>
-              <button
-                onClick={handleCreate}
-                disabled={submitting}
-                style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: '#9B7DB5', color: 'white', cursor: submitting ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 'bold', opacity: submitting ? 0.7 : 1 }}
-              >
-                {submitting ? '创建中...' : '创建账号 Create'}
+              <button onClick={handleCreate} disabled={submitting} style={{
+                flex: 2, padding: '12px',
+                borderRadius: 'var(--r-md)',
+                border: 'none',
+                background: submitting ? 'var(--c-lavender)' : 'var(--c-brand)',
+                color: '#fff',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                fontSize: 'var(--text-base)',
+                fontWeight: 500,
+              }}>
+                {submitting ? '创建中…' : '创建账号'}
               </button>
             </div>
           </div>

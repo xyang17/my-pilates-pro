@@ -1,26 +1,127 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────
+   设计系统 Token — 粉紫单色系
+   MyPilatesPro Design System v1
+───────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* 色彩 */
+  --c-page-bg:      #F5F0F8;   /* 页面底色：极淡紫霞 */
+  --c-card-bg:      #FFFFFF;   /* 卡片背景 */
+  --c-fill-light:   #EDE6F4;   /* 浅填充 / 悬停 */
+  --c-fill-mid:     #E0D5EC;   /* 中等填充 / 分割线 */
+  --c-pink-mist:    #DFC0C4;   /* 粉紫霞 — 客户/温暖标注 */
+  --c-lavender:     #C2AFCC;   /* 天顶紫霞 — 系统交互 */
+  --c-brand:        #9880B8;   /* 品牌主色 — 按钮/激活态 */
+  --c-brand-hover:  #8870A8;   /* 品牌悬停 */
+  --c-border:       #E0D5EC;   /* 默认边框 */
+  --c-border-em:    #C2AFCC;   /* 强调边框 */
+
+  /* 文字 */
+  --c-text-primary:   #5A4878; /* 主文字（中深紫，非黑） */
+  --c-text-secondary: #9888B0; /* 次要文字 */
+  --c-text-hint:      #C2AFCC; /* 提示 / placeholder */
+  --c-text-on-brand:  #FFFFFF; /* 品牌色上的文字 */
+
+  /* 状态色（语义化，极少使用） */
+  --c-error:         #C4A4A4;  /* 错误（紫调暖红，不刺眼） */
+  --c-error-bg:      #F5EDED;
+
+  /* 字体 — 中文优先系统字体栈 */
+  --font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC',
+               'Hiragino Sans GB', 'Microsoft YaHei',
+               'Helvetica Neue', Arial, sans-serif;
+
+  /* 字体大小（移动端基准） */
+  --text-xs:    12px;
+  --text-sm:    13px;
+  --text-base:  15px;  /* 正文基准 */
+  --text-md:    16px;
+  --text-lg:    18px;
+  --text-xl:    21px;
+  --text-2xl:   26px;
+
+  /* 行高 */
+  --leading-tight:  1.3;
+  --leading-normal: 1.6;
+  --leading-loose:  1.8;
+
+  /* 间距（4px 基准网格） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* 圆角 */
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   14px;
+  --r-full: 9999px;
+
+  /* 阴影（轻、只用紫调） */
+  --shadow-sm:   0 1px 3px rgba(152, 128, 184, 0.08);
+  --shadow-md:   0 4px 12px rgba(152, 128, 184, 0.13);
+  --shadow-card: 0 2px 8px rgba(152, 128, 184, 0.10);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+/* 平板 / 桌面：字号略放大 */
+@media (min-width: 768px) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --text-base: 15px;
+    --text-md:   16px;
+    --text-lg:   19px;
+    --text-xl:   22px;
+    --text-2xl:  28px;
   }
 }
 
+/* 全局重置 */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%; /* 禁止 iOS 自动放大字体 */
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: var(--c-page-bg);
+  color: var(--c-text-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 通用输入框基础样式 */
+input, textarea, select {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--c-text-primary);
+  background: var(--c-card-bg);
+  border: 1.5px solid var(--c-border);
+  border-radius: var(--r-md);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--c-lavender);
+  box-shadow: 0 0 0 3px rgba(194, 175, 204, 0.2);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--c-text-hint);
+}
+
+/* 通用按钮基础样式 */
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
 }

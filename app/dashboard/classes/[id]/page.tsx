@@ -73,17 +73,14 @@ interface ClassData {
   created_by: string
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  planned: '#9B7DB5',
-  in_progress: '#FF9800',
-  completed: '#4CAF50',
+const STATUS_CONFIG: Record<string, { bar: string; bg: string; color: string; border: string; label: string; dot: string }> = {
+  planned:     { bar: '#C2AFCC', bg: '#EDE6F4', color: '#9888B0', border: '1px solid #C2AFCC',   label: '未开始', dot: '○' },
+  in_progress: { bar: '#9880B8', bg: '#C2AFCC', color: '#fff',    border: '1px solid #9880B8',   label: '进行中', dot: '●' },
+  completed:   { bar: '#9880B8', bg: '#EDE6F4', color: '#5A4878', border: '1.5px solid #9880B8', label: '已完成', dot: '✓' },
 }
-
-const STATUS_LABEL: Record<string, string> = {
-  planned: '未开始',
-  in_progress: '进行中',
-  completed: '已完成',
-}
+// legacy aliases kept for any remaining references
+const STATUS_COLOR: Record<string, string> = { planned: '#C2AFCC', in_progress: '#9880B8', completed: '#9880B8' }
+const STATUS_LABEL: Record<string, string> = { planned: '未开始', in_progress: '进行中', completed: '已完成' }
 
 export default function ClassDetailPage() {
   const { user, userRole, loading: authLoading } = useAuth()
@@ -504,14 +501,20 @@ export default function ClassDetailPage() {
   }
 
   if (authLoading || isLoading) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 'var(--sp-3)' }}>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid var(--c-fill-mid)', borderTopColor: 'var(--c-brand)', animation: 'spin 0.8s linear infinite' }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>加载中…</span>
+      </div>
+    )
   }
 
   if (!classData) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <p>课程未找到</p>
-        <Link href="/dashboard/classes" style={{ color: '#9B7DB5' }}>← 返回课程列表</Link>
+      <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+        <p style={{ color: 'var(--c-text-secondary)', fontSize: 'var(--text-base)' }}>课程未找到</p>
+        <Link href="/dashboard/classes" style={{ color: 'var(--c-brand)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>← 返回课程列表</Link>
       </div>
     )
   }
@@ -520,89 +523,63 @@ export default function ClassDetailPage() {
   const canAddStudentNote = !isTrainer && classData.class_type === 'group'
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
       {/* Header */}
       <header style={{
-        backgroundColor: '#9B7DB5',
-        color: 'white',
-        padding: '16px 20px',
+        background: 'var(--c-card-bg)',
+        borderBottom: '1px solid var(--c-border)',
+        padding: '0 var(--sp-5)',
+        height: 56,
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
       }}>
-        <Link href="/dashboard/classes" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
+        <Link href="/dashboard/classes" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)', flexShrink: 0 }}>
           ← 返回
         </Link>
-        <h1 style={{ margin: 0, fontSize: '18px' }}>{classData.name}</h1>
+        <h1 style={{ margin: '0 var(--sp-4)', fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{classData.name}</h1>
         {/* Action button based on status and role */}
-        {canReview && classData.status !== 'completed' && (
-          <Link
-            href={`/dashboard/classes/${classId}/review`}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: 'rgba(255,255,255,0.25)',
-              color: 'white',
-              textDecoration: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-            }}
-          >
-            开始复盘 →
-          </Link>
-        )}
-        {canReview && classData.status === 'completed' && (
-          <Link
-            href={`/dashboard/classes/${classId}/review`}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: 'rgba(255,255,255,0.15)',
-              color: 'white',
-              textDecoration: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-            }}
-          >
-            查看复盘
-          </Link>
-        )}
-        {canAddStudentNote && (
-          <Link
-            href={`/dashboard/classes/${classId}/student-notes`}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: 'rgba(255,255,255,0.25)',
-              color: 'white',
-              textDecoration: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-            }}
-          >
-            记录笔记 ✍️
-          </Link>
-        )}
-        {isTrainer && (
-          <button
-            onClick={openCopyModal}
-            title={t('复制此课程计划', 'Copy class plan')}
-            style={{
-              padding: '6px 14px',
-              backgroundColor: 'rgba(255,255,255,0.2)',
-              color: 'white',
-              border: '1px solid rgba(255,255,255,0.4)',
-              borderRadius: '6px',
-              fontSize: '13px',
-              cursor: 'pointer',
-            }}
-          >
-            {t('复制计划', 'Copy')}
-          </button>
-        )}
-        {!isTrainer && !canAddStudentNote && <div style={{ width: 80 }} />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', flexShrink: 0 }}>
+          {canReview && classData.status !== 'completed' && (
+            <Link href={`/dashboard/classes/${classId}/review`} style={{
+              padding: '7px 14px', background: 'var(--c-brand)', color: '#fff',
+              textDecoration: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--text-sm)', fontWeight: 500,
+            }}>
+              复盘 →
+            </Link>
+          )}
+          {canReview && classData.status === 'completed' && (
+            <Link href={`/dashboard/classes/${classId}/review`} style={{
+              padding: '7px 14px', background: 'var(--c-fill-light)', color: 'var(--c-text-primary)',
+              textDecoration: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--text-sm)',
+              border: '1px solid var(--c-border)',
+            }}>
+              查看复盘
+            </Link>
+          )}
+          {canAddStudentNote && (
+            <Link href={`/dashboard/classes/${classId}/student-notes`} style={{
+              padding: '7px 14px', background: 'var(--c-brand)', color: '#fff',
+              textDecoration: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--text-sm)', fontWeight: 500,
+            }}>
+              记录笔记
+            </Link>
+          )}
+          {isTrainer && (
+            <button onClick={openCopyModal} style={{
+              padding: '7px 14px', background: 'var(--c-fill-light)', color: 'var(--c-text-primary)',
+              border: '1px solid var(--c-border)', borderRadius: 'var(--r-sm)', fontSize: 'var(--text-sm)', cursor: 'pointer',
+            }}>
+              复制计划
+            </button>
+          )}
+        </div>
       </header>
 
-      <main style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
+      <main style={{ padding: 'var(--sp-5)', maxWidth: 900, margin: '0 auto' }}>
 
         {/* Cover image */}
         {classData.cover_image_url && (
@@ -613,7 +590,7 @@ export default function ClassDetailPage() {
         )}
 
         {/* Class Info */}
-        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', marginBottom: '16px' }}>
+        <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', padding: 'var(--sp-5)', borderRadius: 'var(--r-lg)', marginBottom: 'var(--sp-4)' }}>
           {/* Color stripe */}
           {classData.color && (
             <div style={{ height: '4px', backgroundColor: classData.color, borderRadius: '2px', marginBottom: '16px' }} />
@@ -674,13 +651,13 @@ export default function ClassDetailPage() {
                   rows={2}
                   style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box' }} />
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
                 <button onClick={handleSaveInfo} disabled={savingInfo}
-                  style={{ padding: '8px 20px', backgroundColor: '#9B7DB5', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', opacity: savingInfo ? 0.7 : 1 }}>
-                  {savingInfo ? '保存中...' : '保存'}
+                  style={{ padding: '8px 20px', background: savingInfo ? 'var(--c-lavender)' : 'var(--c-brand)', color: '#fff', border: 'none', borderRadius: 'var(--r-sm)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 500 }}>
+                  {savingInfo ? '保存中…' : '保存'}
                 </button>
                 <button onClick={() => setEditInfo(false)}
-                  style={{ padding: '8px 16px', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', background: 'none' }}>
+                  style={{ padding: '8px 16px', border: '1px solid var(--c-border)', borderRadius: 'var(--r-sm)', cursor: 'pointer', fontSize: 'var(--text-sm)', background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)' }}>
                   取消
                 </button>
               </div>
@@ -691,7 +668,7 @@ export default function ClassDetailPage() {
               {isTrainer && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
                   <button onClick={openEditInfo}
-                    style={{ fontSize: '12px', color: '#9B7DB5', border: '1px solid #9B7DB5', borderRadius: '6px', padding: '4px 12px', background: 'none', cursor: 'pointer' }}>
+                    style={{ fontSize: 'var(--text-xs)', color: 'var(--c-brand)', border: '1px solid var(--c-border-em)', borderRadius: 'var(--r-sm)', padding: '4px 12px', background: 'var(--c-fill-light)', cursor: 'pointer' }}>
                     ✏️ 编辑信息
                   </button>
                 </div>
@@ -740,14 +717,12 @@ export default function ClassDetailPage() {
                   </div>
                 )}
                 <div>
-                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>状态 Status</p>
-                  <span style={{
-                    display: 'inline-block', padding: '3px 10px',
-                    backgroundColor: STATUS_COLOR[classData.status] || '#999',
-                    color: 'white', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold',
-                  }}>
-                    {STATUS_LABEL[classData.status] || classData.status}
-                  </span>
+                  <p style={{ margin: '0 0 4px 0', color: 'var(--c-text-hint)', fontSize: 'var(--text-xs)' }}>状态</p>
+                  {(() => { const cfg = STATUS_CONFIG[classData.status] || STATUS_CONFIG.planned; return (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', background: cfg.bg, color: cfg.color, border: cfg.border, borderRadius: 'var(--r-full)', fontSize: 'var(--text-xs)', fontWeight: 500 }}>
+                      {cfg.dot} {cfg.label}
+                    </span>
+                  ) })()}
                 </div>
               </div>
 
