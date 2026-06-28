@@ -116,6 +116,12 @@ export default function ClassDetailPage() {
   const [hwExtraSelected, setHwExtraSelected] = useState<Set<string>>(new Set())
   // Client list for student dropdown
   const [clientList, setClientList] = useState<{id:string,name:string,email:string}[]>([])
+  // Exercise library browser modal
+  const [showLibrary, setShowLibrary] = useState(false)
+  const [libSearch, setLibSearch] = useState('')
+  const [libFilterType, setLibFilterType] = useState('')
+  const [libFilterDiff, setLibFilterDiff] = useState('')
+  const [libFilterMuscle, setLibFilterMuscle] = useState('')
 
   const { lang, t } = useLang()
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
@@ -706,81 +712,57 @@ export default function ClassDetailPage() {
               })
             )}
 
-            {/* Quick-add search bar (trainer only, not completed) */}
+            {/* Quick-add bar (trainer only, not completed) */}
             {isTrainer && classData.status !== 'completed' && (() => {
               const discipline = classData.discipline || ''
               const alreadyAdded = new Set(classData.exercises.map(e => e.exercise_id))
-              const suggestions = availableExercises.filter(ex => {
+              // Show discipline-matched suggestions as quick chips
+              const quickSuggestions = availableExercises.filter(ex => {
                 if (alreadyAdded.has(ex.id)) return false
-                const matchDiscipline = addFilterAll || !discipline || (
-                  !!ex.type_en && (
-                    ex.type_en.toLowerCase().includes(discipline.toLowerCase()) ||
-                    discipline.toLowerCase().includes(ex.type_en.toLowerCase())
-                  )
+                if (!discipline) return true
+                return !!ex.type_en && (
+                  ex.type_en.toLowerCase().includes(discipline.toLowerCase()) ||
+                  discipline.toLowerCase().includes(ex.type_en.toLowerCase())
                 )
-                if (!addSearch) return matchDiscipline
-                return matchDiscipline && (
-                  (ex.name_cn || '').includes(addSearch) ||
-                  (ex.name_en || '').toLowerCase().includes(addSearch.toLowerCase()) ||
-                  (ex.target_muscles_cn || '').includes(addSearch)
-                )
-              }).slice(0, 12)
+              }).slice(0, 10)
 
               return (
-                <div style={{ borderTop: '2px dashed #e8dff5', padding: '10px 14px', backgroundColor: '#faf8fd' }}>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: suggestions.length > 0 || addSearch ? '8px' : '0' }}>
-                    <span style={{ fontSize: '16px' }}>🔍</span>
-                    <input
-                      type="text"
-                      placeholder={t(`搜索添加动作${discipline ? `（仅 ${discipline}）` : ''}...`, `Search exercises to add${discipline ? ` (${discipline} only)` : ''}...`)}
-                      value={addSearch}
-                      onChange={e => setAddSearch(e.target.value)}
-                      style={{ flex: 1, padding: '7px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
-                    />
-                    {discipline && (
-                      <button onClick={() => setAddFilterAll(v => !v)}
-                        style={{ padding: '6px 10px', borderRadius: '8px', border: `1px solid ${addFilterAll ? '#ddd' : '#9B7DB5'}`, backgroundColor: addFilterAll ? 'white' : '#f0eaf8', color: addFilterAll ? '#999' : '#9B7DB5', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        {addFilterAll ? t('全部动作', 'All') : t(`仅 ${discipline}`, discipline)}
+                <div style={{ borderTop: '2px dashed #e8dff5', backgroundColor: '#faf8fd' }}>
+                  {/* Row 1: chips + browse button */}
+                  <div style={{ padding: '10px 14px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {quickSuggestions.map(ex => (
+                      <button
+                        key={ex.id}
+                        onClick={() => handleAddExercise(ex.id)}
+                        disabled={adding}
+                        style={{
+                          padding: '5px 10px', borderRadius: '14px', border: '1px solid #ddd',
+                          backgroundColor: 'white', cursor: adding ? 'wait' : 'pointer',
+                          fontSize: '12px', color: '#555', display: 'flex', alignItems: 'center', gap: '3px',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f0eaf8'; e.currentTarget.style.borderColor = '#9B7DB5'; e.currentTarget.style.color = '#9B7DB5' }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.borderColor = '#ddd'; e.currentTarget.style.color = '#555' }}
+                      >
+                        <span style={{ fontSize: '11px', color: '#bbb' }}>+</span>
+                        <span>{lang === 'zh' ? (ex.name_cn || ex.name_en) : (ex.name_en || ex.name_cn)}</span>
+                        {(ex.default_sets || ex.default_reps) && (
+                          <span style={{ color: '#ccc', fontSize: '10px' }}>
+                            {[ex.default_sets && `${ex.default_sets}×`, ex.default_reps].filter(Boolean).join('')}
+                          </span>
+                        )}
                       </button>
-                    )}
+                    ))}
+                    <button
+                      onClick={() => setShowLibrary(true)}
+                      style={{
+                        padding: '5px 12px', borderRadius: '14px', border: '1px solid #9B7DB5',
+                        backgroundColor: '#f0eaf8', color: '#9B7DB5', cursor: 'pointer',
+                        fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap', marginLeft: 'auto',
+                      }}
+                    >
+                      📚 {t('浏览动作库', 'Browse Library')}
+                    </button>
                   </div>
-                  {suggestions.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {suggestions.map(ex => (
-                        <button
-                          key={ex.id}
-                          onClick={() => handleAddExercise(ex.id)}
-                          disabled={adding}
-                          style={{
-                            padding: '5px 12px', borderRadius: '16px', border: '1px solid #ddd',
-                            backgroundColor: 'white', cursor: adding ? 'wait' : 'pointer', fontSize: '12px', color: '#444',
-                            display: 'flex', alignItems: 'center', gap: '4px',
-                            transition: 'all 0.1s',
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f0eaf8'; e.currentTarget.style.borderColor = '#9B7DB5'; e.currentTarget.style.color = '#9B7DB5' }}
-                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.borderColor = '#ddd'; e.currentTarget.style.color = '#444' }}
-                        >
-                          <span>+</span>
-                          <span>{lang === 'zh' ? (ex.name_cn || ex.name_en) : (ex.name_en || ex.name_cn)}</span>
-                          {(ex.default_sets || ex.default_reps) && (
-                            <span style={{ color: '#bbb', fontSize: '10px' }}>
-                              {[ex.default_sets && `${ex.default_sets}×`, ex.default_reps].filter(Boolean).join('')}
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {addSearch && suggestions.length === 0 && (
-                    <p style={{ margin: 0, fontSize: '12px', color: '#bbb', paddingLeft: '4px' }}>
-                      {t('没有匹配动作', 'No matches')}
-                      {!addFilterAll && discipline && (
-                        <button onClick={() => setAddFilterAll(true)} style={{ background: 'none', border: 'none', color: '#9B7DB5', cursor: 'pointer', fontSize: '12px', marginLeft: '4px' }}>
-                          {t('查看全部动作', 'Show all exercises')}
-                        </button>
-                      )}
-                    </p>
-                  )}
                 </div>
               )
             })()}
@@ -809,6 +791,142 @@ export default function ClassDetailPage() {
           </div>
         )}
       </main>
+
+      {/* Exercise Library Modal */}
+      {showLibrary && classData && (() => {
+        const alreadyAdded = new Set(classData.exercises.map(e => e.exercise_id))
+
+        // Build filter options from availableExercises
+        const allTypes = [...new Set(availableExercises.map(e => e.type_en).filter(Boolean))].sort() as string[]
+        const allDiffs = [...new Set(availableExercises.map(e => e.difficulty_en).filter(Boolean))].sort() as string[]
+        const allMuscles = [...new Set(
+          availableExercises.flatMap(e => (e.target_muscles_en || '').split(',').map((m: string) => m.trim())).filter(Boolean)
+        )].sort() as string[]
+
+        const activeFilterCount = [libFilterType, libFilterDiff, libFilterMuscle].filter(Boolean).length
+
+        const libResults = availableExercises.filter(ex => {
+          if (libFilterType && ex.type_en !== libFilterType) return false
+          if (libFilterDiff && ex.difficulty_en !== libFilterDiff) return false
+          if (libFilterMuscle && !(ex.target_muscles_en || '').split(',').map((m: string) => m.trim()).includes(libFilterMuscle)) return false
+          if (libSearch) {
+            const q = libSearch.toLowerCase()
+            return (
+              (ex.name_cn || '').includes(libSearch) ||
+              (ex.name_en || '').toLowerCase().includes(q) ||
+              (ex.target_muscles_cn || '').includes(libSearch) ||
+              (ex.target_muscles_en || '').toLowerCase().includes(q)
+            )
+          }
+          return true
+        })
+
+        const closeLibrary = () => {
+          setShowLibrary(false)
+          setLibSearch('')
+          setLibFilterType('')
+          setLibFilterDiff('')
+          setLibFilterMuscle('')
+        }
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 500, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <div style={{ backgroundColor: 'white', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '680px', height: '90vh', display: 'flex', flexDirection: 'column' }}>
+
+              {/* Header */}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '17px' }}>📚 {t('动作库', 'Exercise Library')}</h2>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#999' }}>{libResults.length} {t('个动作', 'exercises')}{activeFilterCount > 0 ? `（${activeFilterCount} 个筛选）` : ''}</p>
+                </div>
+                <button onClick={closeLibrary} style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#999', padding: '4px' }}>✕</button>
+              </div>
+
+              {/* Search */}
+              <div style={{ padding: '12px 20px 0', flexShrink: 0 }}>
+                <input
+                  type="text"
+                  placeholder={t('搜索动作名称、目标肌肉...', 'Search name, muscles...')}
+                  value={libSearch}
+                  onChange={e => setLibSearch(e.target.value)}
+                  style={{ width: '100%', padding: '9px 14px', border: '1px solid #ddd', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                  autoFocus
+                />
+              </div>
+
+              {/* Filters */}
+              <div style={{ padding: '10px 20px', flexShrink: 0, display: 'flex', gap: '8px', overflowX: 'auto' }}>
+                {/* Type filter */}
+                <select value={libFilterType} onChange={e => setLibFilterType(e.target.value)}
+                  style={{ padding: '6px 10px', border: `1px solid ${libFilterType ? '#9B7DB5' : '#ddd'}`, borderRadius: '20px', fontSize: '12px', backgroundColor: libFilterType ? '#f0eaf8' : 'white', color: libFilterType ? '#9B7DB5' : '#666', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <option value="">{t('全部分类', 'All types')}</option>
+                  {allTypes.map(t2 => <option key={t2} value={t2}>{t2}</option>)}
+                </select>
+                {/* Difficulty filter */}
+                <select value={libFilterDiff} onChange={e => setLibFilterDiff(e.target.value)}
+                  style={{ padding: '6px 10px', border: `1px solid ${libFilterDiff ? '#9B7DB5' : '#ddd'}`, borderRadius: '20px', fontSize: '12px', backgroundColor: libFilterDiff ? '#f0eaf8' : 'white', color: libFilterDiff ? '#9B7DB5' : '#666', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <option value="">{t('全部难度', 'All levels')}</option>
+                  {allDiffs.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                {/* Muscle filter */}
+                <select value={libFilterMuscle} onChange={e => setLibFilterMuscle(e.target.value)}
+                  style={{ padding: '6px 10px', border: `1px solid ${libFilterMuscle ? '#9B7DB5' : '#ddd'}`, borderRadius: '20px', fontSize: '12px', backgroundColor: libFilterMuscle ? '#f0eaf8' : 'white', color: libFilterMuscle ? '#9B7DB5' : '#666', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <option value="">{t('全部肌肉', 'All muscles')}</option>
+                  {allMuscles.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+                {activeFilterCount > 0 && (
+                  <button onClick={() => { setLibFilterType(''); setLibFilterDiff(''); setLibFilterMuscle('') }}
+                    style={{ padding: '6px 12px', border: '1px solid #ddd', borderRadius: '20px', fontSize: '12px', backgroundColor: 'white', color: '#999', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {t('清除筛选', 'Clear')}
+                  </button>
+                )}
+              </div>
+
+              {/* Exercise list */}
+              <div style={{ overflowY: 'auto', flex: 1, padding: '0 20px 20px' }}>
+                {libResults.length === 0 && (
+                  <p style={{ textAlign: 'center', color: '#bbb', padding: '40px 0', fontSize: '14px' }}>{t('没有匹配的动作', 'No exercises found')}</p>
+                )}
+                {libResults.map(ex => {
+                  const added = alreadyAdded.has(ex.id)
+                  return (
+                    <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 0', borderBottom: '1px solid #f0f0f0' }}>
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: '0 0 3px 0', fontWeight: '600', fontSize: '14px', color: added ? '#bbb' : '#333' }}>
+                          {lang === 'zh' ? (ex.name_cn || ex.name_en) : (ex.name_en || ex.name_cn)}
+                        </p>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {ex.type_cn && <span style={{ fontSize: '11px', color: '#9B7DB5', backgroundColor: '#f0eaf8', padding: '1px 7px', borderRadius: '8px' }}>{lang === 'zh' ? ex.type_cn : ex.type_en}</span>}
+                          {ex.difficulty_cn && <span style={{ fontSize: '11px', color: '#888', backgroundColor: '#f5f5f5', padding: '1px 7px', borderRadius: '8px' }}>{lang === 'zh' ? ex.difficulty_cn : ex.difficulty_en}</span>}
+                          {ex.target_muscles_cn && <span style={{ fontSize: '11px', color: '#666' }}>{lang === 'zh' ? ex.target_muscles_cn : ex.target_muscles_en}</span>}
+                        </div>
+                      </div>
+                      {/* Default params */}
+                      {(ex.default_sets || ex.default_reps) && (
+                        <span style={{ fontSize: '11px', color: '#bbb', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                          {[ex.default_sets && `${ex.default_sets}组`, ex.default_reps && `${ex.default_reps}次`].filter(Boolean).join(' × ')}
+                        </span>
+                      )}
+                      {/* Add button */}
+                      {added ? (
+                        <span style={{ fontSize: '12px', color: '#bbb', whiteSpace: 'nowrap', flexShrink: 0 }}>✓ {t('已添加', 'Added')}</span>
+                      ) : (
+                        <button
+                          onClick={() => handleAddExercise(ex.id)}
+                          disabled={adding}
+                          style={{ width: '32px', height: '32px', borderRadius: '50%', border: 'none', backgroundColor: '#9B7DB5', color: 'white', cursor: adding ? 'wait' : 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, lineHeight: 1 }}>
+                          +
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Homework Modal */}
       {showHomework && classData && (() => {
