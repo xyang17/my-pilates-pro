@@ -118,23 +118,55 @@ export default function ExercisesPage() {
     })
   }
 
-  if (loading || isLoading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
+  if (loading || isLoading) return (
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>加载中…</span>
+    </div>
+  )
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      <header style={{ backgroundColor: '#9B7DB5', color: 'white', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-        <h1 style={{ margin: 0, fontSize: '18px' }}>{t('动作库', 'Exercise Library')}</h1>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <Link href="/dashboard/exercises/import" style={{ padding: '7px 14px', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', textDecoration: 'none', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.5)', fontSize: '13px' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
+      <header style={{
+        background: 'var(--c-card-bg)',
+        borderBottom: '1px solid var(--c-border)',
+        padding: '0 var(--sp-5)',
+        height: 56,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 'var(--sp-3)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)' }}>{t('动作库', 'Exercise Library')}</h1>
+        <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
+          <Link href="/dashboard/exercises/import" style={{
+            padding: '7px 14px',
+            background: 'var(--c-fill-light)',
+            color: 'var(--c-text-secondary)',
+            textDecoration: 'none',
+            borderRadius: 'var(--r-sm)',
+            border: '1px solid var(--c-border)',
+            fontSize: 'var(--text-sm)',
+          }}>
             📥 {t('导入', 'Import')}
           </Link>
-          <Link href="/dashboard/exercises/new" style={{ padding: '7px 14px', backgroundColor: 'white', color: '#9B7DB5', textDecoration: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold' }}>
+          <Link href="/dashboard/exercises/new" style={{
+            padding: '7px 14px',
+            background: 'var(--c-brand)',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: 'var(--r-sm)',
+            fontSize: 'var(--text-sm)',
+            fontWeight: 500,
+          }}>
             + {t('新建', 'New')}
           </Link>
         </div>
       </header>
 
-      <main style={{ padding: '16px', maxWidth: '800px', margin: '0 auto' }}>
+      <main style={{ padding: 'var(--sp-4)', maxWidth: '800px', margin: '0 auto' }}>
         {/* Search */}
         <input
           type="text"
@@ -149,7 +181,7 @@ export default function ExercisesPage() {
           <select
             value={filterDifficulty}
             onChange={e => setFilterDifficulty(e.target.value)}
-            style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: `1px solid ${filterDifficulty ? '#9B7DB5' : '#ddd'}`, fontSize: '13px', backgroundColor: filterDifficulty ? '#f0eaf8' : 'white', color: filterDifficulty ? '#9B7DB5' : '#555', cursor: 'pointer' }}
+            style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: `1px solid ${filterDifficulty ? 'var(--c-brand)' : '#ddd'}`, fontSize: '13px', backgroundColor: filterDifficulty ? '#f0eaf8' : 'white', color: filterDifficulty ? 'var(--c-brand)' : '#555', cursor: 'pointer' }}
           >
             <option value="">{t('全部难度', 'All Levels')}</option>
             {difficultyOptions.map(d => (
@@ -160,7 +192,7 @@ export default function ExercisesPage() {
           <select
             value={filterMuscle}
             onChange={e => setFilterMuscle(e.target.value)}
-            style={{ flex: 2, padding: '8px 12px', borderRadius: '8px', border: `1px solid ${filterMuscle ? '#9B7DB5' : '#ddd'}`, fontSize: '13px', backgroundColor: filterMuscle ? '#f0eaf8' : 'white', color: filterMuscle ? '#9B7DB5' : '#555', cursor: 'pointer' }}
+            style={{ flex: 2, padding: '8px 12px', borderRadius: '8px', border: `1px solid ${filterMuscle ? 'var(--c-brand)' : '#ddd'}`, fontSize: '13px', backgroundColor: filterMuscle ? '#f0eaf8' : 'white', color: filterMuscle ? 'var(--c-brand)' : '#555', cursor: 'pointer' }}
           >
             <option value="">{t('全部肌群', 'All Muscles')}</option>
             {muscleOptions.map(m => (
@@ -171,7 +203,7 @@ export default function ExercisesPage() {
           {(filterDifficulty || filterMuscle) && (
             <button
               onClick={() => { setFilterDifficulty(''); setFilterMuscle('') }}
-              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '13px', cursor: 'pointer', backgroundColor: 'white', color: '#999' }}
+              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '13px', cursor: 'pointer', background: 'var(--c-card-bg)', color: '#999' }}
             >
               ✕
             </button>
@@ -182,7 +214,7 @@ export default function ExercisesPage() {
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '16px' }}>
           <button
             onClick={() => { setActiveCategory('__all__'); setSearchTerm('') }}
-            style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, backgroundColor: activeCategory === '__all__' ? '#9B7DB5' : 'white', color: activeCategory === '__all__' ? 'white' : '#666', fontWeight: activeCategory === '__all__' ? 'bold' : 'normal' }}
+            style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, backgroundColor: activeCategory === '__all__' ? 'var(--c-brand)' : 'white', color: activeCategory === '__all__' ? 'white' : '#666', fontWeight: activeCategory === '__all__' ? 'bold' : 'normal' }}
           >
             {t('全部', 'All')} ({exercises.length})
           </button>
@@ -190,7 +222,7 @@ export default function ExercisesPage() {
             <button
               key={key}
               onClick={() => { setActiveCategory(key); setSearchTerm('') }}
-              style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, backgroundColor: activeCategory === key ? '#9B7DB5' : 'white', color: activeCategory === key ? 'white' : '#666', fontWeight: activeCategory === key ? 'bold' : 'normal' }}
+              style={{ padding: '6px 14px', borderRadius: '20px', border: 'none', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, backgroundColor: activeCategory === key ? 'var(--c-brand)' : 'white', color: activeCategory === key ? 'white' : '#666', fontWeight: activeCategory === key ? 'bold' : 'normal' }}
             >
               {label}
             </button>
@@ -199,11 +231,11 @@ export default function ExercisesPage() {
 
         {/* List */}
         {filtered.length === 0 ? (
-          <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '40px', textAlign: 'center', color: '#999' }}>
+          <div style={{ background: 'var(--c-card-bg)', borderRadius: '10px', padding: '40px', textAlign: 'center', color: '#999' }}>
             {exercises.length === 0 ? (
               <>
                 <p style={{ marginBottom: '12px' }}>{t('暂无动作，点击新建或从 Excel 导入', 'No exercises yet. Create one or import from Excel.')}</p>
-                <Link href="/dashboard/exercises/new" style={{ color: '#9B7DB5', fontWeight: 'bold' }}>+ {t('新建第一个动作', 'Create First Exercise')} →</Link>
+                <Link href="/dashboard/exercises/new" style={{ color: 'var(--c-brand)', fontWeight: 'bold' }}>+ {t('新建第一个动作', 'Create First Exercise')} →</Link>
               </>
             ) : t('没有匹配的动作', 'No matching exercises')}
           </div>
@@ -211,7 +243,7 @@ export default function ExercisesPage() {
           Object.entries(grouped).map(([key, { label, items }]) => (
             <div key={key} style={{ marginBottom: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                <h2 style={{ margin: 0, fontSize: '14px', color: '#9B7DB5', fontWeight: 'bold' }}>{label}</h2>
+                <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--c-brand)', fontWeight: 'bold' }}>{label}</h2>
                 <span style={{ fontSize: '12px', color: '#bbb' }}>{items.length} {t('个', '')}</span>
                 <div style={{ flex: 1, height: '1px', backgroundColor: '#e8dff5' }} />
               </div>
@@ -234,13 +266,13 @@ function ExerciseRows({ items, exName, exNameSub, exDiff, exMuscles }: {
   exMuscles: (ex: Exercise) => string
 }) {
   return (
-    <div style={{ backgroundColor: 'white', borderRadius: '10px', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--c-card-bg)', borderRadius: '10px', overflow: 'hidden' }}>
       {items.map((ex, idx) => {
         const diff = exDiff(ex)
         return (
           <Link key={ex.id} href={`/dashboard/exercises/${ex.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: idx < items.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '8px', backgroundColor: '#f0eaf8', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'var(--c-fill-light)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {ex.featured_image_url
                   ? <img src={ex.featured_image_url} alt={ex.name_en} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   : <span style={{ fontSize: '22px' }}>🏋️</span>}
@@ -262,7 +294,7 @@ function ExerciseRows({ items, exName, exNameSub, exDiff, exMuscles }: {
                 {ex.default_sets && ex.default_reps && (
                   <span style={{ fontSize: '11px', color: '#bbb' }}>{ex.default_sets}×{ex.default_reps}</span>
                 )}
-                <span style={{ fontSize: '12px', color: '#9B7DB5' }}>→</span>
+                <span style={{ fontSize: '12px', color: 'var(--c-brand)' }}>→</span>
               </div>
             </div>
           </Link>

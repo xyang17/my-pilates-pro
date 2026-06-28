@@ -208,7 +208,7 @@ export default function ClassReviewPage() {
     return (
       <div style={{ padding: '40px', textAlign: 'center' }}>
         <p>{error || '课程未找到'}</p>
-        <Link href="/dashboard/classes" style={{ color: '#9B7DB5' }}>← 返回</Link>
+        <Link href="/dashboard/classes" style={{ color: 'var(--c-brand)' }}>← 返回</Link>
       </div>
     )
   }
@@ -216,27 +216,20 @@ export default function ClassReviewPage() {
   const isCompleted = classData.status === 'completed'
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
       {/* Header */}
-      <header style={{
-        backgroundColor: '#9B7DB5',
-        color: 'white',
-        padding: '16px 20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <Link href={`/dashboard/classes/${classId}`} style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
+      <header style={{ background: 'var(--c-card-bg)', borderBottom: '1px solid var(--c-border)', padding: '0 var(--sp-5)', height: 56, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--sp-4)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <Link href={`/dashboard/classes/${classId}`} style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)', flexShrink: 0 }}>
           ← 返回
         </Link>
-        <div style={{ textAlign: 'center' }}>
-          <h1 style={{ margin: 0, fontSize: '17px' }}>{isCompleted ? '课后记录' : '课后复盘'}</h1>
-          <p style={{ margin: '2px 0 0 0', fontSize: '12px', opacity: 0.8 }}>
+        <div style={{ textAlign: 'center', flex: 1 }}>
+          <h1 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--c-text-primary)' }}>{isCompleted ? '课后记录' : '课后复盘'}</h1>
+          <p style={{ margin: '2px 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-text-secondary)' }}>
             {classData.name} · {new Date(classData.date).toLocaleDateString('zh-CN')}
           </p>
         </div>
-        <div style={{ fontSize: '12px', opacity: saveStatus === 'saved' ? 1 : 0.6 }}>
-          {saveStatus === 'saving' ? '保存中...' : saveStatus === 'saved' ? '✓ 已保存' : ''}
+        <div style={{ fontSize: 'var(--text-xs)', color: saveStatus === 'saved' ? 'var(--c-brand)' : 'var(--c-text-hint)', flexShrink: 0 }}>
+          {saveStatus === 'saving' ? '保存中…' : saveStatus === 'saved' ? '✓ 已保存' : ''}
         </div>
       </header>
 
@@ -249,19 +242,19 @@ export default function ClassReviewPage() {
 
         {/* Exercise list */}
         {exercises.length === 0 ? (
-          <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '40px', textAlign: 'center', color: '#999', marginBottom: '16px' }}>
+          <div style={{ background: 'var(--c-card-bg)', borderRadius: '8px', padding: '40px', textAlign: 'center', color: '#999', marginBottom: '16px' }}>
             <p>这节课没有预设动作</p>
             <p style={{ fontSize: '13px' }}>课后总结直接在下方填写即可</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
             {exercises.map((ex, i) => (
-              <div key={ex.id} style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px' }}>
+              <div key={ex.id} style={{ background: 'var(--c-card-bg)', borderRadius: '8px', padding: '16px' }}>
                 {/* Exercise title */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                   <div style={{
                     width: '26px', height: '26px',
-                    backgroundColor: '#9B7DB5', color: 'white',
+                    backgroundColor: 'var(--c-brand)', color: 'white',
                     borderRadius: '50%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '12px', fontWeight: 'bold', flexShrink: 0,
@@ -380,7 +373,7 @@ export default function ClassReviewPage() {
         )}
 
         {/* Overall summary */}
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--c-card-bg)', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
           <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', color: '#444' }}>整体课程总结</p>
           <textarea
             rows={4}

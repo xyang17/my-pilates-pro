@@ -60,11 +60,15 @@ export default function TrainerProfilePage() {
     }
   }
 
-  if (authLoading || isLoading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
+  if (authLoading || isLoading) return (
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>加载中…</span>
+    </div>
+  )
   if (!trainer) return (
     <div style={{ padding: '40px', textAlign: 'center' }}>
-      <p>{error || '教练未找到'}</p>
-      <Link href="/dashboard" style={{ color: '#9B7DB5' }}>← 返回</Link>
+      <p style={{ color: 'var(--c-text-secondary)' }}>{error || '教练未找到'}</p>
+      <Link href="/dashboard" style={{ color: 'var(--c-brand)' }}>← 返回</Link>
     </div>
   )
 
@@ -72,47 +76,58 @@ export default function TrainerProfilePage() {
   const past = trainer.classes.filter(c => c.status === 'completed')
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      <header style={{ backgroundColor: '#9B7DB5', color: 'white', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: 'white', fontSize: '14px', cursor: 'pointer' }}>← 返回 Back</button>
-        <h1 style={{ margin: 0, fontSize: '18px' }}>教练主页 Trainer Profile</h1>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
+      <header style={{
+        background: 'var(--c-card-bg)',
+        borderBottom: '1px solid var(--c-border)',
+        padding: '0 var(--sp-5)',
+        height: 56,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--sp-4)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}>
+        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: 'var(--c-text-secondary)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>← 返回</button>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', flex: 1 }}>教练主页</h1>
       </header>
 
-      <main style={{ padding: '20px', maxWidth: '700px', margin: '0 auto' }}>
+      <main style={{ padding: 'var(--sp-5)', maxWidth: '700px', margin: '0 auto' }}>
         {/* Profile card */}
-        <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+        <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 'var(--sp-6)', marginBottom: 'var(--sp-4)' }}>
+          <div style={{ display: 'flex', gap: 'var(--sp-5)', alignItems: 'flex-start' }}>
             {trainer.photo_url ? (
               <img src={trainer.photo_url} alt={trainer.name}
-                style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             ) : (
-              <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#9B7DB5', color: 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 'bold' }}>
+              <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'var(--c-fill-light)', border: '2px solid var(--c-pink-mist)', color: 'var(--c-brand)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-2xl)', fontWeight: 700 }}>
                 {trainer.name?.[0] || '?'}
               </div>
             )}
             <div style={{ flex: 1 }}>
-              <h2 style={{ margin: '0 0 6px 0', fontSize: '20px' }}>{trainer.name}</h2>
+              <h2 style={{ margin: '0 0 6px', fontSize: 'var(--text-xl)', fontWeight: 600, color: 'var(--c-text-primary)' }}>{trainer.name}</h2>
               {trainer.certificate && (
-                <p style={{ margin: '0 0 8px 0', color: '#9B7DB5', fontSize: '13px' }}>🏆 {trainer.certificate}</p>
+                <p style={{ margin: '0 0 8px', color: 'var(--c-brand)', fontSize: 'var(--text-sm)' }}>🏆 {trainer.certificate}</p>
               )}
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '13px' }}>📧 {trainer.email}</p>
+              <p style={{ margin: '0 0 4px', color: 'var(--c-text-secondary)', fontSize: 'var(--text-sm)' }}>📧 {trainer.email}</p>
             </div>
           </div>
           {trainer.bio && (
-            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
-              <p style={{ margin: '0 0 6px 0', color: '#999', fontSize: '12px' }}>简介 Bio</p>
-              <p style={{ margin: 0, color: '#444', lineHeight: '1.7', fontSize: '14px' }}>{trainer.bio}</p>
+            <div style={{ marginTop: 'var(--sp-4)', paddingTop: 'var(--sp-4)', borderTop: '1px solid var(--c-border)' }}>
+              <p style={{ margin: '0 0 6px', color: 'var(--c-text-hint)', fontSize: 'var(--text-xs)' }}>简介</p>
+              <p style={{ margin: 0, color: 'var(--c-text-primary)', lineHeight: '1.7', fontSize: 'var(--text-sm)' }}>{trainer.bio}</p>
             </div>
           )}
         </div>
 
         {/* Upcoming classes */}
-        <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '20px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', borderBottom: '2px solid #f3eef9', paddingBottom: '10px' }}>
-            即将上课 Upcoming ({upcoming.length})
+        <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 'var(--sp-5)', marginBottom: 'var(--sp-4)' }}>
+          <h3 style={{ margin: '0 0 var(--sp-4)', fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--c-text-primary)', borderBottom: '1px solid var(--c-border)', paddingBottom: 'var(--sp-3)' }}>
+            即将上课 ({upcoming.length})
           </h3>
           {upcoming.length === 0 ? (
-            <p style={{ color: '#999', textAlign: 'center', padding: '20px 0' }}>暂无排课</p>
+            <p style={{ color: 'var(--c-text-hint)', textAlign: 'center', padding: 'var(--sp-5) 0', fontSize: 'var(--text-sm)' }}>暂无排课</p>
           ) : (
             upcoming.map(c => <ClassRow key={c.id} c={c} />)
           )}
@@ -120,9 +135,9 @@ export default function TrainerProfilePage() {
 
         {/* Past classes */}
         {past.length > 0 && (
-          <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '20px' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', borderBottom: '2px solid #f3eef9', paddingBottom: '10px' }}>
-              历史课程 History ({past.length})
+          <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 'var(--sp-5)' }}>
+            <h3 style={{ margin: '0 0 var(--sp-4)', fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--c-text-primary)', borderBottom: '1px solid var(--c-border)', paddingBottom: 'var(--sp-3)' }}>
+              历史课程 ({past.length})
             </h3>
             {past.map(c => <ClassRow key={c.id} c={c} />)}
           </div>
@@ -136,18 +151,18 @@ function ClassRow({ c }: { c: TrainerClass }) {
   const LEVEL_LABEL: Record<string, string> = { beginner: '初级', intermediate: '中级', advanced: '高级' }
   return (
     <Link href={`/dashboard/classes/${c.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid #f5f5f5' }}>
-        <div style={{ width: '4px', height: '40px', borderRadius: '2px', backgroundColor: c.color || '#9B7DB5', flexShrink: 0 }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)', padding: 'var(--sp-3) 0', borderBottom: '1px solid var(--c-border)' }}>
+        <div style={{ width: 4, height: 40, borderRadius: 2, background: 'var(--c-lavender)', flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
-          <p style={{ margin: '0 0 3px 0', fontWeight: 'bold', fontSize: '14px' }}>{c.name}</p>
-          <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
+          <p style={{ margin: '0 0 3px', fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)' }}>{c.name}</p>
+          <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--c-text-secondary)' }}>
             {new Date(c.date + 'T12:00:00').toLocaleDateString('zh-CN')}
             {c.start_time && ` · ${c.start_time.slice(0, 5)}`}
             {c.discipline && ` · ${c.discipline}`}
             {c.level && ` · ${LEVEL_LABEL[c.level] || c.level}`}
           </p>
         </div>
-        <span style={{ fontSize: '12px', color: '#9B7DB5' }}>→</span>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-hint)' }}>→</span>
       </div>
     </Link>
   )

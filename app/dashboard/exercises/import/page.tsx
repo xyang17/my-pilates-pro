@@ -120,10 +120,10 @@ export default function ImportExercisesPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      <header style={{ backgroundColor: '#9B7DB5', color: 'white', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <Link href="/dashboard/exercises" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>← 返回 Back</Link>
-        <h1 style={{ margin: 0, fontSize: '18px' }}>批量导入动作 Import Exercises</h1>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
+      <header style={{ background: 'var(--c-card-bg)', borderBottom: '1px solid var(--c-border)', padding: '0 var(--sp-5)', height: 56, display: 'flex', alignItems: 'center', gap: 'var(--sp-4)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <Link href="/dashboard/exercises" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>← 返回</Link>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', flex: 1 }}>批量导入动作</h1>
       </header>
 
       <main style={{ padding: '20px', maxWidth: '700px', margin: '0 auto' }}>
@@ -139,7 +139,7 @@ export default function ImportExercisesPage() {
             {result.errors.map((e, i) => (
               <p key={i} style={{ margin: '4px 0', fontSize: '12px', color: '#E74C3C' }}>• {e.exercise}: {e.error}</p>
             ))}
-            <Link href="/dashboard/exercises" style={{ display: 'inline-block', marginTop: '12px', color: '#9B7DB5', fontWeight: 'bold', fontSize: '14px', textDecoration: 'none' }}>
+            <Link href="/dashboard/exercises" style={{ display: 'inline-block', marginTop: '12px', color: 'var(--c-brand)', fontWeight: 'bold', fontSize: '14px', textDecoration: 'none' }}>
               → 查看动作库 View Library
             </Link>
           </div>
@@ -153,7 +153,7 @@ export default function ImportExercisesPage() {
         )}
 
         {/* Instructions */}
-        <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '20px', marginBottom: '16px' }}>
+        <div style={{ background: 'var(--c-card-bg)', borderRadius: '10px', padding: '20px', marginBottom: '16px' }}>
           <h2 style={{ margin: '0 0 12px 0', fontSize: '15px' }}>使用说明 How to Import</h2>
           <ol style={{ margin: 0, paddingLeft: '20px', lineHeight: '2', fontSize: '13px', color: '#555' }}>
             <li>下载模板 / Download the template below</li>
@@ -164,7 +164,7 @@ export default function ImportExercisesPage() {
           </ol>
           <button
             onClick={downloadTemplate}
-            style={{ marginTop: '14px', padding: '10px 20px', backgroundColor: '#9B7DB5', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
+            style={{ marginTop: '14px', padding: '10px 20px', backgroundColor: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
           >
             📥 下载模板 Download Template
           </button>
@@ -172,7 +172,7 @@ export default function ImportExercisesPage() {
 
         {/* Upload */}
         {!result && (
-          <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '20px' }}>
+          <div style={{ background: 'var(--c-card-bg)', borderRadius: '10px', padding: '20px' }}>
             <h2 style={{ margin: '0 0 16px 0', fontSize: '15px' }}>上传文件 Upload File</h2>
 
             <div
@@ -181,7 +181,7 @@ export default function ImportExercisesPage() {
               onDragLeave={() => setDragging(false)}
               onClick={() => fileInputRef.current?.click()}
               style={{
-                border: `2px dashed ${dragging ? '#9B7DB5' : '#ddd'}`,
+                border: `2px dashed ${dragging ? 'var(--c-brand)' : '#ddd'}`,
                 borderRadius: '10px',
                 padding: '40px',
                 textAlign: 'center',
@@ -194,7 +194,7 @@ export default function ImportExercisesPage() {
               <div style={{ fontSize: '36px', marginBottom: '8px' }}>📄</div>
               {file ? (
                 <>
-                  <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', color: '#9B7DB5' }}>{file.name}</p>
+                  <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', color: 'var(--c-brand)' }}>{file.name}</p>
                   <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>点击重新选择 / Click to change</p>
                 </>
               ) : (
@@ -209,7 +209,7 @@ export default function ImportExercisesPage() {
             {/* Preview */}
             {preview.length > 0 && (
               <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f9f6fc', borderRadius: '8px' }}>
-                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#9B7DB5', fontWeight: 'bold' }}>预览前 {preview.length} 行 / Preview first {preview.length} rows</p>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--c-brand)', fontWeight: 'bold' }}>预览前 {preview.length} 行 / Preview first {preview.length} rows</p>
                 {preview.map((row, i) => (
                   <p key={i} style={{ margin: '2px 0', fontSize: '12px', color: '#555' }}>
                     {i + 1}. {(row as any).name_en || '—'} / {(row as any).name_cn || '—'}
@@ -225,7 +225,7 @@ export default function ImportExercisesPage() {
               <button
                 onClick={handleSubmit}
                 disabled={!file || isLoading}
-                style={{ flex: 2, padding: '12px', backgroundColor: '#9B7DB5', color: 'white', border: 'none', borderRadius: '8px', cursor: file && !isLoading ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '14px', opacity: file && !isLoading ? 1 : 0.5 }}
+                style={{ flex: 2, padding: '12px', backgroundColor: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: '8px', cursor: file && !isLoading ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '14px', opacity: file && !isLoading ? 1 : 0.5 }}
               >
                 {isLoading ? '导入中... Importing...' : `导入动作 Import${preview.length > 0 ? ` (预览 ${preview.length} 行+)` : ''}`}
               </button>

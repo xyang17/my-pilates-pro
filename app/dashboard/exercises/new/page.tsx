@@ -94,14 +94,10 @@ export default function NewExercisePage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
       {/* Header */}
-      <header style={{
-        backgroundColor: '#9B7DB5',
-        color: 'white',
-        padding: '20px',
-      }}>
-        <h1>Create New Exercise</h1>
+      <header style={{ background: 'var(--c-card-bg)', borderBottom: '1px solid var(--c-border)', padding: '0 var(--sp-5)', height: 56, display: 'flex', alignItems: 'center', gap: 'var(--sp-4)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)' }}>新建动作</h1>
       </header>
 
       {/* Form */}
@@ -119,7 +115,7 @@ export default function NewExercisePage() {
         )}
 
         <form onSubmit={handleSubmit} style={{
-          backgroundColor: 'white',
+          background: 'var(--c-card-bg)',
           padding: '30px',
           borderRadius: '8px',
         }}>
@@ -479,7 +475,7 @@ export default function NewExercisePage() {
               disabled={isLoading}
               style={{
                 padding: '12px',
-                backgroundColor: '#9B7DB5',
+                backgroundColor: 'var(--c-brand)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',

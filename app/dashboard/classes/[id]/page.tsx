@@ -752,13 +752,13 @@ export default function ClassDetailPage() {
 
         {/* Assigned client card — shown to trainers on private classes */}
         {isTrainer && assignedClient && classData.class_type === 'private' && (
-          <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', marginBottom: '16px', borderLeft: '4px solid #9B7DB5' }}>
+          <div style={{ background: 'var(--c-card-bg)', borderRadius: '8px', padding: '16px', marginBottom: '16px', borderLeft: '4px solid var(--c-brand)' }}>
             <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', marginBottom: (assignedClient.injury_notes || assignedClient.goals || assignedClient.bio) ? '14px' : '0' }}>
               {assignedClient.photo_url ? (
                 <img src={assignedClient.photo_url} alt={assignedClient.name}
                   style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
               ) : (
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#9B7DB5', color: 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--c-fill-light)', border: '2px solid var(--c-pink-mist)', color: 'var(--c-brand)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 600 }}>
                   {assignedClient.name?.[0] || '?'}
                 </div>
               )}
@@ -766,7 +766,7 @@ export default function ClassDetailPage() {
                 <p style={{ margin: '0 0 2px 0', fontWeight: 'bold', fontSize: '15px' }}>👤 {assignedClient.name || assignedClient.email}</p>
                 <p style={{ margin: 0, fontSize: '12px', color: '#aaa' }}>{assignedClient.email}</p>
               </div>
-              <Link href={`/dashboard/clients/${assignedClient.id}`} style={{ fontSize: '12px', color: '#9B7DB5', textDecoration: 'none', flexShrink: 0 }}>
+              <Link href={`/dashboard/clients/${assignedClient.id}`} style={{ fontSize: '12px', color: 'var(--c-brand)', textDecoration: 'none', flexShrink: 0 }}>
                 学员档案 →
               </Link>
             </div>
@@ -787,7 +787,7 @@ export default function ClassDetailPage() {
                 )}
                 {!assignedClient.injury_notes && !assignedClient.goals && assignedClient.bio && (
                   <div style={{ backgroundColor: '#f8f6fb', borderRadius: '6px', padding: '10px 12px' }}>
-                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#9B7DB5', fontWeight: 'bold' }}>📝 备注</p>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: 'var(--c-brand)', fontWeight: 'bold' }}>📝 备注</p>
                     <p style={{ margin: 0, fontSize: '13px', color: '#444', lineHeight: '1.6' }}>{assignedClient.bio}</p>
                   </div>
                 )}
@@ -806,20 +806,20 @@ export default function ClassDetailPage() {
 
         {/* Trainer card */}
         {trainerInfo && (
-          <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', marginBottom: '16px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+          <div style={{ background: 'var(--c-card-bg)', borderRadius: '8px', padding: '16px', marginBottom: '16px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
             {trainerInfo.photo_url ? (
               <img src={trainerInfo.photo_url} alt={trainerInfo.name}
                 style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             ) : (
-              <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: '#9B7DB5', color: 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 'bold' }}>
+              <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'var(--c-fill-light)', border: '2px solid var(--c-pink-mist)', color: 'var(--c-brand)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 600 }}>
                 {trainerInfo.name?.[0] || '?'}
               </div>
             )}
             <div style={{ flex: 1 }}>
               <p style={{ margin: '0 0 2px 0', fontWeight: 'bold', fontSize: '15px' }}>{trainerInfo.name}</p>
-              {trainerInfo.certificate && <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9B7DB5' }}>🏆 {trainerInfo.certificate}</p>}
+              {trainerInfo.certificate && <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--c-brand)' }}>🏆 {trainerInfo.certificate}</p>}
               {trainerInfo.bio && <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#666', lineHeight: '1.5' }}>{trainerInfo.bio.length > 100 ? trainerInfo.bio.slice(0, 100) + '...' : trainerInfo.bio}</p>}
-              <Link href={`/dashboard/trainers/${trainerInfo.id}`} style={{ fontSize: '12px', color: '#9B7DB5', textDecoration: 'none' }}>查看教练主页 →</Link>
+              <Link href={`/dashboard/trainers/${trainerInfo.id}`} style={{ fontSize: '12px', color: 'var(--c-brand)', textDecoration: 'none' }}>查看教练主页 →</Link>
             </div>
           </div>
         )}
@@ -850,8 +850,8 @@ export default function ClassDetailPage() {
                   background: 'none',
                   cursor: 'pointer',
                   fontWeight: activeTab === tab ? 'bold' : 'normal',
-                  color: activeTab === tab ? '#9B7DB5' : '#666',
-                  borderBottom: activeTab === tab ? '2px solid #9B7DB5' : '2px solid transparent',
+                  color: activeTab === tab ? 'var(--c-brand)' : '#666',
+                  borderBottom: activeTab === tab ? '2px solid var(--c-brand)' : '2px solid transparent',
                   marginBottom: '-2px',
                   fontSize: '14px',
                 }}
@@ -864,7 +864,7 @@ export default function ClassDetailPage() {
 
         {/* Exercise List */}
         {activeTab === 'exercises' && (
-          <div style={{ backgroundColor: 'white', borderRadius: isTrainer && isGroupClass ? '0 0 10px 10px' : '10px', overflow: 'hidden' }}>
+          <div style={{ background: 'var(--c-card-bg)', borderRadius: isTrainer && isGroupClass ? '0 0 10px 10px' : '10px', overflow: 'hidden' }}>
             {/* Header */}
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 'bold', color: '#444', fontSize: '14px' }}>
@@ -877,7 +877,7 @@ export default function ClassDetailPage() {
                     fetchClients()
                     if (classData?.assigned_to) setHomeworkStudentId(classData.assigned_to)
                   }}
-                  style={{ padding: '5px 12px', backgroundColor: '#E8A87C', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                  style={{ padding: '5px 12px', background: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}>
                   📋 {t('布置作业', 'Assign HW')}
                 </button>
               )}
@@ -908,7 +908,7 @@ export default function ClassDetailPage() {
                 return (
                   <div key={ex.id} style={{ display: 'grid', gridTemplateColumns: '24px 1fr 56px 56px 90px 1fr 28px', gap: '6px', padding: '8px 14px', borderBottom: i < classData.exercises.length - 1 ? '1px solid #f8f8f8' : 'none', alignItems: 'center', backgroundColor: isSaving ? '#fffef5' : 'white' }}>
                     {/* Index */}
-                    <div style={{ width: '22px', height: '22px', backgroundColor: '#9B7DB5', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                    <div style={{ width: '22px', height: '22px', backgroundColor: 'var(--c-brand)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', flexShrink: 0 }}>
                       {i + 1}
                     </div>
 
@@ -1019,29 +1019,29 @@ export default function ClassDetailPage() {
                         placeholder={t('搜索动作名称、肌肉...', 'Search name, muscles...')}
                         value={libSearch}
                         onChange={e => setLibSearch(e.target.value)}
-                        style={{ flex: 1, padding: '7px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px', outline: 'none', backgroundColor: 'white' }}
+                        style={{ flex: 1, padding: '7px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px', outline: 'none', background: 'var(--c-card-bg)' }}
                       />
                       <span style={{ fontSize: '12px', color: '#999', whiteSpace: 'nowrap' }}>{libResults.length} {t('个', '')}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
                       <select value={libFilterType} onChange={e => setLibFilterType(e.target.value)}
-                        style={{ padding: '5px 8px', border: `1px solid ${libFilterType ? '#9B7DB5' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: libFilterType ? '#f0eaf8' : 'white', color: libFilterType ? '#9B7DB5' : '#666', cursor: 'pointer', flexShrink: 0 }}>
+                        style={{ padding: '5px 8px', border: `1px solid ${libFilterType ? 'var(--c-brand)' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: libFilterType ? '#f0eaf8' : 'white', color: libFilterType ? 'var(--c-brand)' : '#666', cursor: 'pointer', flexShrink: 0 }}>
                         <option value="">{t('全部分类', 'All types')}</option>
                         {allTypes.map(tp => <option key={tp} value={tp}>{tp}</option>)}
                       </select>
                       <select value={libFilterDiff} onChange={e => setLibFilterDiff(e.target.value)}
-                        style={{ padding: '5px 8px', border: `1px solid ${libFilterDiff ? '#9B7DB5' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: libFilterDiff ? '#f0eaf8' : 'white', color: libFilterDiff ? '#9B7DB5' : '#666', cursor: 'pointer', flexShrink: 0 }}>
+                        style={{ padding: '5px 8px', border: `1px solid ${libFilterDiff ? 'var(--c-brand)' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: libFilterDiff ? '#f0eaf8' : 'white', color: libFilterDiff ? 'var(--c-brand)' : '#666', cursor: 'pointer', flexShrink: 0 }}>
                         <option value="">{t('全部难度', 'All levels')}</option>
                         {allDiffs.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
                       <select value={libFilterMuscle} onChange={e => setLibFilterMuscle(e.target.value)}
-                        style={{ padding: '5px 8px', border: `1px solid ${libFilterMuscle ? '#9B7DB5' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: libFilterMuscle ? '#f0eaf8' : 'white', color: libFilterMuscle ? '#9B7DB5' : '#666', cursor: 'pointer', flexShrink: 0 }}>
+                        style={{ padding: '5px 8px', border: `1px solid ${libFilterMuscle ? 'var(--c-brand)' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: libFilterMuscle ? '#f0eaf8' : 'white', color: libFilterMuscle ? 'var(--c-brand)' : '#666', cursor: 'pointer', flexShrink: 0 }}>
                         <option value="">{t('全部肌肉', 'All muscles')}</option>
                         {allMuscles.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                       {activeFilterCount > 0 && (
                         <button onClick={() => { setLibFilterType(''); setLibFilterDiff(''); setLibFilterMuscle('') }}
-                          style={{ padding: '5px 10px', border: '1px solid #ddd', borderRadius: '16px', fontSize: '11px', backgroundColor: 'white', color: '#999', cursor: 'pointer', flexShrink: 0 }}>
+                          style={{ padding: '5px 10px', border: '1px solid #ddd', borderRadius: '16px', fontSize: '11px', background: 'var(--c-card-bg)', color: '#999', cursor: 'pointer', flexShrink: 0 }}>
                           {t('清除', 'Clear')}
                         </button>
                       )}
@@ -1062,8 +1062,8 @@ export default function ClassDetailPage() {
                               {lang === 'zh' ? (ex.name_cn || ex.name_en) : (ex.name_en || ex.name_cn)}
                             </p>
                             <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                              {ex.type_cn && <span style={{ fontSize: '10px', color: '#9B7DB5', backgroundColor: '#f0eaf8', padding: '1px 6px', borderRadius: '6px' }}>{lang === 'zh' ? ex.type_cn : ex.type_en}</span>}
-                              {ex.difficulty_cn && <span style={{ fontSize: '10px', color: '#888', backgroundColor: '#f5f5f5', padding: '1px 6px', borderRadius: '6px' }}>{lang === 'zh' ? ex.difficulty_cn : ex.difficulty_en}</span>}
+                              {ex.type_cn && <span style={{ fontSize: '10px', color: 'var(--c-brand)', background: 'var(--c-fill-light)', padding: '1px 6px', borderRadius: '6px' }}>{lang === 'zh' ? ex.type_cn : ex.type_en}</span>}
+                              {ex.difficulty_cn && <span style={{ fontSize: '10px', color: '#888', background: 'var(--c-page-bg)', padding: '1px 6px', borderRadius: '6px' }}>{lang === 'zh' ? ex.difficulty_cn : ex.difficulty_en}</span>}
                               {ex.target_muscles_cn && <span style={{ fontSize: '10px', color: '#aaa' }}>{lang === 'zh' ? ex.target_muscles_cn : ex.target_muscles_en}</span>}
                             </div>
                           </div>
@@ -1076,7 +1076,7 @@ export default function ClassDetailPage() {
                             <span style={{ fontSize: '11px', color: '#bbb', flexShrink: 0 }}>✓</span>
                           ) : (
                             <button onClick={() => handleAddExercise(ex.id)} disabled={adding}
-                              style={{ width: '28px', height: '28px', borderRadius: '50%', border: 'none', backgroundColor: '#9B7DB5', color: 'white', cursor: adding ? 'wait' : 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, lineHeight: 1 }}>
+                              style={{ width: '28px', height: '28px', borderRadius: '50%', border: 'none', backgroundColor: 'var(--c-brand)', color: 'white', cursor: adding ? 'wait' : 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, lineHeight: 1 }}>
                               +
                             </button>
                           )}
@@ -1092,7 +1092,7 @@ export default function ClassDetailPage() {
 
                 {/* Student Notes Tab (trainer view of group class) */}
         {activeTab === 'student-notes' && (
-          <div style={{ backgroundColor: 'white', borderRadius: '0 0 8px 8px', padding: '20px' }}>
+          <div style={{ background: 'var(--c-card-bg)', borderRadius: '0 0 8px 8px', padding: '20px' }}>
             {studentNotes.length === 0 ? (
               <p style={{ color: '#999', textAlign: 'center', padding: '20px 0' }}>暂无学员笔记</p>
             ) : (
@@ -1120,7 +1120,7 @@ export default function ClassDetailPage() {
 
         return (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-            <div style={{ backgroundColor: 'white', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: 'var(--c-card-bg)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2 style={{ margin: 0, fontSize: '17px' }}>📋 {t('布置课后作业', 'Assign Homework')}</h2>
                 <button onClick={() => { setShowHomework(false); setHwExtraSearch(''); setHwExtraSelected(new Set()) }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>✕</button>
@@ -1131,7 +1131,7 @@ export default function ClassDetailPage() {
                 <label style={{ fontSize: '13px', color: '#666', display: 'block', marginBottom: '16px' }}>
                   {t('分配给学员', 'Assign to student')}
                   <select value={homeworkStudentId} onChange={e => setHomeworkStudentId(e.target.value)}
-                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', backgroundColor: 'white' }}>
+                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', background: 'var(--c-card-bg)' }}>
                     <option value="">{t('选择学员...', 'Select student...')}</option>
                     {clientList.map(c => (
                       <option key={c.id} value={c.id}>{c.name || c.email}</option>
@@ -1157,7 +1157,7 @@ export default function ClassDetailPage() {
                           })
                         }}
                         style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', cursor: 'pointer', borderBottom: i < classData.exercises.length - 1 ? '1px solid #eee' : 'none', backgroundColor: selected ? '#f0eaf8' : 'white' }}>
-                        <div style={{ width: '22px', height: '22px', borderRadius: '6px', border: `2px solid ${selected ? '#9B7DB5' : '#ddd'}`, backgroundColor: selected ? '#9B7DB5' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <div style={{ width: '22px', height: '22px', borderRadius: '6px', border: `2px solid ${selected ? 'var(--c-brand)' : '#ddd'}`, backgroundColor: selected ? 'var(--c-brand)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           {selected && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
                         </div>
                         <div style={{ flex: 1 }}>
@@ -1176,7 +1176,7 @@ export default function ClassDetailPage() {
                   <p style={{ margin: 0, fontSize: '13px', color: '#888', fontWeight: '600' }}>{t('额外添加动作', 'Add extra exercises')}</p>
                   <button
                     onClick={() => setShowHwLibrary(true)}
-                    style={{ padding: '6px 14px', backgroundColor: '#9B7DB5', color: 'white', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    style={{ padding: '6px 14px', backgroundColor: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
                     + {t('从动作库选', 'Browse library')}
                   </button>
                 </div>
@@ -1186,9 +1186,9 @@ export default function ClassDetailPage() {
                       const ex = availableExercises.find(e => e.id === id)
                       if (!ex) return null
                       return (
-                        <span key={id} style={{ padding: '4px 10px', backgroundColor: '#f0eaf8', borderRadius: '12px', fontSize: '12px', color: '#9B7DB5', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <span key={id} style={{ padding: '4px 10px', background: 'var(--c-fill-light)', borderRadius: '12px', fontSize: '12px', color: 'var(--c-brand)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           {lang === 'zh' ? (ex.name_cn || ex.name_en) : (ex.name_en || ex.name_cn)}
-                          <button onClick={() => setHwExtraSelected(prev => { const n = new Set(prev); n.delete(id); return n })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9B7DB5', fontSize: '12px', padding: 0, lineHeight: 1 }}>✕</button>
+                          <button onClick={() => setHwExtraSelected(prev => { const n = new Set(prev); n.delete(id); return n })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-brand)', fontSize: '12px', padding: 0, lineHeight: 1 }}>✕</button>
                         </span>
                       )
                     })}
@@ -1218,7 +1218,7 @@ export default function ClassDetailPage() {
                 <button
                   onClick={handleCreateHomework}
                   disabled={totalSelected === 0 || !homeworkStudentId || homeworkSubmitting}
-                  style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: '#E8A87C', color: 'white', cursor: totalSelected > 0 && homeworkStudentId ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '14px', opacity: totalSelected > 0 && homeworkStudentId ? 1 : 0.5 }}>
+                  style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', background: 'var(--c-brand)', color: 'white', cursor: totalSelected > 0 && homeworkStudentId ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '14px', opacity: totalSelected > 0 && homeworkStudentId ? 1 : 0.5 }}>
                   {homeworkSubmitting ? t('布置中...', 'Saving...') : `${t('布置作业', 'Assign')}（${totalSelected} ${t('个动作', 'exercises')}）`}
                 </button>
               </div>
@@ -1230,7 +1230,7 @@ export default function ClassDetailPage() {
       {/* Copy Class Modal */}
       {showCopyModal && classData && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 700, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ background: 'var(--c-card-bg)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
             {/* Header */}
             <div style={{ padding: '20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -1258,9 +1258,9 @@ export default function ClassDetailPage() {
                   type="date"
                   value={copyForm.date}
                   onChange={e => setCopyForm(p => ({ ...p, date: e.target.value }))}
-                  style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: `1px solid ${copyForm.date ? '#ddd' : '#E8A87C'}`, borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: `1px solid ${copyForm.date ? 'var(--c-border)' : 'var(--c-error)'}`, borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
                 />
-                {!copyForm.date && <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#E8A87C' }}>请选择日期</p>}
+                {!copyForm.date && <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--c-error)' }}>请选择日期</p>}
               </label>
 
               {/* Time */}
@@ -1281,7 +1281,7 @@ export default function ClassDetailPage() {
                   <select
                     value={copyForm.assigned_to}
                     onChange={e => setCopyForm(p => ({ ...p, assigned_to: e.target.value }))}
-                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', backgroundColor: 'white' }}
+                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', background: 'var(--c-card-bg)' }}
                   >
                     <option value="">{t('不指定学员', 'No student assigned')}</option>
                     {clientList.map(c => (
@@ -1300,7 +1300,7 @@ export default function ClassDetailPage() {
                 <div style={{ backgroundColor: '#f9f6fc', borderRadius: '10px', overflow: 'hidden' }}>
                   {classData.exercises.map((ex, i) => (
                     <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: i < classData.exercises.length - 1 ? '1px solid #eee' : 'none' }}>
-                      <span style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#9B7DB5', color: 'white', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                      <span style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'var(--c-brand)', color: 'white', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
                       <div style={{ flex: 1 }}>
                         <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 'bold' }}>
                           {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
@@ -1324,7 +1324,7 @@ export default function ClassDetailPage() {
               <button
                 onClick={handleCopyClass}
                 disabled={!copyForm.date || copying}
-                style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: '#9B7DB5', color: 'white', fontWeight: 'bold', fontSize: '14px', cursor: !copyForm.date || copying ? 'not-allowed' : 'pointer', opacity: !copyForm.date || copying ? 0.5 : 1 }}>
+                style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--c-brand)', color: 'white', fontWeight: 'bold', fontSize: '14px', cursor: !copyForm.date || copying ? 'not-allowed' : 'pointer', opacity: !copyForm.date || copying ? 0.5 : 1 }}>
                 {copying ? t('创建中…', 'Creating…') : t('确认创建', 'Confirm & Create')}
               </button>
             </div>
@@ -1360,7 +1360,7 @@ export default function ClassDetailPage() {
 
         return (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 600, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-            <div style={{ backgroundColor: 'white', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: 'var(--c-card-bg)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
               {/* Header */}
               <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2 style={{ margin: 0, fontSize: '16px' }}>💪 {t('从动作库选择', 'Browse Exercise Library')}</h2>
@@ -1379,23 +1379,23 @@ export default function ClassDetailPage() {
                 />
                 <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
                   <select value={hwLibFilterType} onChange={e => setHwLibFilterType(e.target.value)}
-                    style={{ padding: '5px 8px', border: `1px solid ${hwLibFilterType ? '#9B7DB5' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: hwLibFilterType ? '#f0eaf8' : 'white', color: hwLibFilterType ? '#9B7DB5' : '#666', cursor: 'pointer', flexShrink: 0 }}>
+                    style={{ padding: '5px 8px', border: `1px solid ${hwLibFilterType ? 'var(--c-brand)' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: hwLibFilterType ? '#f0eaf8' : 'white', color: hwLibFilterType ? 'var(--c-brand)' : '#666', cursor: 'pointer', flexShrink: 0 }}>
                     <option value="">{t('全部分类', 'All types')}</option>
                     {allTypes.map(tp => <option key={tp} value={tp}>{tp}</option>)}
                   </select>
                   <select value={hwLibFilterDiff} onChange={e => setHwLibFilterDiff(e.target.value)}
-                    style={{ padding: '5px 8px', border: `1px solid ${hwLibFilterDiff ? '#9B7DB5' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: hwLibFilterDiff ? '#f0eaf8' : 'white', color: hwLibFilterDiff ? '#9B7DB5' : '#666', cursor: 'pointer', flexShrink: 0 }}>
+                    style={{ padding: '5px 8px', border: `1px solid ${hwLibFilterDiff ? 'var(--c-brand)' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: hwLibFilterDiff ? '#f0eaf8' : 'white', color: hwLibFilterDiff ? 'var(--c-brand)' : '#666', cursor: 'pointer', flexShrink: 0 }}>
                     <option value="">{t('全部难度', 'All levels')}</option>
                     {allDiffs.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                   <select value={hwLibFilterMuscle} onChange={e => setHwLibFilterMuscle(e.target.value)}
-                    style={{ padding: '5px 8px', border: `1px solid ${hwLibFilterMuscle ? '#9B7DB5' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: hwLibFilterMuscle ? '#f0eaf8' : 'white', color: hwLibFilterMuscle ? '#9B7DB5' : '#666', cursor: 'pointer', flexShrink: 0 }}>
+                    style={{ padding: '5px 8px', border: `1px solid ${hwLibFilterMuscle ? 'var(--c-brand)' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: hwLibFilterMuscle ? '#f0eaf8' : 'white', color: hwLibFilterMuscle ? 'var(--c-brand)' : '#666', cursor: 'pointer', flexShrink: 0 }}>
                     <option value="">{t('全部肌肉', 'All muscles')}</option>
                     {allMuscles.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                   {(hwLibFilterType || hwLibFilterDiff || hwLibFilterMuscle) && (
                     <button onClick={() => { setHwLibFilterType(''); setHwLibFilterDiff(''); setHwLibFilterMuscle('') }}
-                      style={{ padding: '5px 10px', border: '1px solid #ddd', borderRadius: '16px', fontSize: '11px', backgroundColor: 'white', color: '#999', cursor: 'pointer', flexShrink: 0 }}>
+                      style={{ padding: '5px 10px', border: '1px solid #ddd', borderRadius: '16px', fontSize: '11px', background: 'var(--c-card-bg)', color: '#999', cursor: 'pointer', flexShrink: 0 }}>
                       {t('清除', 'Clear')}
                     </button>
                   )}
@@ -1414,7 +1414,7 @@ export default function ClassDetailPage() {
                     <div key={ex.id}
                       onClick={() => setHwExtraSelected(prev => { const n = new Set(prev); n.has(ex.id) ? n.delete(ex.id) : n.add(ex.id); return n })}
                       style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f5f5f5', cursor: 'pointer' }}>
-                      <div style={{ width: '22px', height: '22px', borderRadius: '6px', border: `2px solid ${sel ? '#9B7DB5' : '#ddd'}`, backgroundColor: sel ? '#9B7DB5' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: '22px', height: '22px', borderRadius: '6px', border: `2px solid ${sel ? 'var(--c-brand)' : '#ddd'}`, backgroundColor: sel ? 'var(--c-brand)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {sel && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1422,8 +1422,8 @@ export default function ClassDetailPage() {
                           {lang === 'zh' ? (ex.name_cn || ex.name_en) : (ex.name_en || ex.name_cn)}
                         </p>
                         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                          {ex.type_cn && <span style={{ fontSize: '10px', color: '#9B7DB5', backgroundColor: '#f0eaf8', padding: '1px 6px', borderRadius: '6px' }}>{lang === 'zh' ? ex.type_cn : ex.type_en}</span>}
-                          {ex.difficulty_cn && <span style={{ fontSize: '10px', color: '#888', backgroundColor: '#f5f5f5', padding: '1px 6px', borderRadius: '6px' }}>{lang === 'zh' ? ex.difficulty_cn : ex.difficulty_en}</span>}
+                          {ex.type_cn && <span style={{ fontSize: '10px', color: 'var(--c-brand)', background: 'var(--c-fill-light)', padding: '1px 6px', borderRadius: '6px' }}>{lang === 'zh' ? ex.type_cn : ex.type_en}</span>}
+                          {ex.difficulty_cn && <span style={{ fontSize: '10px', color: '#888', background: 'var(--c-page-bg)', padding: '1px 6px', borderRadius: '6px' }}>{lang === 'zh' ? ex.difficulty_cn : ex.difficulty_en}</span>}
                           {ex.target_muscles_cn && <span style={{ fontSize: '10px', color: '#aaa' }}>{lang === 'zh' ? ex.target_muscles_cn : ex.target_muscles_en}</span>}
                         </div>
                       </div>
@@ -1439,7 +1439,7 @@ export default function ClassDetailPage() {
                 </span>
                 <button
                   onClick={() => { setShowHwLibrary(false); setHwLibSearch(''); setHwLibFilterType(''); setHwLibFilterDiff(''); setHwLibFilterMuscle('') }}
-                  style={{ padding: '10px 24px', backgroundColor: '#9B7DB5', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  style={{ padding: '10px 24px', backgroundColor: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
                   {t('确认', 'Done')}
                 </button>
               </div>

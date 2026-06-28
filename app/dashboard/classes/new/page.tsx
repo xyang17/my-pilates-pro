@@ -33,11 +33,11 @@ const LEVELS = [
   { value: 'advanced',     en: 'Advanced',     cn: '高级' },
 ]
 
-const COLORS = ['#9B7DB5', '#E8A87C', '#85C1E9', '#82E0AA', '#F1948A', '#F7DC6F', '#A9CCE3']
+const COLORS = ['var(--c-brand)', '#E8A87C', '#85C1E9', '#82E0AA', '#F1948A', '#F7DC6F', '#A9CCE3']
 
 const s = {
   section: {
-    backgroundColor: 'white',
+    background: 'var(--c-card-bg)',
     borderRadius: '10px',
     padding: '20px',
     marginBottom: '16px',
@@ -100,16 +100,16 @@ function InlineCalendar({ value, onChange }: { value: string; onChange: (d: stri
   const CN_MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']
 
   return (
-    <div style={{ border: '1px solid #e0d5f0', borderRadius: '10px', overflow: 'hidden', backgroundColor: 'white' }}>
+    <div style={{ border: '1px solid #e0d5f0', borderRadius: '10px', overflow: 'hidden', background: 'var(--c-card-bg)' }}>
       {/* Nav */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: '#f9f6fd' }}>
         <button type="button" onClick={() => navToMonth(-1)}
-          style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#9B7DB5', lineHeight: 1 }}>‹</button>
+          style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--c-brand)', lineHeight: 1 }}>‹</button>
         <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>
           {view.year} {CN_MONTHS[view.month]}
         </span>
         <button type="button" onClick={() => navToMonth(1)}
-          style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#9B7DB5', lineHeight: 1 }}>›</button>
+          style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--c-brand)', lineHeight: 1 }}>›</button>
       </div>
       {/* Weekday headers */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '8px 10px 0' }}>
@@ -131,10 +131,10 @@ function InlineCalendar({ value, onChange }: { value: string; onChange: (d: stri
             <button key={i} type="button" onClick={() => select(day)} style={{
               padding: '7px 0', border: 'none', borderRadius: '50%', cursor: 'pointer',
               fontSize: '13px', textAlign: 'center',
-              backgroundColor: isSel ? '#9B7DB5' : 'transparent',
-              color: isSel ? 'white' : isToday ? '#9B7DB5' : '#333',
+              backgroundColor: isSel ? 'var(--c-brand)' : 'transparent',
+              color: isSel ? 'white' : isToday ? 'var(--c-brand)' : '#333',
               fontWeight: isSel || isToday ? 'bold' : 'normal',
-              outline: isToday && !isSel ? '1.5px solid #9B7DB5' : 'none',
+              outline: isToday && !isSel ? '1.5px solid var(--c-brand)' : 'none',
             }}>{day}</button>
           )
         })}
@@ -159,9 +159,9 @@ function TimeSlotPicker({ value, onChange }: { value: string; onChange: (t: stri
         {slots.map(slot => (
           <button key={slot} type="button" onClick={() => { onChange(slot); setShowCustom(false) }} style={{
             padding: '6px 12px',
-            border: `1.5px solid ${value === slot ? '#9B7DB5' : '#ddd'}`,
+            border: `1.5px solid ${value === slot ? 'var(--c-brand)' : '#ddd'}`,
             borderRadius: '20px',
-            backgroundColor: value === slot ? '#9B7DB5' : 'white',
+            backgroundColor: value === slot ? 'var(--c-brand)' : 'white',
             color: value === slot ? 'white' : '#555',
             cursor: 'pointer', fontSize: '13px',
             fontWeight: value === slot ? 'bold' : 'normal',
@@ -169,10 +169,10 @@ function TimeSlotPicker({ value, onChange }: { value: string; onChange: (t: stri
         ))}
         <button type="button" onClick={() => setShowCustom(true)} style={{
           padding: '6px 12px',
-          border: `1.5px solid ${showCustom ? '#9B7DB5' : '#ddd'}`,
+          border: `1.5px solid ${showCustom ? 'var(--c-brand)' : '#ddd'}`,
           borderRadius: '20px',
           backgroundColor: showCustom ? '#f3eef9' : 'white',
-          color: showCustom ? '#9B7DB5' : '#999',
+          color: showCustom ? 'var(--c-brand)' : '#999',
           cursor: 'pointer', fontSize: '13px',
         }}>其他 Other…</button>
       </div>
@@ -182,7 +182,7 @@ function TimeSlotPicker({ value, onChange }: { value: string; onChange: (t: stri
           onChange={(e) => onChange(e.target.value)}
           autoFocus
           style={{
-            padding: '8px 12px', border: '1.5px solid #9B7DB5',
+            padding: '8px 12px', border: '1.5px solid var(--c-brand)',
             borderRadius: '8px', fontSize: '14px', width: '160px',
           }}
         />
@@ -215,7 +215,7 @@ export default function NewClassPage() {
     description:     '',
     max_capacity:    10,
     price:           '',
-    color:           '#9B7DB5',
+    color:           'var(--c-brand)',
     cover_image_url: '',
     trainer_id:      '',
     assigned_to:     '',
@@ -312,16 +312,13 @@ export default function NewClassPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
       {/* Header */}
-      <header style={{
-        backgroundColor: '#9B7DB5', color: 'white',
-        padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px',
-      }}>
-        <Link href="/dashboard/classes" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
-          ← 返回 Back
+      <header style={{ background: 'var(--c-card-bg)', borderBottom: '1px solid var(--c-border)', padding: '0 var(--sp-5)', height: 56, display: 'flex', alignItems: 'center', gap: 'var(--sp-4)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <Link href="/dashboard/classes" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>
+          ← 返回
         </Link>
-        <h1 style={{ margin: 0, fontSize: '18px' }}>新建课程 New Class</h1>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', flex: 1 }}>新建课程</h1>
       </header>
 
       <main style={{ padding: '20px', maxWidth: '700px', margin: '0 auto' }}>
@@ -356,10 +353,10 @@ export default function NewClassPage() {
                     onClick={() => setFormData((prev) => ({ ...prev, discipline: d.value }))}
                     style={{
                       padding: '10px 6px', textAlign: 'center', cursor: 'pointer',
-                      border: `2px solid ${formData.discipline === d.value ? '#9B7DB5' : '#ddd'}`,
+                      border: `2px solid ${formData.discipline === d.value ? 'var(--c-brand)' : '#ddd'}`,
                       borderRadius: '8px',
                       backgroundColor: formData.discipline === d.value ? '#f3eef9' : 'white',
-                      color: formData.discipline === d.value ? '#9B7DB5' : '#555',
+                      color: formData.discipline === d.value ? 'var(--c-brand)' : '#555',
                       fontWeight: formData.discipline === d.value ? 'bold' : 'normal',
                     }}
                   >
@@ -379,10 +376,10 @@ export default function NewClassPage() {
                     onClick={() => setFormData((prev) => ({ ...prev, class_type: ct }))}
                     style={{
                       padding: '12px', cursor: 'pointer', fontSize: '14px',
-                      border: `2px solid ${formData.class_type === ct ? '#9B7DB5' : '#ddd'}`,
+                      border: `2px solid ${formData.class_type === ct ? 'var(--c-brand)' : '#ddd'}`,
                       borderRadius: '8px',
                       backgroundColor: formData.class_type === ct ? '#f3eef9' : 'white',
-                      color: formData.class_type === ct ? '#9B7DB5' : '#555',
+                      color: formData.class_type === ct ? 'var(--c-brand)' : '#555',
                       fontWeight: formData.class_type === ct ? 'bold' : 'normal',
                     }}
                   >
@@ -418,10 +415,10 @@ export default function NewClassPage() {
                     onClick={() => setFormData((prev) => ({ ...prev, level: l.value }))}
                     style={{
                       padding: '10px', cursor: 'pointer', fontSize: '13px',
-                      border: `2px solid ${formData.level === l.value ? '#9B7DB5' : '#ddd'}`,
+                      border: `2px solid ${formData.level === l.value ? 'var(--c-brand)' : '#ddd'}`,
                       borderRadius: '8px',
                       backgroundColor: formData.level === l.value ? '#f3eef9' : 'white',
-                      color: formData.level === l.value ? '#9B7DB5' : '#555',
+                      color: formData.level === l.value ? 'var(--c-brand)' : '#555',
                       fontWeight: formData.level === l.value ? 'bold' : 'normal',
                     }}
                   >
@@ -503,7 +500,7 @@ export default function NewClassPage() {
                 ) : (
                   <div style={{
                     width: '56px', height: '56px', borderRadius: '50%', flexShrink: 0,
-                    backgroundColor: '#9B7DB5', color: 'white',
+                    backgroundColor: 'var(--c-brand)', color: 'white',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '22px', fontWeight: 'bold',
                   }}>
@@ -513,7 +510,7 @@ export default function NewClassPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', fontSize: '15px' }}>{selectedTrainer.name}</p>
                   {selectedTrainer.certificate && (
-                    <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#9B7DB5' }}>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--c-brand)' }}>
                       🏆 {selectedTrainer.certificate}
                     </p>
                   )}
@@ -525,7 +522,7 @@ export default function NewClassPage() {
                     </p>
                   )}
                   <Link href={`/dashboard/trainers/${selectedTrainer.id}`}
-                    style={{ fontSize: '12px', color: '#9B7DB5', textDecoration: 'none' }}>
+                    style={{ fontSize: '12px', color: 'var(--c-brand)', textDecoration: 'none' }}>
                     查看详情 View Profile →
                   </Link>
                 </div>
@@ -611,7 +608,7 @@ export default function NewClassPage() {
                 <button
                   type="button"
                   onClick={() => setPhotoUrls((prev) => [...prev, ''])}
-                  style={{ padding: '8px 16px', border: '1px dashed #9B7DB5', backgroundColor: 'transparent', color: '#9B7DB5', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                  style={{ padding: '8px 16px', border: '1px dashed var(--c-brand)', backgroundColor: 'transparent', color: 'var(--c-brand)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
                 >
                   + 添加照片 Add Photo
                 </button>
@@ -652,7 +649,7 @@ export default function NewClassPage() {
             </Link>
             <button
               type="submit" disabled={isLoading}
-              style={{ padding: '14px', backgroundColor: '#9B7DB5', color: 'white', border: 'none', borderRadius: '8px', cursor: isLoading ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '15px', opacity: isLoading ? 0.6 : 1 }}
+              style={{ padding: '14px', backgroundColor: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: '8px', cursor: isLoading ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '15px', opacity: isLoading ? 0.6 : 1 }}
             >
               {isLoading ? '创建中... Creating...' : '创建课程 Create Class'}
             </button>

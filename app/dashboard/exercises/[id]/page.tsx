@@ -139,7 +139,7 @@ export default function ExerciseDetailPage() {
     return (
       <div style={{ padding: '40px', textAlign: 'center' }}>
         <p>Exercise not found</p>
-        <Link href="/dashboard/exercises" style={{ color: '#9B7DB5' }}>
+        <Link href="/dashboard/exercises" style={{ color: 'var(--c-brand)' }}>
           ← Back to Exercises
         </Link>
       </div>
@@ -147,57 +147,49 @@ export default function ExerciseDetailPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
       {/* Header */}
-      <header style={{
-        backgroundColor: '#9B7DB5',
-        color: 'white',
-        padding: '20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '20px',
-      }}>
-        <Link href="/dashboard/exercises" style={{ color: 'white', textDecoration: 'none' }}>
-          ← Back
+      <header style={{ background: 'var(--c-card-bg)', borderBottom: '1px solid var(--c-border)', padding: '0 var(--sp-5)', height: 56, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--sp-3)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <Link href="/dashboard/exercises" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)', flexShrink: 0 }}>
+          ← 返回
         </Link>
-        <div style={{ flex: 1 }}>
-          <h1 style={{ margin: 0, fontSize: '24px' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--c-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {language === 'en' ? exercise.name_en : exercise.name_cn}
           </h1>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 'var(--sp-2)', alignItems: 'center', flexShrink: 0 }}>
           {/* Language Toggle */}
-          <div style={{ display: 'flex', gap: '5px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px', padding: '5px' }}>
+          <div style={{ display: 'flex', gap: 4, background: 'var(--c-fill-light)', borderRadius: 'var(--r-sm)', padding: 4 }}>
             <button
               onClick={() => setLanguage('en')}
               style={{
-                padding: '5px 12px',
-                backgroundColor: language === 'en' ? 'white' : 'transparent',
-                color: language === 'en' ? '#9B7DB5' : 'white',
+                padding: '4px 10px',
+                background: language === 'en' ? 'var(--c-card-bg)' : 'transparent',
+                color: language === 'en' ? 'var(--c-brand)' : 'var(--c-text-secondary)',
                 border: 'none',
-                borderRadius: '3px',
+                borderRadius: 'var(--r-sm)',
                 cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: 'bold',
+                fontSize: 'var(--text-xs)',
+                fontWeight: language === 'en' ? 600 : 400,
               }}
             >
-              🇬🇧 EN
+              EN
             </button>
             <button
               onClick={() => setLanguage('zh')}
               style={{
-                padding: '5px 12px',
-                backgroundColor: language === 'zh' ? 'white' : 'transparent',
-                color: language === 'zh' ? '#9B7DB5' : 'white',
+                padding: '4px 10px',
+                background: language === 'zh' ? 'var(--c-card-bg)' : 'transparent',
+                color: language === 'zh' ? 'var(--c-brand)' : 'var(--c-text-secondary)',
                 border: 'none',
-                borderRadius: '3px',
+                borderRadius: 'var(--r-sm)',
                 cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: 'bold',
+                fontSize: 'var(--text-xs)',
+                fontWeight: language === 'zh' ? 600 : 400,
               }}
             >
-              🇨🇳 中文
+              中文
             </button>
           </div>
 
@@ -206,18 +198,16 @@ export default function ExerciseDetailPage() {
             <Link
               href={`/dashboard/exercises/${exercise.id}/edit`}
               style={{
-                padding: '8px 16px',
-                backgroundColor: 'rgba(255,255,255,0.2)',
-                color: 'white',
+                padding: '6px 12px',
+                background: 'var(--c-fill-light)',
+                color: 'var(--c-text-primary)',
                 textDecoration: 'none',
-                borderRadius: '4px',
-                border: '1px solid white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold',
+                borderRadius: 'var(--r-sm)',
+                border: '1px solid var(--c-border)',
+                fontSize: 'var(--text-sm)',
               }}
             >
-              ✏️ Edit
+              ✏️ 编辑
             </Link>
           )}
         </div>
@@ -239,7 +229,7 @@ export default function ExerciseDetailPage() {
 
         {/* Exercise Info */}
         <div style={{
-          backgroundColor: 'white',
+          background: 'var(--c-card-bg)',
           borderRadius: '8px',
           overflow: 'hidden',
           marginBottom: '30px',
@@ -247,7 +237,7 @@ export default function ExerciseDetailPage() {
           {/* Image Gallery */}
           {exercise.images && exercise.images.length > 0 ? (
             <div style={{
-              backgroundColor: '#f5f5f5',
+              background: 'var(--c-page-bg)',
               padding: '20px',
               minHeight: '300px',
               display: 'flex',
@@ -279,7 +269,7 @@ export default function ExerciseDetailPage() {
             </div>
           ) : (
             <div style={{
-              backgroundColor: '#f5f5f5',
+              background: 'var(--c-page-bg)',
               padding: '60px 20px',
               textAlign: 'center',
               color: '#999',
@@ -402,12 +392,12 @@ export default function ExerciseDetailPage() {
 
         {/* Notes Section */}
         <div style={{
-          backgroundColor: 'white',
+          background: 'var(--c-card-bg)',
           borderRadius: '8px',
           overflow: 'hidden',
         }}>
           <div style={{
-            backgroundColor: '#f5f5f5',
+            background: 'var(--c-page-bg)',
             padding: '20px',
             borderBottom: '1px solid #ddd',
           }}>
@@ -459,7 +449,7 @@ export default function ExerciseDetailPage() {
                   disabled={!newNote.trim() || isSubmittingNote}
                   style={{
                     padding: '8px 20px',
-                    backgroundColor: '#9B7DB5',
+                    backgroundColor: 'var(--c-brand)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '4px',

@@ -168,7 +168,7 @@ export default function EditExercisePage() {
 
   if (error && !success) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', padding: '40px' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', padding: '40px' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <div style={{
             backgroundColor: '#ffebee',
@@ -179,7 +179,7 @@ export default function EditExercisePage() {
           }}>
             {error}
           </div>
-          <Link href="/dashboard/exercises" style={{ color: '#9B7DB5' }}>
+          <Link href="/dashboard/exercises" style={{ color: 'var(--c-brand)' }}>
             ← Back to Exercises
           </Link>
         </div>
@@ -188,20 +188,13 @@ export default function EditExercisePage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
       {/* Header */}
-      <header style={{
-        backgroundColor: '#9B7DB5',
-        color: 'white',
-        padding: '20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <Link href={`/dashboard/exercises/${exerciseId}`} style={{ color: 'white', textDecoration: 'none' }}>
-          ← Back
+      <header style={{ background: 'var(--c-card-bg)', borderBottom: '1px solid var(--c-border)', padding: '0 var(--sp-5)', height: 56, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--sp-4)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <Link href={`/dashboard/exercises/${exerciseId}`} style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>
+          ← 返回
         </Link>
-        <h1 style={{ margin: 0 }}>Edit Exercise</h1>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)' }}>编辑动作</h1>
         <div></div>
       </header>
 
@@ -221,7 +214,7 @@ export default function EditExercisePage() {
         )}
 
         <form onSubmit={handleSubmit} style={{
-          backgroundColor: 'white',
+          background: 'var(--c-card-bg)',
           borderRadius: '8px',
           padding: '30px',
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
@@ -645,7 +638,7 @@ export default function EditExercisePage() {
               disabled={isSaving}
               style={{
                 padding: '12px',
-                backgroundColor: '#9B7DB5',
+                backgroundColor: 'var(--c-brand)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',

@@ -139,22 +139,15 @@ export default function StudentNotesPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
       {/* Header */}
-      <header style={{
-        backgroundColor: '#9B7DB5',
-        color: 'white',
-        padding: '16px 20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <Link href={`/dashboard/classes/${classId}`} style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
+      <header style={{ background: 'var(--c-card-bg)', borderBottom: '1px solid var(--c-border)', padding: '0 var(--sp-5)', height: 56, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--sp-4)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <Link href={`/dashboard/classes/${classId}`} style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)', flexShrink: 0 }}>
           ← 返回
         </Link>
-        <div style={{ textAlign: 'center' }}>
-          <h1 style={{ margin: 0, fontSize: '17px' }}>我的课后笔记</h1>
-          <p style={{ margin: '2px 0 0 0', fontSize: '12px', opacity: 0.8 }}>
+        <div style={{ textAlign: 'center', flex: 1 }}>
+          <h1 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--c-text-primary)' }}>我的课后笔记</h1>
+          <p style={{ margin: '2px 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-text-secondary)' }}>
             {className} · {new Date(classDate).toLocaleDateString('zh-CN')}
           </p>
         </div>
@@ -173,7 +166,7 @@ export default function StudentNotesPage() {
         </p>
 
         {exercises.length === 0 ? (
-          <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '40px', textAlign: 'center', color: '#999' }}>
+          <div style={{ background: 'var(--c-card-bg)', borderRadius: '8px', padding: '40px', textAlign: 'center', color: '#999' }}>
             这节课暂无动作记录
           </div>
         ) : (
@@ -184,11 +177,11 @@ export default function StudentNotesPage() {
               const hasChanged = isSaved ? currentContent !== savedNotes[ex.id]?.content : currentContent.trim() !== ''
 
               return (
-                <div key={ex.id} style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px' }}>
+                <div key={ex.id} style={{ background: 'var(--c-card-bg)', borderRadius: '8px', padding: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                     <div style={{
                       width: '26px', height: '26px',
-                      backgroundColor: '#9B7DB5', color: 'white',
+                      backgroundColor: 'var(--c-brand)', color: 'white',
                       borderRadius: '50%',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '12px', fontWeight: 'bold', flexShrink: 0,
@@ -243,7 +236,7 @@ export default function StudentNotesPage() {
                       disabled={!hasChanged || savingId === ex.id || !currentContent.trim()}
                       style={{
                         padding: '6px 14px',
-                        backgroundColor: hasChanged && currentContent.trim() ? '#9B7DB5' : '#eee',
+                        backgroundColor: hasChanged && currentContent.trim() ? 'var(--c-brand)' : '#eee',
                         color: hasChanged && currentContent.trim() ? 'white' : '#999',
                         border: 'none',
                         borderRadius: '4px',
