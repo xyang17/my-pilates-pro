@@ -18,7 +18,7 @@ interface CalendarClass {
   status: string
   color?: string
   trainer_id?: string
-  assigned_user?: { id: string; name: string } | null
+  assigned_to?: string | null
 }
 
 const DAY_NAMES_CN = ['日', '一', '二', '三', '四', '五', '六']
@@ -35,13 +35,31 @@ export default function CalendarPage() {
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth()) // 0-indexed
   const [classes, setClasses] = useState<CalendarClass[]>([])
+  const [clientMap, setClientMap] = useState<Record<string, string>>({}) // id → name
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) { router.push('/auth/login'); return }
-    if (user) fetchClasses()
+    if (user) {
+      fetchClasses()
+      if (userRole === 'ADMIN' || userRole === 'TRAINER') fetchClients()
+    }
   }, [user, authLoading, year, month])
+
+  const fetchClients = async () => {
+    try {
+      const res = await fetch('/api/clients', {
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (res.ok) {
+        const data: { id: string; name: string; email: string }[] = await res.json()
+        const map: Record<string, string> = {}
+        data.forEach(c => { map[c.id] = c.name || c.email })
+        setClientMap(map)
+      }
+    } catch { /* non-critical */ }
+  }
 
   const fetchClasses = async () => {
     setIsLoading(true)
@@ -190,7 +208,7 @@ export default function CalendarPage() {
             ) : (
               selectedClasses
                 .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
-                .map(c => <CalendarClassCard key={c.id} c={c} />)
+                .map(c => <CalendarClassCard key={c.id} c={c} clientMap={clientMap} />)
             )}
           </div>
         )}
@@ -209,7 +227,7 @@ export default function CalendarPage() {
               if (monthClasses.length === 0 && !isLoading) return (
                 <p style={{ color: '#bbb', textAlign: 'center', padding: '20px 0' }}>{t('本月暂无课程', 'No classes this month')}</p>
               )
-              return monthClasses.map(c => <CalendarClassCard key={c.id} c={c} showDate />)
+              return monthClasses.map(c => <CalendarClassCard key={c.id} c={c} showDate clientMap={clientMap} />)
             })()}
           </div>
         )}
@@ -218,7 +236,7 @@ export default function CalendarPage() {
   )
 }
 
-function CalendarClassCard({ c, showDate }: { c: CalendarClass; showDate?: boolean }) {
+function CalendarClassCard({ c, showDate, clientMap = {} }: { c: CalendarClass; showDate?: boolean; clientMap?: Record<string, string> }) {
   const { lang, t } = useLang()
   const STATUS_LABEL_ZH: Record<string, string> = { planned: '未开始', in_progress: '进行中', completed: '已完成' }
   const STATUS_LABEL_EN: Record<string, string> = { planned: 'Planned', in_progress: 'In Progress', completed: 'Completed' }
@@ -242,8 +260,8 @@ function CalendarClassCard({ c, showDate }: { c: CalendarClass; showDate?: boole
             {c.start_time && `${c.start_time.slice(0, 5)} · `}
             {c.duration}{t('分钟', 'min')}
             {c.discipline && ` · ${c.discipline}`}
-            {c.class_type === 'private' && c.assigned_user && (
-              <span style={{ color: '#9B7DB5', marginLeft: '4px' }}>· 👤 {c.assigned_user.name}</span>
+            {c.class_type === 'private' && c.assigned_to && clientMap[c.assigned_to] && (
+              <span style={{ color: '#9B7DB5', marginLeft: '4px' }}>· 👤 {clientMap[c.assigned_to]}</span>
             )}
           </p>
         </div>
