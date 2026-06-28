@@ -13,6 +13,12 @@ interface Trainer {
   certificate?: string
 }
 
+interface Client {
+  id: string
+  name: string
+  email: string
+}
+
 const DISCIPLINES = [
   { value: 'Pilates',             en: 'Pilates',             cn: '综合普拉提' },
   { value: 'Pilates Reformer',    en: 'Pilates Reformer',    cn: '普拉提床' },
@@ -212,11 +218,13 @@ export default function NewClassPage() {
     color:           '#9B7DB5',
     cover_image_url: '',
     trainer_id:      '',
+    assigned_to:     '',
     notes:           '',
   })
 
   const [photoUrls, setPhotoUrls] = useState<string[]>([''])
   const [trainers, setTrainers] = useState<Trainer[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -226,8 +234,20 @@ export default function NewClassPage() {
   }, [user, loading])
 
   useEffect(() => {
-    if (user) fetchTrainers()
+    if (user) {
+      fetchTrainers()
+      fetchClients()
+    }
   }, [user])
+
+  const fetchClients = async () => {
+    try {
+      const res = await fetch('/api/clients', {
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (res.ok) setClients(await res.json())
+    } catch {}
+  }
 
   const fetchTrainers = async () => {
     try {
@@ -370,6 +390,23 @@ export default function NewClassPage() {
                 ))}
               </div>
             </div>
+
+            {/* Student selector — only for private class */}
+            {formData.class_type === 'private' && (
+              <div style={s.field}>
+                <label style={s.label}><BiLabel cn="学员" en="Student" note="私教课 Private class" /></label>
+                <select
+                  value={formData.assigned_to}
+                  onChange={e => setFormData(prev => ({ ...prev, assigned_to: e.target.value }))}
+                  style={s.input}
+                >
+                  <option value="">-- 选择学员 Select student --</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name || c.email}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div style={s.field}>
               <label style={s.label}><BiLabel cn="难度等级" en="Level" /></label>

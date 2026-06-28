@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/context/AuthContext'
 import { useLang } from '@/context/LanguageContext'
+import { useToast } from '@/context/ToastContext'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -63,6 +64,7 @@ interface ClassData {
   color?: string
   cover_image_url?: string
   trainer_id?: string
+  assigned_to?: string
   status: 'planned' | 'in_progress' | 'completed'
   notes?: string
   post_summary?: string
@@ -114,6 +116,11 @@ export default function ClassDetailPage() {
   // Homework extra exercises (non-class)
   const [hwExtraSearch, setHwExtraSearch] = useState('')
   const [hwExtraSelected, setHwExtraSelected] = useState<Set<string>>(new Set())
+  const [showHwLibrary, setShowHwLibrary] = useState(false)
+  const [hwLibSearch, setHwLibSearch] = useState('')
+  const [hwLibFilterType, setHwLibFilterType] = useState('')
+  const [hwLibFilterDiff, setHwLibFilterDiff] = useState('')
+  const [hwLibFilterMuscle, setHwLibFilterMuscle] = useState('')
   // Client list for student dropdown
   const [clientList, setClientList] = useState<{id:string,name:string,email:string}[]>([])
   // Exercise library (inline)
@@ -123,6 +130,7 @@ export default function ClassDetailPage() {
   const [libFilterMuscle, setLibFilterMuscle] = useState('')
 
   const { lang, t } = useLang()
+  const { showToast } = useToast()
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
   const isGroupClass = classData?.class_type === 'group'
 
@@ -282,7 +290,7 @@ export default function ClassDetailPage() {
       setAddSearch('')
       fetchClassData()
     } catch (err: any) {
-      setError(err.message)
+      showToast(err.message, 'error')
     } finally {
       setAdding(false)
     }
@@ -336,8 +344,8 @@ export default function ClassDetailPage() {
       setHomeworkStudentId('')
       setHomeworkDueDate('')
       setHomeworkNotes('')
-      alert(t('作业已布置！', 'Homework assigned!'))
-    } catch (err: any) { setError(err.message) }
+      showToast(t('作业已布置！', 'Homework assigned!'))
+    } catch (err: any) { showToast(err.message, 'error') }
     finally { setHomeworkSubmitting(false) }
   }
 
@@ -352,7 +360,7 @@ export default function ClassDetailPage() {
       if (!res.ok) throw new Error('Failed to remove exercise')
       fetchClassData()
     } catch (err: any) {
-      setError(err.message)
+      showToast(err.message, 'error')
     }
   }
 
@@ -439,11 +447,6 @@ export default function ClassDetailPage() {
       </header>
 
       <main style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
-        {error && (
-          <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '12px', borderRadius: '6px', marginBottom: '16px' }}>
-            {error}
-          </div>
-        )}
 
         {/* Cover image */}
         {classData.cover_image_url && (
@@ -605,7 +608,11 @@ export default function ClassDetailPage() {
                 {classData.exercises.length > 0 && <span style={{ color: '#bbb', fontWeight: 'normal', marginLeft: '6px' }}>({classData.exercises.length})</span>}
               </span>
               {isTrainer && classData.exercises.length > 0 && (
-                <button onClick={() => { setShowHomework(true); fetchClients() }}
+                <button onClick={() => {
+                    setShowHomework(true)
+                    fetchClients()
+                    if (classData?.assigned_to) setHomeworkStudentId(classData.assigned_to)
+                  }}
                   style={{ padding: '5px 12px', backgroundColor: '#E8A87C', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
                   📋 {t('布置作业', 'Assign HW')}
                 </button>
@@ -845,15 +852,7 @@ export default function ClassDetailPage() {
       {/* Homework Modal */}
       {showHomework && classData && (() => {
         const totalSelected = homeworkSelected.size + hwExtraSelected.size
-        const hwExtraSuggestions = availableExercises.filter(ex => {
-          const alreadyInClass = new Set(classData.exercises.map(e => e.exercise_id))
-          if (alreadyInClass.has(ex.id)) return false
-          if (!hwExtraSearch) return false
-          return (
-            (ex.name_cn || '').includes(hwExtraSearch) ||
-            (ex.name_en || '').toLowerCase().includes(hwExtraSearch.toLowerCase())
-          )
-        }).slice(0, 8)
+        const alreadyInClass = new Set(classData.exercises.map(e => e.exercise_id))
 
         return (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
@@ -909,41 +908,15 @@ export default function ClassDetailPage() {
                 </div>
 
                 {/* Extra exercises from library */}
-                <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#888', fontWeight: '600' }}>{t('额外添加动作', 'Add extra exercises')}</p>
-                <input
-                  type="text"
-                  placeholder={t('搜索动作库...', 'Search exercise library...')}
-                  value={hwExtraSearch}
-                  onChange={e => setHwExtraSearch(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', marginBottom: hwExtraSuggestions.length > 0 || hwExtraSelected.size > 0 ? '8px' : '16px' }}
-                />
-                {hwExtraSuggestions.length > 0 && (
-                  <div style={{ backgroundColor: '#f9f6fc', borderRadius: '10px', overflow: 'hidden', marginBottom: '8px' }}>
-                    {hwExtraSuggestions.map((ex, i) => {
-                      const sel = hwExtraSelected.has(ex.id)
-                      return (
-                        <div key={ex.id}
-                          onClick={() => {
-                            setHwExtraSelected(prev => {
-                              const next = new Set(prev)
-                              next.has(ex.id) ? next.delete(ex.id) : next.add(ex.id)
-                              return next
-                            })
-                          }}
-                          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', cursor: 'pointer', borderBottom: i < hwExtraSuggestions.length - 1 ? '1px solid #eee' : 'none', backgroundColor: sel ? '#f0eaf8' : 'white' }}>
-                          <div style={{ width: '20px', height: '20px', borderRadius: '5px', border: `2px solid ${sel ? '#9B7DB5' : '#ddd'}`, backgroundColor: sel ? '#9B7DB5' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {sel && <span style={{ color: 'white', fontSize: '11px' }}>✓</span>}
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <p style={{ margin: 0, fontSize: '13px', fontWeight: 'bold' }}>{lang === 'zh' ? (ex.name_cn || ex.name_en) : (ex.name_en || ex.name_cn)}</p>
-                            <p style={{ margin: 0, fontSize: '11px', color: '#bbb' }}>{ex.type_cn || ex.type_en || ''}</p>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-                {hwExtraSelected.size > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#888', fontWeight: '600' }}>{t('额外添加动作', 'Add extra exercises')}</p>
+                  <button
+                    onClick={() => setShowHwLibrary(true)}
+                    style={{ padding: '6px 14px', backgroundColor: '#9B7DB5', color: 'white', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    + {t('从动作库选', 'Browse library')}
+                  </button>
+                </div>
+                {hwExtraSelected.size > 0 ? (
                   <div style={{ marginBottom: '16px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {Array.from(hwExtraSelected).map(id => {
                       const ex = availableExercises.find(e => e.id === id)
@@ -956,6 +929,8 @@ export default function ClassDetailPage() {
                       )
                     })}
                   </div>
+                ) : (
+                  <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#bbb' }}>{t('未选择额外动作', 'No extra exercises selected')}</p>
                 )}
 
                 {/* Due date + notes */}
@@ -975,12 +950,128 @@ export default function ClassDetailPage() {
                 </div>
               </div>
               <div style={{ padding: '16px 20px', borderTop: '1px solid #eee', display: 'flex', gap: '10px' }}>
-                <button onClick={() => { setShowHomework(false); setHwExtraSearch(''); setHwExtraSelected(new Set()) }} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontSize: '14px' }}>{t('取消', 'Cancel')}</button>
+                <button onClick={() => { setShowHomework(false); setHwExtraSelected(new Set()) }} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontSize: '14px' }}>{t('取消', 'Cancel')}</button>
                 <button
                   onClick={handleCreateHomework}
                   disabled={totalSelected === 0 || !homeworkStudentId || homeworkSubmitting}
                   style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: '#E8A87C', color: 'white', cursor: totalSelected > 0 && homeworkStudentId ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '14px', opacity: totalSelected > 0 && homeworkStudentId ? 1 : 0.5 }}>
                   {homeworkSubmitting ? t('布置中...', 'Saving...') : `${t('布置作业', 'Assign')}（${totalSelected} ${t('个动作', 'exercises')}）`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Hw Library Sub-dialog */}
+      {showHwLibrary && classData && (() => {
+        const alreadyInClass = new Set(classData.exercises.map(e => e.exercise_id))
+        const allTypes = [...new Set(availableExercises.map(e => e.type_en).filter(Boolean))].sort() as string[]
+        const allDiffs = [...new Set(availableExercises.map(e => e.difficulty_en).filter(Boolean))].sort() as string[]
+        const allMuscles = [...new Set(
+          availableExercises.flatMap(e => (e.target_muscles_en || '').split(',').map((m: string) => m.trim())).filter(Boolean)
+        )].sort() as string[]
+
+        const hwLibResults = availableExercises.filter(ex => {
+          if (alreadyInClass.has(ex.id)) return false
+          if (hwLibFilterType && ex.type_en !== hwLibFilterType) return false
+          if (hwLibFilterDiff && ex.difficulty_en !== hwLibFilterDiff) return false
+          if (hwLibFilterMuscle && !(ex.target_muscles_en || '').split(',').map((m: string) => m.trim()).includes(hwLibFilterMuscle)) return false
+          if (hwLibSearch) {
+            const q = hwLibSearch.toLowerCase()
+            return (
+              (ex.name_cn || '').includes(hwLibSearch) ||
+              (ex.name_en || '').toLowerCase().includes(q) ||
+              (ex.target_muscles_cn || '').includes(hwLibSearch) ||
+              (ex.target_muscles_en || '').toLowerCase().includes(q)
+            )
+          }
+          return true
+        })
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 600, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            <div style={{ backgroundColor: 'white', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+              {/* Header */}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ margin: 0, fontSize: '16px' }}>💪 {t('从动作库选择', 'Browse Exercise Library')}</h2>
+                <button onClick={() => { setShowHwLibrary(false); setHwLibSearch(''); setHwLibFilterType(''); setHwLibFilterDiff(''); setHwLibFilterMuscle('') }}
+                  style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>✕</button>
+              </div>
+
+              {/* Search + filters */}
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+                <input
+                  type="text"
+                  placeholder={t('搜索动作名称、肌肉...', 'Search name, muscles...')}
+                  value={hwLibSearch}
+                  onChange={e => setHwLibSearch(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', marginBottom: '8px', outline: 'none' }}
+                />
+                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
+                  <select value={hwLibFilterType} onChange={e => setHwLibFilterType(e.target.value)}
+                    style={{ padding: '5px 8px', border: `1px solid ${hwLibFilterType ? '#9B7DB5' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: hwLibFilterType ? '#f0eaf8' : 'white', color: hwLibFilterType ? '#9B7DB5' : '#666', cursor: 'pointer', flexShrink: 0 }}>
+                    <option value="">{t('全部分类', 'All types')}</option>
+                    {allTypes.map(tp => <option key={tp} value={tp}>{tp}</option>)}
+                  </select>
+                  <select value={hwLibFilterDiff} onChange={e => setHwLibFilterDiff(e.target.value)}
+                    style={{ padding: '5px 8px', border: `1px solid ${hwLibFilterDiff ? '#9B7DB5' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: hwLibFilterDiff ? '#f0eaf8' : 'white', color: hwLibFilterDiff ? '#9B7DB5' : '#666', cursor: 'pointer', flexShrink: 0 }}>
+                    <option value="">{t('全部难度', 'All levels')}</option>
+                    {allDiffs.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <select value={hwLibFilterMuscle} onChange={e => setHwLibFilterMuscle(e.target.value)}
+                    style={{ padding: '5px 8px', border: `1px solid ${hwLibFilterMuscle ? '#9B7DB5' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: hwLibFilterMuscle ? '#f0eaf8' : 'white', color: hwLibFilterMuscle ? '#9B7DB5' : '#666', cursor: 'pointer', flexShrink: 0 }}>
+                    <option value="">{t('全部肌肉', 'All muscles')}</option>
+                    {allMuscles.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  {(hwLibFilterType || hwLibFilterDiff || hwLibFilterMuscle) && (
+                    <button onClick={() => { setHwLibFilterType(''); setHwLibFilterDiff(''); setHwLibFilterMuscle('') }}
+                      style={{ padding: '5px 10px', border: '1px solid #ddd', borderRadius: '16px', fontSize: '11px', backgroundColor: 'white', color: '#999', cursor: 'pointer', flexShrink: 0 }}>
+                      {t('清除', 'Clear')}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Results */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
+                <p style={{ margin: '8px 0 4px 0', fontSize: '11px', color: '#bbb' }}>{hwLibResults.length} {t('个动作', 'exercises')}</p>
+                {hwLibResults.length === 0 && (
+                  <p style={{ textAlign: 'center', color: '#bbb', padding: '30px 0', fontSize: '13px' }}>{t('没有匹配动作', 'No matches')}</p>
+                )}
+                {hwLibResults.map(ex => {
+                  const sel = hwExtraSelected.has(ex.id)
+                  return (
+                    <div key={ex.id}
+                      onClick={() => setHwExtraSelected(prev => { const n = new Set(prev); n.has(ex.id) ? n.delete(ex.id) : n.add(ex.id); return n })}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f5f5f5', cursor: 'pointer' }}>
+                      <div style={{ width: '22px', height: '22px', borderRadius: '6px', border: `2px solid ${sel ? '#9B7DB5' : '#ddd'}`, backgroundColor: sel ? '#9B7DB5' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {sel && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 'bold', color: '#333' }}>
+                          {lang === 'zh' ? (ex.name_cn || ex.name_en) : (ex.name_en || ex.name_cn)}
+                        </p>
+                        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                          {ex.type_cn && <span style={{ fontSize: '10px', color: '#9B7DB5', backgroundColor: '#f0eaf8', padding: '1px 6px', borderRadius: '6px' }}>{lang === 'zh' ? ex.type_cn : ex.type_en}</span>}
+                          {ex.difficulty_cn && <span style={{ fontSize: '10px', color: '#888', backgroundColor: '#f5f5f5', padding: '1px 6px', borderRadius: '6px' }}>{lang === 'zh' ? ex.difficulty_cn : ex.difficulty_en}</span>}
+                          {ex.target_muscles_cn && <span style={{ fontSize: '10px', color: '#aaa' }}>{lang === 'zh' ? ex.target_muscles_cn : ex.target_muscles_en}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding: '14px 20px', borderTop: '1px solid #eee', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span style={{ flex: 1, fontSize: '13px', color: '#888' }}>
+                  {hwExtraSelected.size > 0 ? `${t('已选', 'Selected')} ${hwExtraSelected.size} ${t('个', '')}` : t('点击动作选择', 'Tap to select')}
+                </span>
+                <button
+                  onClick={() => { setShowHwLibrary(false); setHwLibSearch(''); setHwLibFilterType(''); setHwLibFilterDiff(''); setHwLibFilterMuscle('') }}
+                  style={{ padding: '10px 24px', backgroundColor: '#9B7DB5', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  {t('确认', 'Done')}
                 </button>
               </div>
             </div>
