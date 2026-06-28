@@ -46,6 +46,8 @@ interface Client {
   email: string
   photo_url?: string
   bio?: string
+  injury_notes?: string
+  goals?: string
   created_at: string
   classes: ClientClass[]
 }
@@ -62,6 +64,10 @@ export default function ClientDetailPage() {
   const [hwLoading, setHwLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'classes' | 'homework'>('classes')
   const [expandedHw, setExpandedHw] = useState<Set<string>>(new Set())
+  // Trainer notes edit
+  const [editNotes, setEditNotes] = useState(false)
+  const [notesForm, setNotesForm] = useState({ injury_notes: '', goals: '' })
+  const [savingNotes, setSavingNotes] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) { router.push('/auth/login'); return }
@@ -80,6 +86,30 @@ export default function ClientDetailPage() {
       if (res.ok) setClient(await res.json())
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const openEditNotes = () => {
+    setNotesForm({ injury_notes: client?.injury_notes || '', goals: client?.goals || '' })
+    setEditNotes(true)
+  }
+
+  const handleSaveNotes = async () => {
+    if (!client || savingNotes) return
+    setSavingNotes(true)
+    try {
+      const res = await fetch(`/api/clients/${clientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify(notesForm),
+      })
+      if (!res.ok) throw new Error('保存失败')
+      setClient(prev => prev ? { ...prev, ...notesForm } : prev)
+      setEditNotes(false)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setSavingNotes(false)
     }
   }
 
@@ -156,10 +186,71 @@ export default function ClientDetailPage() {
 
           {client.bio && (
             <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
-              <p style={{ margin: '0 0 6px 0', color: '#999', fontSize: '12px' }}>备注</p>
+              <p style={{ margin: '0 0 6px 0', color: '#999', fontSize: '12px' }}>简介</p>
               <p style={{ margin: 0, color: '#444', fontSize: '14px', lineHeight: '1.6' }}>{client.bio}</p>
             </div>
           )}
+
+          {/* Trainer assessment notes */}
+          <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <p style={{ margin: 0, color: '#999', fontSize: '12px', fontWeight: '600' }}>教练评估</p>
+              {!editNotes && (
+                <button onClick={openEditNotes}
+                  style={{ fontSize: '12px', color: '#9B7DB5', border: '1px solid #9B7DB5', borderRadius: '6px', padding: '3px 10px', background: 'none', cursor: 'pointer' }}>
+                  ✏️ 编辑
+                </button>
+              )}
+            </div>
+
+            {editNotes ? (
+              <div>
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#E8763A', fontWeight: 'bold', marginBottom: '4px' }}>⚠️ 伤病 / 体态问题</label>
+                  <textarea value={notesForm.injury_notes}
+                    onChange={e => setNotesForm(p => ({ ...p, injury_notes: e.target.value }))}
+                    placeholder="如：腰椎间盘突出，右肩撞击综合征，骨盆前倾..."
+                    rows={3}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box' }} />
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#2E8B57', fontWeight: 'bold', marginBottom: '4px' }}>🎯 训练目标</label>
+                  <textarea value={notesForm.goals}
+                    onChange={e => setNotesForm(p => ({ ...p, goals: e.target.value }))}
+                    placeholder="如：核心力量提升，减脂塑形，改善体态，运动后恢复..."
+                    rows={3}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box' }} />
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={handleSaveNotes} disabled={savingNotes}
+                    style={{ padding: '7px 18px', backgroundColor: '#9B7DB5', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', opacity: savingNotes ? 0.7 : 1 }}>
+                    {savingNotes ? '保存中...' : '保存'}
+                  </button>
+                  <button onClick={() => setEditNotes(false)}
+                    style={{ padding: '7px 14px', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', background: 'none' }}>
+                    取消
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: client.injury_notes && client.goals ? '1fr 1fr' : '1fr', gap: '10px' }}>
+                {client.injury_notes ? (
+                  <div style={{ backgroundColor: '#fff8f0', borderRadius: '6px', padding: '10px 12px' }}>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#E8763A', fontWeight: 'bold' }}>⚠️ 伤病 / 体态问题</p>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#444', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{client.injury_notes}</p>
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, fontSize: '13px', color: '#bbb' }}>暂无伤病记录</p>
+                )}
+                {client.goals && (
+                  <div style={{ backgroundColor: '#f0f9f4', borderRadius: '6px', padding: '10px 12px' }}>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#2E8B57', fontWeight: 'bold' }}>🎯 训练目标</p>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#444', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{client.goals}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Tabs */}

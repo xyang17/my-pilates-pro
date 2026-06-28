@@ -136,6 +136,8 @@ export default function ClassDetailPage() {
   const [editInfo, setEditInfo] = useState(false)
   const [infoForm, setInfoForm] = useState({ name: '', date: '', start_time: '', duration: '', discipline: '', level: '', notes: '', assigned_to: '' })
   const [savingInfo, setSavingInfo] = useState(false)
+  // Assigned client profile (private class)
+  const [assignedClient, setAssignedClient] = useState<{ id: string; name: string; email: string; photo_url?: string; bio?: string; injury_notes?: string; goals?: string } | null>(null)
 
   const { lang, t } = useLang()
   const { showToast } = useToast()
@@ -152,6 +154,18 @@ export default function ClassDetailPage() {
       if (isTrainer) fetchAvailableExercises()
     }
   }, [user, authLoading])
+
+  // Fetch assigned client profile when class data arrives
+  useEffect(() => {
+    if (classData?.assigned_to && isTrainer && user) {
+      fetch(`/api/clients/${classData.assigned_to}`, {
+        headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' },
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) setAssignedClient(d) })
+        .catch(() => {})
+    }
+  }, [classData?.assigned_to, isTrainer, user])
 
   // Fetch student notes when switching to that tab
   useEffect(() => {
@@ -760,6 +774,60 @@ export default function ClassDetailPage() {
             </>
           )}
         </div>
+
+        {/* Assigned client card — shown to trainers on private classes */}
+        {isTrainer && assignedClient && classData.class_type === 'private' && (
+          <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', marginBottom: '16px', borderLeft: '4px solid #9B7DB5' }}>
+            <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', marginBottom: (assignedClient.injury_notes || assignedClient.goals || assignedClient.bio) ? '14px' : '0' }}>
+              {assignedClient.photo_url ? (
+                <img src={assignedClient.photo_url} alt={assignedClient.name}
+                  style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#9B7DB5', color: 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold' }}>
+                  {assignedClient.name?.[0] || '?'}
+                </div>
+              )}
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: '0 0 2px 0', fontWeight: 'bold', fontSize: '15px' }}>👤 {assignedClient.name || assignedClient.email}</p>
+                <p style={{ margin: 0, fontSize: '12px', color: '#aaa' }}>{assignedClient.email}</p>
+              </div>
+              <Link href={`/dashboard/clients/${assignedClient.id}`} style={{ fontSize: '12px', color: '#9B7DB5', textDecoration: 'none', flexShrink: 0 }}>
+                学员档案 →
+              </Link>
+            </div>
+
+            {(assignedClient.injury_notes || assignedClient.goals || assignedClient.bio) && (
+              <div style={{ display: 'grid', gridTemplateColumns: assignedClient.injury_notes && assignedClient.goals ? '1fr 1fr' : '1fr', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
+                {assignedClient.injury_notes && (
+                  <div style={{ backgroundColor: '#fff8f0', borderRadius: '6px', padding: '10px 12px' }}>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#E8763A', fontWeight: 'bold' }}>⚠️ 伤病 / 体态问题</p>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#444', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{assignedClient.injury_notes}</p>
+                  </div>
+                )}
+                {assignedClient.goals && (
+                  <div style={{ backgroundColor: '#f0f9f4', borderRadius: '6px', padding: '10px 12px' }}>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#2E8B57', fontWeight: 'bold' }}>🎯 训练目标</p>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#444', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{assignedClient.goals}</p>
+                  </div>
+                )}
+                {!assignedClient.injury_notes && !assignedClient.goals && assignedClient.bio && (
+                  <div style={{ backgroundColor: '#f8f6fb', borderRadius: '6px', padding: '10px 12px' }}>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#9B7DB5', fontWeight: 'bold' }}>📝 备注</p>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#444', lineHeight: '1.6' }}>{assignedClient.bio}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!assignedClient.injury_notes && !assignedClient.goals && !assignedClient.bio && (
+              <div style={{ paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
+                <Link href={`/dashboard/clients/${assignedClient.id}`} style={{ fontSize: '12px', color: '#bbb', textDecoration: 'none' }}>
+                  + 添加学员体测备注和训练目标
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Trainer card */}
         {trainerInfo && (
