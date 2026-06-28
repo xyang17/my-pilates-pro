@@ -132,6 +132,10 @@ export default function ClassDetailPage() {
   const [showCopyModal, setShowCopyModal] = useState(false)
   const [copyForm, setCopyForm] = useState({ name: '', date: '', start_time: '', assigned_to: '' })
   const [copying, setCopying] = useState(false)
+  // Class info inline edit
+  const [editInfo, setEditInfo] = useState(false)
+  const [infoForm, setInfoForm] = useState({ name: '', date: '', start_time: '', duration: '', discipline: '', level: '', notes: '', assigned_to: '' })
+  const [savingInfo, setSavingInfo] = useState(false)
 
   const { lang, t } = useLang()
   const { showToast } = useToast()
@@ -422,6 +426,54 @@ export default function ClassDetailPage() {
     }
   }
 
+  const openEditInfo = () => {
+    if (!classData) return
+    if (classData.class_type === 'private') fetchClients()
+    setInfoForm({
+      name: classData.name,
+      date: classData.date,
+      start_time: classData.start_time?.slice(0, 5) || '',
+      duration: classData.duration.toString(),
+      discipline: classData.discipline || classData.type || '',
+      level: classData.level || '',
+      notes: classData.notes || '',
+      assigned_to: classData.assigned_to || '',
+    })
+    setEditInfo(true)
+  }
+
+  const handleSaveInfo = async () => {
+    if (!classData || savingInfo) return
+    setSavingInfo(true)
+    try {
+      const res = await fetch(`/api/classes/${classId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        body: JSON.stringify({
+          name: infoForm.name,
+          date: infoForm.date,
+          start_time: infoForm.start_time || null,
+          duration: parseInt(infoForm.duration) || 60,
+          discipline: infoForm.discipline,
+          level: infoForm.level,
+          notes: infoForm.notes || null,
+          assigned_to: infoForm.assigned_to || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || '保存失败')
+      }
+      await fetchClassData()
+      setEditInfo(false)
+      showToast(t('保存成功', 'Saved!'))
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setSavingInfo(false)
+    }
+  }
+
   const handleRemoveExercise = async (instanceId: string) => {
     if (!confirm('确认移除这个动作？')) return
     try {
@@ -553,80 +605,159 @@ export default function ClassDetailPage() {
             <div style={{ height: '4px', backgroundColor: classData.color, borderRadius: '2px', marginBottom: '16px' }} />
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '16px' }}>
+          {editInfo ? (
+            /* ── EDIT MODE ── */
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>日期 Date</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{new Date(classData.date + 'T12:00:00').toLocaleDateString('zh-CN')}</p>
-            </div>
-            {classData.start_time && (
-              <div>
-                <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>时间 Time</p>
-                <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.start_time.slice(0, 5)}</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>课程名称</label>
+                  <input value={infoForm.name} onChange={e => setInfoForm(p => ({ ...p, name: e.target.value }))}
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>日期</label>
+                  <input type="date" value={infoForm.date} onChange={e => setInfoForm(p => ({ ...p, date: e.target.value }))}
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>开始时间</label>
+                  <input type="time" value={infoForm.start_time} onChange={e => setInfoForm(p => ({ ...p, start_time: e.target.value }))}
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>时长（分钟）</label>
+                  <input type="number" min="1" value={infoForm.duration} onChange={e => setInfoForm(p => ({ ...p, duration: e.target.value }))}
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>类别</label>
+                  <input value={infoForm.discipline} onChange={e => setInfoForm(p => ({ ...p, discipline: e.target.value }))}
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>难度</label>
+                  <select value={infoForm.level} onChange={e => setInfoForm(p => ({ ...p, level: e.target.value }))}
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}>
+                    <option value="beginner">初级</option>
+                    <option value="intermediate">中级</option>
+                    <option value="advanced">高级</option>
+                  </select>
+                </div>
+                {classData.class_type === 'private' && clientList.length > 0 && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>学员</label>
+                    <select value={infoForm.assigned_to} onChange={e => setInfoForm(p => ({ ...p, assigned_to: e.target.value }))}
+                      style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}>
+                      <option value="">未分配</option>
+                      {clientList.map(c => <option key={c.id} value={c.id}>{c.name || c.email}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
-            )}
-            <div>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>时长 Duration</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.duration} 分钟</p>
-            </div>
-            <div>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>类别 Discipline</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.discipline || classData.type || '—'}</p>
-            </div>
-            <div>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>形式 Format</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.class_type === 'group' ? '👥 团课' : '🧘 私教'}</p>
-            </div>
-            {classData.level && (
-              <div>
-                <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>难度 Level</p>
-                <p style={{ margin: 0, fontWeight: 'bold' }}>
-                  {{ beginner: '初级', intermediate: '中级', advanced: '高级' }[classData.level] || classData.level}
-                </p>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>备注</label>
+                <textarea value={infoForm.notes} onChange={e => setInfoForm(p => ({ ...p, notes: e.target.value }))}
+                  rows={2}
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box' }} />
               </div>
-            )}
-            {classData.price != null && (
-              <div>
-                <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>价格 Price</p>
-                <p style={{ margin: 0, fontWeight: 'bold' }}>¥{classData.price}</p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={handleSaveInfo} disabled={savingInfo}
+                  style={{ padding: '8px 20px', backgroundColor: '#9B7DB5', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', opacity: savingInfo ? 0.7 : 1 }}>
+                  {savingInfo ? '保存中...' : '保存'}
+                </button>
+                <button onClick={() => setEditInfo(false)}
+                  style={{ padding: '8px 16px', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', background: 'none' }}>
+                  取消
+                </button>
               </div>
-            )}
-            {classData.class_type === 'group' && classData.max_capacity && (
-              <div>
-                <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>人数上限</p>
-                <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.max_capacity} 人</p>
-              </div>
-            )}
-            <div>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>状态 Status</p>
-              <span style={{
-                display: 'inline-block', padding: '3px 10px',
-                backgroundColor: STATUS_COLOR[classData.status] || '#999',
-                color: 'white', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold',
-              }}>
-                {STATUS_LABEL[classData.status] || classData.status}
-              </span>
             </div>
-          </div>
+          ) : (
+            /* ── VIEW MODE ── */
+            <>
+              {isTrainer && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                  <button onClick={openEditInfo}
+                    style={{ fontSize: '12px', color: '#9B7DB5', border: '1px solid #9B7DB5', borderRadius: '6px', padding: '4px 12px', background: 'none', cursor: 'pointer' }}>
+                    ✏️ 编辑信息
+                  </button>
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '16px' }}>
+                <div>
+                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>日期 Date</p>
+                  <p style={{ margin: 0, fontWeight: 'bold' }}>{new Date(classData.date + 'T12:00:00').toLocaleDateString('zh-CN')}</p>
+                </div>
+                {classData.start_time && (
+                  <div>
+                    <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>时间 Time</p>
+                    <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.start_time.slice(0, 5)}</p>
+                  </div>
+                )}
+                <div>
+                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>时长 Duration</p>
+                  <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.duration} 分钟</p>
+                </div>
+                <div>
+                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>类别 Discipline</p>
+                  <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.discipline || classData.type || '—'}</p>
+                </div>
+                <div>
+                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>形式 Format</p>
+                  <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.class_type === 'group' ? '👥 团课' : '🧘 私教'}</p>
+                </div>
+                {classData.level && (
+                  <div>
+                    <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>难度 Level</p>
+                    <p style={{ margin: 0, fontWeight: 'bold' }}>
+                      {{ beginner: '初级', intermediate: '中级', advanced: '高级' }[classData.level] || classData.level}
+                    </p>
+                  </div>
+                )}
+                {classData.price != null && (
+                  <div>
+                    <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>价格 Price</p>
+                    <p style={{ margin: 0, fontWeight: 'bold' }}>¥{classData.price}</p>
+                  </div>
+                )}
+                {classData.class_type === 'group' && classData.max_capacity && (
+                  <div>
+                    <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>人数上限</p>
+                    <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.max_capacity} 人</p>
+                  </div>
+                )}
+                <div>
+                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>状态 Status</p>
+                  <span style={{
+                    display: 'inline-block', padding: '3px 10px',
+                    backgroundColor: STATUS_COLOR[classData.status] || '#999',
+                    color: 'white', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold',
+                  }}>
+                    {STATUS_LABEL[classData.status] || classData.status}
+                  </span>
+                </div>
+              </div>
 
-          {classData.description && (
-            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
-              <p style={{ margin: '0 0 6px 0', color: '#999', fontSize: '11px' }}>课程介绍 Description</p>
-              <p style={{ margin: 0, color: '#444', lineHeight: '1.6' }}>{classData.description}</p>
-            </div>
-          )}
+              {classData.description && (
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
+                  <p style={{ margin: '0 0 6px 0', color: '#999', fontSize: '11px' }}>课程介绍 Description</p>
+                  <p style={{ margin: 0, color: '#444', lineHeight: '1.6' }}>{classData.description}</p>
+                </div>
+              )}
 
-          {classData.notes && (
-            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>备注 Notes</p>
-              <p style={{ margin: 0, color: '#444' }}>{classData.notes}</p>
-            </div>
-          )}
+              {classData.notes && (
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
+                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>备注 Notes</p>
+                  <p style={{ margin: 0, color: '#444' }}>{classData.notes}</p>
+                </div>
+              )}
 
-          {classData.post_summary && (
-            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
-              <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>课后总结 Post Summary</p>
-              <p style={{ margin: 0, color: '#444' }}>{classData.post_summary}</p>
-            </div>
+              {classData.post_summary && (
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
+                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>课后总结 Post Summary</p>
+                  <p style={{ margin: 0, color: '#444' }}>{classData.post_summary}</p>
+                </div>
+              )}
+            </>
           )}
         </div>
 
