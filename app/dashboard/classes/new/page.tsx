@@ -234,11 +234,12 @@ export default function NewClassPage() {
   }, [user, loading])
 
   useEffect(() => {
-    if (user) {
-      fetchTrainers()
-      fetchClients()
-    }
+    if (user) fetchTrainers()
   }, [user])
+
+  useEffect(() => {
+    if (user && userRole) fetchClients()
+  }, [user, userRole])
 
   const fetchClients = async () => {
     try {
