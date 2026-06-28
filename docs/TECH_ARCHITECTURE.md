@@ -1,7 +1,7 @@
 # MyPilatesPro — Technical Architecture & Decision Log
 
-**Last Updated:** June 22, 2026  
-**Status:** Foundation Phase (Local Development)  
+**Last Updated:** June 28, 2026  
+**Status:** Core Feature Phase — Live at myfitnesspro.co  
 **Project Lead:** Jessica (xyang17)  
 **Repository:** https://github.com/xyang17/my-pilates-pro
 
@@ -444,6 +444,119 @@ Before committing:
 
 ---
 
+## Updates Log
+
+### June 28, 2026 — Core Feature Sprint Complete
+
+#### 新增功能（本轮开发）
+
+**1. 全局中英文切换系统**
+- 新建 `context/LanguageContext.tsx`，提供 `useLang()` hook 和 `t(zh, en)` helper
+- 语言偏好存入 `localStorage`（key: `mfp_lang`），刷新/重开后保持
+- Dashboard 底部悬浮按钮 `中文 / EN` 切换，通过 `app/dashboard/layout.tsx` 实现全局覆盖
+- 所有 Dashboard 页面已接入（dashboard, exercises, classes, calendar, clients, profile, workouts）
+- 数据库双语字段（name_cn/name_en 等）根据语言显示对应内容
+
+**2. 动作库重设计（Exercise Library）**
+- 从网格卡片改为**列表视图**，信息密度更高
+- 分类 Tab（全部 / 普拉提核心床 / 普拉提垫上 / 抗阻训练）从数据动态生成
+- 新增**难度下拉筛选**（初级 / 中级 / 高级）
+- 新增**肌群下拉筛选**（从数据库 target_muscles 字段拆分，自动去重排序）
+- 搜索 + 分类 + 难度 + 肌群四重筛选联动
+- 未设置分类的动作归入「其他 Other」
+
+**3. 动作批量导入修复**
+- 从 CDN 加载 xlsx 改为 npm 包（`npm install xlsx`），解决中国网络环境 CDN 不稳定问题
+- 修复 API 返回格式不一致导致的前端崩溃（`{count, exercises}` → `{created, failed, errors}`）
+- 支持双格式列名：snake_case (`type_en`) 和 camelCase (`typeEN`) 同时兼容
+- 导入时自动从 master_exercise 读取默认参数（default_sets/reps/weight）填充 class_exercise_instance
+- 新增拖拽上传、文件预览（前3行）、逐行导入并收集错误报告
+
+**4. 课程动作计划——电子表格式内联编辑**
+- 旧流程：添加动作 → 找到 → 确认 → 再点编辑 → 改参数 → 保存（5+ 步）
+- 新流程：搜索框输入 → 点击标签直接加入（自动填入默认值）→ 直接在格子里改数字（失焦自动保存）
+- 每行始终显示：组数 / 次数 / 配重+单位 / 备注，无需进入编辑模式
+- 底部常驻快速搜索栏，搜索结果以标签形式展示（显示默认参数预览，如 `3×12`）
+- 已加入的动作不再出现在建议列表
+- 自动保存：`onBlur` 触发 PUT API，只在内容改变时才发请求，后台静默保存
+
+**5. 课后作业模块（Homework）**
+- 新表：`public.homework`（作业主表）+ `public.homework_exercise`（作业动作）
+- 课程详情页「📋 布置作业」按钮（教练可见，有动作时显示）
+- 底部弹窗：勾选课程动作（带参数预览） + 填写截止日期 + 备注 + 指定学员
+- API: `POST /api/homework`（创建）、`GET /api/homework`（列表）、`GET/PATCH /api/homework/[id]`
+- 作业列表页 `/dashboard/workouts`：学员查看作业，展开看动作详情，可标记完成/撤销
+- 教练看到自己布置的所有作业记录
+
+**6. 新建学员功能**
+- 客户列表页「+ 新建学员」弹窗
+- 包含：姓名、邮箱、密码（带 👁 显示/隐藏切换）、手机号（含国家区号下拉：+86/+1/+44/+81 等）
+- 调用 `/api/auth/signup` 创建 Supabase Auth 用户
+
+**7. 其他页面补全**
+- `/dashboard/profile`：头像（首字母）、姓名、角色徽章、基本信息、退出登录
+- `/dashboard/schedule`：自动重定向至 `/dashboard/calendar`
+- `/dashboard/workouts`：课后作业列表（现已有内容）
+- `/dashboard/calendar`：月历视图，点击日期看当天课程，底部月度概览
+- `/dashboard/clients`：学员列表 + 搜索
+- `/dashboard/clients/[id]`：学员详情（头像、统计、课程历史）
+- `/dashboard/trainers/[id]`：教练主页（证书、简介、课程列表）
+
+---
+
+#### 本轮学到的流程经验
+
+**Excel 导入兼容性**
+Excel 的列名可能是 camelCase（`typeEN`）或 snake_case（`type_en`），后端 API 必须同时处理两种格式，否则数据会丢。标准写法：
+```ts
+type_en: ex.type_en || ex.typeEN || ex.type || ''
+```
+
+**数据库数据清理流程**
+发现数据库有脏数据时，先 `SELECT` 确认范围，再 `DELETE`。不要盲目删除：
+```sql
+-- 先确认
+SELECT COUNT(*), type_en FROM public.master_exercise GROUP BY type_en;
+-- 确认后再删
+DELETE FROM public.master_exercise WHERE (type_en IS NULL OR type_en = '');
+```
+
+**表格式内联编辑的状态管理模式**
+对于需要每个字段单独 auto-save 的场景，用 `localParams: Record<id, fields>` 存本地编辑状态，`onBlur` 比较改前改后值，只在有变化时才发 API 请求，避免无效请求：
+```ts
+const [localParams, setLocalParams] = useState<Record<string, FieldMap>>({})
+// onBlur: 比较新旧值，有变化才保存
+const saveField = async (ex) => {
+  const p = getLocal(ex)
+  if (p.sets === (ex.sets?.toString() || '') && /* ... */) return
+  await fetch(`/api/classes/${classId}/exercises/${ex.id}`, { method: 'PUT', ... })
+}
+```
+
+**Git 沙盒限制**
+Claude 的沙盒环境对 `.git/` 目录有权限限制（无法创建 HEAD.lock），所有 git 操作必须在 Jessica 的本地终端执行。Claude 只负责写文件，不执行 git 命令。
+
+**SSH 替代 HTTPS（中国网络）**
+中国网络环境下 HTTPS 推送 GitHub 经常超时，改用 SSH 更稳定：
+```bash
+git remote set-url origin git@github.com:xyang17/my-pilates-pro.git
+# 生成 key: ssh-keygen -t ed25519 -C "your@email.com"
+# 公钥添加到 GitHub Settings → SSH and GPG keys
+```
+
+---
+
+#### 已知待处理问题
+
+| 问题 | 状态 | 说明 |
+|------|------|------|
+| 作业布置学员选择 | 待改进 | 目前用 UUID 输入，需改为从客户列表下拉选择 |
+| 动作库重新导入 | 待执行 | 删除旧数据后需重导入37条真实数据（有修复 camelCase 支持后才能正确导入类型） |
+| 作业 homework 表 SQL | 待执行 | CREATE TABLE homework + homework_exercise，需在 Supabase 运行 |
+| 所有页面中文切换完整性 | 部分完成 | class detail、review、student-notes、exercise detail 等页面还未接入 useLang |
+
+---
+
 ## Documentation & Knowledge Base
 
 ### How to Keep This Doc Updated
@@ -564,6 +677,10 @@ git add -A && git commit -m "描述本次改动" && git push
 | 修改用户角色/权限后页面不生效 | AuthContext 在登录时读取一次角色并缓存在 React state，DB 改动不会自动刷新 | **只要修改了 `public.user` 的 `role` 字段，必须告知用户退出登录再重新登录**，否则前端看到的是旧的角色 |
 | 用户角色改了但浏览器还显示旧角色 | 重新登录发生在 DB 改动之前（时序问题）| 确保操作顺序：先完成 SQL 改动并确认 SELECT 结果正确 → 再退出登录 → 再重新登录 |
 | `public.user` 表没有对应记录 | 用户通过 Supabase Auth 注册，但 `public.user` 没有对应触发器自动创建行；代码默认 role = 'CLIENT' | 手动注册流程必须同时往 `public.user` 插入记录；或排查确认 signup trigger 存在 |
+| Excel 导入字段丢失 | Excel 列名是 camelCase（`typeEN`），但 API 只处理 snake_case（`type_en`），导致 type/difficulty 等字段全部空 | import API 必须同时处理两种格式：`ex.type_en \|\| ex.typeEN \|\| ''` |
+| `authenticated` role 读不到 `public.user` | Supabase 默认不授权 `authenticated` role 读 `public.user`，导致角色查询静默返回 null，前端默认 CLIENT | 每个新表建完必须运行 `GRANT ALL ON TABLE public.xxx TO anon, authenticated, service_role` |
+| git HEAD.lock 在沙盒里无法删除 | Claude 沙盒对 `.git/` 目录权限不足 | 所有 git 操作（add/commit/push）必须在 Jessica 本地终端执行，Claude 只写文件 |
+| CDN 在中国加载失败 | jsdelivr/unpkg 等 CDN 在中国不稳定，动作库 xlsx CDN 导致整个导入页崩溃 | 改用 npm 包：`npm install xlsx`，从 node_modules 导入 |
 
 ---
 
@@ -622,6 +739,6 @@ Same as above (set in Vercel project settings)
 
 ---
 
-**Last Updated:** June 22, 2026  
-**Next Review:** July 22, 2026  
-**Status:** Foundation Complete, Ready for Phase 1 Development
+**Last Updated:** June 28, 2026  
+**Next Review:** July 28, 2026  
+**Status:** Core Features Live — Moving to UI Polish Phase
