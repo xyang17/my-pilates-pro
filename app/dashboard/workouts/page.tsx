@@ -21,7 +21,36 @@ interface HomeworkExercise {
     name_cn: string
     name_en: string
     featured_image_url?: string
+    type_cn?: string
+    type_en?: string
+    difficulty_cn?: string
+    difficulty_en?: string
+    target_muscles_cn?: string
+    target_muscles_en?: string
+    description_cn?: string
+    description_en?: string
+    instructions_cn?: string
+    instructions_en?: string
   }
+}
+
+interface ExerciseDetail {
+  id: string
+  name_cn: string
+  name_en: string
+  featured_image_url?: string
+  type_cn?: string
+  type_en?: string
+  difficulty_cn?: string
+  difficulty_en?: string
+  target_muscles_cn?: string
+  target_muscles_en?: string
+  description_cn?: string
+  description_en?: string
+  instructions_cn?: string
+  instructions_en?: string
+  default_sets?: number
+  default_reps?: number
 }
 
 interface Homework {
@@ -43,6 +72,9 @@ export default function WorkoutsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [completing, setCompleting] = useState<string | null>(null)
+  // Exercise detail drawer
+  const [detailExercise, setDetailExercise] = useState<ExerciseDetail | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) { router.push('/auth/login'); return }
@@ -73,6 +105,18 @@ export default function WorkoutsPage() {
     } finally {
       setCompleting(null)
     }
+  }
+
+  const openDetail = async (exerciseId: string) => {
+    setLoadingDetail(true)
+    setDetailExercise(null)
+    try {
+      const res = await fetch(`/api/exercises/${exerciseId}`, {
+        headers: { 'x-user-id': user?.id || '' },
+      })
+      if (res.ok) setDetailExercise(await res.json())
+    } catch { /* non-critical */ }
+    finally { setLoadingDetail(false) }
   }
 
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
@@ -216,12 +260,15 @@ export default function WorkoutsPage() {
 
                       {/* Exercise list */}
                       {[...hw.homework_exercise].sort((a, b) => a.order_num - b.order_num).map((ex, i) => (
-                        <div key={ex.id} style={{
-                          display: 'flex', gap: 'var(--sp-3)',
-                          padding: 'var(--sp-3) var(--sp-4)',
-                          borderBottom: i < hw.homework_exercise.length - 1 ? '1px solid var(--c-border)' : 'none',
-                          alignItems: 'center',
-                        }}>
+                        <div key={ex.id}
+                          onClick={() => openDetail(ex.master_exercise.id)}
+                          style={{
+                            display: 'flex', gap: 'var(--sp-3)',
+                            padding: 'var(--sp-3) var(--sp-4)',
+                            borderBottom: i < hw.homework_exercise.length - 1 ? '1px solid var(--c-border)' : 'none',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                          }}>
                           <div style={{
                             width: 36, height: 36, borderRadius: 'var(--r-md)',
                             background: 'var(--c-fill-light)',
@@ -246,10 +293,7 @@ export default function WorkoutsPage() {
                             </p>
                             {ex.notes && <p style={{ margin: '3px 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-brand)', fontStyle: 'italic' }}>📌 {ex.notes}</p>}
                           </div>
-                          <Link href={`/dashboard/exercises/${ex.master_exercise.id}`}
-                            style={{ fontSize: 'var(--text-xs)', color: 'var(--c-brand)', textDecoration: 'none', flexShrink: 0 }}>
-                            {t('详情', 'Detail')} →
-                          </Link>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-brand)', flexShrink: 0 }}>详情 ›</span>
                         </div>
                       ))}
 
@@ -279,6 +323,118 @@ export default function WorkoutsPage() {
           </div>
         )}
       </main>
+
+      {/* Exercise Detail Drawer */}
+      {(loadingDetail || detailExercise) && (
+        <div
+          onClick={() => setDetailExercise(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 600, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--c-card-bg)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 640, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+
+            {/* Drawer handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--c-fill-mid)' }} />
+            </div>
+
+            {loadingDetail ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', flexDirection: 'column', gap: 12 }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid var(--c-fill-mid)', borderTopColor: 'var(--c-brand)', animation: 'spin 0.8s linear infinite' }} />
+                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>加载中…</span>
+              </div>
+            ) : detailExercise && (
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {/* Header */}
+                <div style={{ padding: '12px 20px 16px', borderBottom: '1px solid var(--c-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: '0 0 2px', fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--c-text-primary)' }}>
+                        {lang === 'zh' ? (detailExercise.name_cn || detailExercise.name_en) : (detailExercise.name_en || detailExercise.name_cn)}
+                      </p>
+                      {detailExercise.name_cn && detailExercise.name_en && (
+                        <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)' }}>
+                          {lang === 'zh' ? detailExercise.name_en : detailExercise.name_cn}
+                        </p>
+                      )}
+                    </div>
+                    <button onClick={() => setDetailExercise(null)}
+                      style={{ background: 'var(--c-fill-light)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', fontSize: 16, color: 'var(--c-text-secondary)', flexShrink: 0 }}>✕</button>
+                  </div>
+
+                  {/* Tags */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                    {(lang === 'zh' ? detailExercise.type_cn : detailExercise.type_en) && (
+                      <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--c-fill-light)', color: 'var(--c-brand)', fontWeight: 600 }}>
+                        {lang === 'zh' ? detailExercise.type_cn : detailExercise.type_en}
+                      </span>
+                    )}
+                    {(lang === 'zh' ? detailExercise.difficulty_cn : detailExercise.difficulty_en) && (
+                      <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)' }}>
+                        {lang === 'zh' ? detailExercise.difficulty_cn : detailExercise.difficulty_en}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Featured image */}
+                {detailExercise.featured_image_url && (
+                  <div style={{ background: 'var(--c-fill-light)' }}>
+                    <img src={detailExercise.featured_image_url} alt={detailExercise.name_en}
+                      style={{ width: '100%', maxHeight: 200, objectFit: 'cover' }} />
+                  </div>
+                )}
+
+                <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Target muscles */}
+                  {(lang === 'zh' ? detailExercise.target_muscles_cn : detailExercise.target_muscles_en) && (
+                    <div>
+                      <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: 'var(--c-text-hint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        {t('目标肌群', 'Target Muscles')}
+                      </p>
+                      <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)', lineHeight: 1.6 }}>
+                        {lang === 'zh' ? detailExercise.target_muscles_cn : detailExercise.target_muscles_en}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  {(lang === 'zh' ? detailExercise.description_cn : detailExercise.description_en) && (
+                    <div>
+                      <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: 'var(--c-text-hint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        {t('动作说明', 'Description')}
+                      </p>
+                      <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                        {lang === 'zh' ? detailExercise.description_cn : detailExercise.description_en}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Instructions / Key points */}
+                  {(lang === 'zh' ? detailExercise.instructions_cn : detailExercise.instructions_en) && (
+                    <div style={{ background: 'var(--c-fill-light)', borderRadius: 'var(--r-md)', padding: '14px 16px' }}>
+                      <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: 'var(--c-brand)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        📌 {t('动作要点', 'Key Points')}
+                      </p>
+                      <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                        {lang === 'zh' ? detailExercise.instructions_cn : detailExercise.instructions_en}
+                      </p>
+                    </div>
+                  )}
+
+                  {!detailExercise.description_cn && !detailExercise.description_en &&
+                   !detailExercise.instructions_cn && !detailExercise.instructions_en && (
+                    <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--c-text-hint)', textAlign: 'center', padding: '20px 0' }}>
+                      {t('暂无详细说明', 'No details added yet')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -129,6 +129,10 @@ export default function ClassDetailPage() {
   const [showCopyModal, setShowCopyModal] = useState(false)
   const [copyForm, setCopyForm] = useState({ name: '', date: '', start_time: '', assigned_to: '' })
   const [copying, setCopying] = useState(false)
+  // Drag-to-reorder
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [reordering, setReordering] = useState(false)
   // Class info inline edit
   const [editInfo, setEditInfo] = useState(false)
   const [infoForm, setInfoForm] = useState({ name: '', date: '', start_time: '', duration: '', discipline: '', level: '', notes: '', assigned_to: '' })
@@ -500,6 +504,41 @@ export default function ClassDetailPage() {
     }
   }
 
+  const handleDragStart = (id: string) => setDraggedId(id)
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault()
+    if (id !== draggedId) setDragOverId(id)
+  }
+
+  const handleDrop = async (targetId: string) => {
+    if (!draggedId || draggedId === targetId || !classData) return
+    const sorted = [...classData.exercises].sort((a, b) => a.order - b.order)
+    const fromIdx = sorted.findIndex(e => e.id === draggedId)
+    const toIdx   = sorted.findIndex(e => e.id === targetId)
+    if (fromIdx === -1 || toIdx === -1) return
+    const reordered = [...sorted]
+    const [moved] = reordered.splice(fromIdx, 1)
+    reordered.splice(toIdx, 0, moved)
+    // Optimistic update
+    setClassData(prev => prev ? { ...prev, exercises: reordered.map((e, i) => ({ ...e, order: i + 1 })) } : prev)
+    setDraggedId(null)
+    setDragOverId(null)
+    setReordering(true)
+    try {
+      await Promise.all(reordered.map((ex, i) =>
+        fetch(`/api/classes/${classId}/exercises/${ex.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+          body: JSON.stringify({ order: i + 1 }),
+        })
+      ))
+    } catch { /* non-critical */ }
+    finally { setReordering(false) }
+  }
+
+  const handleDragEnd = () => { setDraggedId(null); setDragOverId(null) }
+
   if (authLoading || isLoading) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 'var(--sp-3)' }}>
@@ -870,6 +909,8 @@ export default function ClassDetailPage() {
               <span style={{ fontWeight: 'bold', color: '#444', fontSize: '14px' }}>
                 {t('动作列表', 'Exercises')}
                 {classData.exercises.length > 0 && <span style={{ color: '#bbb', fontWeight: 'normal', marginLeft: '6px' }}>({classData.exercises.length})</span>}
+                {reordering && <span style={{ color: 'var(--c-brand)', fontWeight: 'normal', fontSize: '11px', marginLeft: '8px' }}>保存顺序…</span>}
+                {isTrainer && classData.exercises.length > 1 && !reordering && <span style={{ color: '#bbb', fontWeight: 'normal', fontSize: '11px', marginLeft: '8px' }}>拖动 ⠿ 排序</span>}
               </span>
               {isTrainer && classData.exercises.length > 0 && (
                 <button onClick={() => {
@@ -903,14 +944,28 @@ export default function ClassDetailPage() {
                   color: 'var(--c-text-primary)',
                   width: '100%',
                 }
+                const isDragging = draggedId === ex.id
+                const isDragOver = dragOverId === ex.id
                 return (
-                  <div key={ex.id} style={{
-                    padding: '10px 14px',
-                    borderBottom: i < classData.exercises.length - 1 ? '1px solid var(--c-border)' : 'none',
-                    background: isSaving ? 'var(--c-fill-light)' : 'var(--c-card-bg)',
-                  }}>
-                    {/* Row 1: Number + Name + Remove */}
+                  <div key={ex.id}
+                    draggable={isTrainer}
+                    onDragStart={() => handleDragStart(ex.id)}
+                    onDragOver={e => handleDragOver(e, ex.id)}
+                    onDrop={() => handleDrop(ex.id)}
+                    onDragEnd={handleDragEnd}
+                    style={{
+                      padding: '10px 14px',
+                      borderBottom: i < classData.exercises.length - 1 ? '1px solid var(--c-border)' : 'none',
+                      background: isDragOver ? 'var(--c-fill-mid)' : isSaving ? 'var(--c-fill-light)' : 'var(--c-card-bg)',
+                      opacity: isDragging ? 0.4 : 1,
+                      cursor: isTrainer ? 'grab' : 'default',
+                      transition: 'background 0.1s, opacity 0.15s',
+                    }}>
+                    {/* Row 1: Drag handle + Number + Name + Remove */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      {isTrainer && (
+                        <span style={{ color: 'var(--c-text-hint)', fontSize: '14px', cursor: 'grab', flexShrink: 0, userSelect: 'none', lineHeight: 1 }} title="拖动排序">⠿</span>
+                      )}
                       <div style={{ width: 22, height: 22, background: 'var(--c-lavender)', color: 'var(--c-text-primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>
                         {i + 1}
                       </div>
