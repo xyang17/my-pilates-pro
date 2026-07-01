@@ -41,6 +41,7 @@ export default function ExercisesPage() {
   const [activeCategory, setActiveCategory] = useState<string>('__all__')
   const [filterDifficulty, setFilterDifficulty] = useState('')
   const [filterMuscle, setFilterMuscle] = useState('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) { router.push('/auth/login'); return }
@@ -53,6 +54,22 @@ export default function ExercisesPage() {
       if (res.ok) setExercises(await res.json())
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(t(`确认删除「${name}」？此操作不可撤销。`, `Delete "${name}"? This cannot be undone.`))) return
+    setDeletingId(id)
+    try {
+      const res = await fetch(`/api/exercises/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-user-id': user?.id || '' },
+      })
+      if (res.ok) {
+        setExercises(prev => prev.filter(ex => ex.id !== id))
+      }
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -247,57 +264,89 @@ export default function ExercisesPage() {
                 <span style={{ fontSize: '12px', color: '#bbb' }}>{items.length} {t('个', '')}</span>
                 <div style={{ flex: 1, height: '1px', backgroundColor: '#e8dff5' }} />
               </div>
-              <ExerciseRows items={items} exName={exName} exNameSub={exNameSub} exDiff={exDiff} exMuscles={exMuscles} />
+              <ExerciseRows items={items} exName={exName} exNameSub={exNameSub} exDiff={exDiff} exMuscles={exMuscles} onDelete={handleDelete} deletingId={deletingId} />
             </div>
           ))
         ) : (
-          <ExerciseRows items={filtered} exName={exName} exNameSub={exNameSub} exDiff={exDiff} exMuscles={exMuscles} />
+          <ExerciseRows items={filtered} exName={exName} exNameSub={exNameSub} exDiff={exDiff} exMuscles={exMuscles} onDelete={handleDelete} deletingId={deletingId} />
         )}
       </main>
     </div>
   )
 }
 
-function ExerciseRows({ items, exName, exNameSub, exDiff, exMuscles }: {
+function ExerciseRows({ items, exName, exNameSub, exDiff, exMuscles, onDelete, deletingId }: {
   items: Exercise[]
   exName: (ex: Exercise) => string
   exNameSub: (ex: Exercise) => string
   exDiff: (ex: Exercise) => string
   exMuscles: (ex: Exercise) => string
+  onDelete?: (id: string, name: string) => void
+  deletingId?: string | null
 }) {
   return (
     <div style={{ background: 'var(--c-card-bg)', borderRadius: '10px', overflow: 'hidden' }}>
       {items.map((ex, idx) => {
         const diff = exDiff(ex)
+        const isDeleting = deletingId === ex.id
         return (
-          <Link key={ex.id} href={`/dashboard/exercises/${ex.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: idx < items.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'var(--c-fill-light)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {ex.featured_image_url
-                  ? <img src={ex.featured_image_url} alt={ex.name_en} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <span style={{ fontSize: '22px' }}>🏋️</span>}
+          <div key={ex.id} style={{ display: 'flex', alignItems: 'center', borderBottom: idx < items.length - 1 ? '1px solid #f5f5f5' : 'none', opacity: isDeleting ? 0.4 : 1 }}>
+            <Link href={`/dashboard/exercises/${ex.id}`} style={{ textDecoration: 'none', color: 'inherit', flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'var(--c-fill-light)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {ex.featured_image_url
+                    ? <img src={ex.featured_image_url} alt={ex.name_en} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <span style={{ fontSize: '22px' }}>🏋️</span>}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: '0 0 2px 0', fontWeight: 'bold', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {exName(ex)}
+                  </p>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {exNameSub(ex)}{exMuscles(ex) && ` · ${exMuscles(ex)}`}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexShrink: 0, alignItems: 'center' }}>
+                  {diff && (
+                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', backgroundColor: DIFF_COLOR[diff] || '#eee', color: DIFF_TEXT[diff] || '#666' }}>
+                      {diff}
+                    </span>
+                  )}
+                  {ex.default_sets && ex.default_reps && (
+                    <span style={{ fontSize: '11px', color: '#bbb' }}>{ex.default_sets}×{ex.default_reps}</span>
+                  )}
+                  <span style={{ fontSize: '12px', color: 'var(--c-brand)' }}>→</span>
+                </div>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: '0 0 2px 0', fontWeight: 'bold', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {exName(ex)}
-                </p>
-                <p style={{ margin: 0, fontSize: '12px', color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {exNameSub(ex)}{exMuscles(ex) && ` · ${exMuscles(ex)}`}
-                </p>
-              </div>
-              <div style={{ display: 'flex', gap: '6px', flexShrink: 0, alignItems: 'center' }}>
-                {diff && (
-                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', backgroundColor: DIFF_COLOR[diff] || '#eee', color: DIFF_TEXT[diff] || '#666' }}>
-                    {diff}
-                  </span>
-                )}
-                {ex.default_sets && ex.default_reps && (
-                  <span style={{ fontSize: '11px', color: '#bbb' }}>{ex.default_sets}×{ex.default_reps}</span>
-                )}
-                <span style={{ fontSize: '12px', color: 'var(--c-brand)' }}>→</span>
-              </div>
-            </div>
-          </Link>
+            </Link>
+            {onDelete && (
+              <button
+                onClick={e => { e.stopPropagation(); onDelete(ex.id, exName(ex)) }}
+                disabled={isDeleting}
+                title="删除动作"
+                style={{
+                  flexShrink: 0,
+                  width: '32px',
+                  height: '32px',
+                  marginRight: '10px',
+                  border: 'none',
+                  borderRadius: '50%',
+                  background: 'transparent',
+                  color: '#ccc',
+                  fontSize: '15px',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fee2e2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#ccc' }}
+              >
+                {isDeleting ? '…' : '✕'}
+              </button>
+            )}
+          </div>
         )
       })}
     </div>
