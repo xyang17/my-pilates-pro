@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useLang } from '@/context/LanguageContext'
 import { useToast } from '@/context/ToastContext'
 import { useRouter, useParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 
 interface MasterExercise {
@@ -539,6 +539,54 @@ export default function ClassDetailPage() {
 
   const handleDragEnd = () => { setDraggedId(null); setDragOverId(null) }
 
+  // Touch drag-and-drop (mobile)
+  useEffect(() => {
+    if (!draggedId || !isTrainer) return
+    let currentOverId: string | null = null
+
+    const onMove = (e: TouchEvent) => {
+      e.preventDefault()
+      const touch = e.touches[0]
+      const el = document.elementFromPoint(touch.clientX, touch.clientY)
+      const row = el?.closest('[data-exercise-id]')
+      const overId = row?.getAttribute('data-exercise-id') || null
+      currentOverId = overId
+      setDragOverId(overId && overId !== draggedId ? overId : null)
+    }
+
+    const onEnd = async () => {
+      const targetId = currentOverId
+      setDraggedId(null)
+      setDragOverId(null)
+      if (!targetId || targetId === draggedId || !classData) return
+      const sorted = [...classData.exercises].sort((a, b) => a.order - b.order)
+      const fromIdx = sorted.findIndex(e => e.id === draggedId)
+      const toIdx   = sorted.findIndex(e => e.id === targetId)
+      if (fromIdx === -1 || toIdx === -1) return
+      const reordered = [...sorted]
+      const [moved] = reordered.splice(fromIdx, 1)
+      reordered.splice(toIdx, 0, moved)
+      setClassData(prev => prev ? { ...prev, exercises: reordered.map((e, i) => ({ ...e, order: i + 1 })) } : prev)
+      setReordering(true)
+      try {
+        await Promise.all(reordered.map((ex, i) =>
+          fetch(`/api/classes/${classId}/exercises/${ex.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+            body: JSON.stringify({ order: i + 1 }),
+          })
+        ))
+      } catch { } finally { setReordering(false) }
+    }
+
+    document.addEventListener('touchmove', onMove, { passive: false })
+    document.addEventListener('touchend', onEnd)
+    return () => {
+      document.removeEventListener('touchmove', onMove)
+      document.removeEventListener('touchend', onEnd)
+    }
+  }, [draggedId, classData, classId, user?.id, isTrainer])
+
   if (authLoading || isLoading) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 'var(--sp-3)' }}>
@@ -948,11 +996,17 @@ export default function ClassDetailPage() {
                 const isDragOver = dragOverId === ex.id
                 return (
                   <div key={ex.id}
+                    data-exercise-id={ex.id}
                     draggable={isTrainer}
                     onDragStart={() => handleDragStart(ex.id)}
                     onDragOver={e => handleDragOver(e, ex.id)}
                     onDrop={() => handleDrop(ex.id)}
                     onDragEnd={handleDragEnd}
+                    onTouchStart={isTrainer ? (e: React.TouchEvent) => {
+                      const tag = (e.target as HTMLElement).tagName.toLowerCase()
+                      if (['input', 'select', 'button', 'textarea'].includes(tag)) return
+                      setDraggedId(ex.id)
+                    } : undefined}
                     style={{
                       padding: '10px 14px',
                       borderBottom: i < classData.exercises.length - 1 ? '1px solid var(--c-border)' : 'none',
@@ -964,7 +1018,10 @@ export default function ClassDetailPage() {
                     {/* Row 1: Drag handle + Number + Name + Remove */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       {isTrainer && (
-                        <span style={{ color: 'var(--c-text-hint)', fontSize: '14px', cursor: 'grab', flexShrink: 0, userSelect: 'none', lineHeight: 1 }} title="拖动排序">⠿</span>
+                        <span
+                          style={{ color: 'var(--c-text-hint)', fontSize: '18px', cursor: 'grab', flexShrink: 0, userSelect: 'none', lineHeight: 1, padding: '4px 6px' }}
+                          title="拖动排序"
+                        >⠿</span>
                       )}
                       <div style={{ width: 22, height: 22, background: 'var(--c-lavender)', color: 'var(--c-text-primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>
                         {i + 1}
