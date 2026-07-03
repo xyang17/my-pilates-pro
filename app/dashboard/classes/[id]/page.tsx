@@ -268,33 +268,59 @@ export default function ClassDetailPage() {
     const p = getLocal(ex)
     // Skip if nothing changed
     if (
-      (p.sets === (ex.sets?.toString() || '')) &&
-      (p.reps === (ex.reps?.toString() || '')) &&
-      (p.weight === (ex.weight?.toString() || '')) &&
-      (p.weight_unit === (ex.weight_unit || 'kg')) &&
-      (p.duration === (ex.duration?.toString() || '')) &&
-      (p.duration_unit === (ex.duration_unit || 'minutes')) &&
-      (p.instance_notes === (ex.instance_notes || ''))
+      (p.sets          === (ex.sets?.toString()      || '')) &&
+      (p.reps          === (ex.reps?.toString()      || '')) &&
+      (p.weight        === (ex.weight?.toString()    || '')) &&
+      (p.weight_unit   === (ex.weight_unit           || 'kg')) &&
+      (p.duration      === (ex.duration?.toString()  || '')) &&
+      (p.duration_unit === (ex.duration_unit         || 'minutes')) &&
+      (p.instance_notes === (ex.instance_notes       || ''))
     ) return
 
     setSavingIds(prev => new Set(prev).add(ex.id))
     try {
-      await fetch(`/api/classes/${classId}/exercises/${ex.id}`, {
+      const payload = {
+        sets:           p.sets          ? parseInt(p.sets)          : null,
+        reps:           p.reps          ? parseInt(p.reps)          : null,
+        weight:         p.weight !== '' ? parseFloat(p.weight)      : null,
+        weight_unit:    p.weight_unit   || 'kg',
+        duration:       p.duration      ? parseInt(p.duration)      : null,
+        duration_unit:  p.duration_unit || 'minutes',
+        instance_notes: p.instance_notes || null,
+      }
+      const res = await fetch(`/api/classes/${classId}/exercises/${ex.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
-        body: JSON.stringify({
-          sets: p.sets ? parseInt(p.sets) : null,
-          reps: p.reps ? parseInt(p.reps) : null,
-          weight: p.weight ? parseFloat(p.weight) : null,
-          weight_unit: p.weight_unit,
-          duration: p.duration ? parseInt(p.duration) : null,
-          duration_unit: p.duration_unit,
-          instance_notes: p.instance_notes || null,
-        }),
+        body: JSON.stringify(payload),
       })
-      // Refresh silently
-      const res = await fetch(`/api/classes/${classId}`, { headers: { 'x-user-id': user?.id || '' } })
-      if (res.ok) { const d = await res.json(); setClassData(d) }
+      if (res.ok) {
+        // Patch only this row in classData — no re-fetch, no race conditions
+        setClassData(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            exercises: prev.exercises.map(e => {
+              if (e.id !== ex.id) return e
+              return {
+                ...e,
+                sets:           payload.sets           ?? undefined,
+                reps:           payload.reps           ?? undefined,
+                weight:         payload.weight         ?? undefined,
+                weight_unit:    payload.weight_unit,
+                duration:       payload.duration       ?? undefined,
+                duration_unit:  payload.duration_unit,
+                instance_notes: payload.instance_notes ?? undefined,
+              } as ClassExercise
+            }),
+          }
+        })
+        // Clear local override so hasUnsaved is accurate
+        setLocalParams(prev => {
+          const next = { ...prev }
+          delete next[ex.id]
+          return next
+        })
+      }
     } catch { /* non-critical */ }
     finally { setSavingIds(prev => { const s = new Set(prev); s.delete(ex.id); return s }) }
   }
@@ -535,8 +561,11 @@ export default function ClassDetailPage() {
       )
     })
     if (dirty.length === 0) { showToast(t('没有未保存的更改', 'Nothing to save')); return }
-    await Promise.all(dirty.map(ex => saveField(ex)))
-    showToast(t('已保存', 'Saved ✓'))
+    // Sequential saves — avoids concurrent setClassData race conditions
+    for (const ex of dirty) {
+      await saveField(ex)
+    }
+    showToast(t(`已保存全部 ${dirty.length} 个动作`, `Saved ${dirty.length} exercises ✓`))
   }
 
   const handleDragStart = (id: string) => setDraggedId(id)
