@@ -12,6 +12,8 @@ interface Exercise {
   name_cn: string
   type_en?: string
   type_cn?: string
+  series_cn?: string
+  series_en?: string
   difficulty_en?: string
   difficulty_cn?: string
   target_muscles_en?: string
@@ -77,6 +79,7 @@ export default function ExercisesPage() {
   const exNameSub = (ex: Exercise) => lang === 'zh' ? ex.name_en : ex.name_cn
   const exDiff = (ex: Exercise) => lang === 'zh' ? (ex.difficulty_cn || ex.difficulty_en || '') : (ex.difficulty_en || ex.difficulty_cn || '')
   const exMuscles = (ex: Exercise) => lang === 'zh' ? (ex.target_muscles_cn || ex.target_muscles_en || '') : (ex.target_muscles_en || ex.target_muscles_cn || '')
+  const exSeries = (ex: Exercise) => lang === 'zh' ? (ex.series_cn || ex.series_en || '') : (ex.series_en || ex.series_cn || '')
 
   const catKey = (ex: Exercise) => ex.type_en || ex.type_cn || '__other__'
   const catLabel = (ex: Exercise) => {
@@ -264,23 +267,24 @@ export default function ExercisesPage() {
                 <span style={{ fontSize: '12px', color: '#bbb' }}>{items.length} {t('个', '')}</span>
                 <div style={{ flex: 1, height: '1px', backgroundColor: '#e8dff5' }} />
               </div>
-              <ExerciseRows items={items} exName={exName} exNameSub={exNameSub} exDiff={exDiff} exMuscles={exMuscles} onDelete={handleDelete} deletingId={deletingId} />
+              <ExerciseRows items={items} exName={exName} exNameSub={exNameSub} exDiff={exDiff} exMuscles={exMuscles} exSeries={exSeries} onDelete={handleDelete} deletingId={deletingId} />
             </div>
           ))
         ) : (
-          <ExerciseRows items={filtered} exName={exName} exNameSub={exNameSub} exDiff={exDiff} exMuscles={exMuscles} onDelete={handleDelete} deletingId={deletingId} />
+          <ExerciseRows items={filtered} exName={exName} exNameSub={exNameSub} exDiff={exDiff} exMuscles={exMuscles} exSeries={exSeries} onDelete={handleDelete} deletingId={deletingId} />
         )}
       </main>
     </div>
   )
 }
 
-function ExerciseRows({ items, exName, exNameSub, exDiff, exMuscles, onDelete, deletingId }: {
+function ExerciseRows({ items, exName, exNameSub, exDiff, exMuscles, exSeries, onDelete, deletingId }: {
   items: Exercise[]
   exName: (ex: Exercise) => string
   exNameSub: (ex: Exercise) => string
   exDiff: (ex: Exercise) => string
   exMuscles: (ex: Exercise) => string
+  exSeries: (ex: Exercise) => string
   onDelete?: (id: string, name: string) => void
   deletingId?: string | null
 }) {
@@ -299,9 +303,16 @@ function ExerciseRows({ items, exName, exNameSub, exDiff, exMuscles, onDelete, d
                     : <span style={{ fontSize: '22px' }}>🏋️</span>}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: '0 0 2px 0', fontWeight: 'bold', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {exName(ex)}
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', overflow: 'hidden' }}>
+                    <p style={{ margin: '0 0 2px 0', fontWeight: 'bold', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>
+                      {exName(ex)}
+                    </p>
+                    {exSeries(ex) && (
+                      <span style={{ flexShrink: 0, fontSize: '10px', padding: '1px 7px', borderRadius: '10px', background: '#EDE6F4', color: '#7B5EA7', whiteSpace: 'nowrap', fontWeight: 500 }}>
+                        {exSeries(ex)}
+                      </span>
+                    )}
+                  </div>
                   <p style={{ margin: 0, fontSize: '12px', color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {exNameSub(ex)}{exMuscles(ex) && ` · ${exMuscles(ex)}`}
                   </p>

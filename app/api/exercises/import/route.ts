@@ -26,6 +26,8 @@ export async function POST(req: NextRequest) {
       description_cn: ex.description_cn || ex.descriptionCN || '',
       instructions_en: ex.instructions_en || ex.instructionsEN || ex.instructions || '',
       instructions_cn: ex.instructions_cn || ex.instructionsCN || '',
+      series_cn: ex.series_cn || ex.seriesCN || null,
+      series_en: ex.series_en || ex.seriesEN || null,
       type_en: ex.type_en || ex.typeEN || ex.type || '',
       type_cn: ex.type_cn || ex.typeCN || '',
       difficulty_en: ex.difficulty_en || ex.difficultyEN || ex.difficulty || '',
