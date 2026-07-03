@@ -413,20 +413,22 @@ export default function ClassDetailPage() {
       if (!res.ok) throw new Error('复制课程失败')
       const newClass = await res.json()
 
-      // Copy all exercises
-      for (const ex of classData.exercises) {
+      // Copy all exercises — use getLocal to include any unsaved local edits
+      const sorted = [...classData.exercises].sort((a, b) => a.order - b.order)
+      for (const ex of sorted) {
+        const p = getLocal(ex)
         await fetch(`/api/classes/${newClass.id}/exercises`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
           body: JSON.stringify({
             exercise_id: ex.exercise_id,
-            sets: ex.sets || null,
-            reps: ex.reps || null,
-            weight: ex.weight || null,
-            weight_unit: ex.weight_unit || 'kg',
-            duration: ex.duration || null,
-            duration_unit: ex.duration_unit || 'minutes',
-            instance_notes: ex.instance_notes || null,
+            sets:          p.sets          ? parseInt(p.sets)          : null,
+            reps:          p.reps          ? parseInt(p.reps)          : null,
+            weight:        p.weight        ? parseFloat(p.weight)      : null,
+            weight_unit:   p.weight_unit   || 'kg',
+            duration:      p.duration      ? parseInt(p.duration)      : null,
+            duration_unit: p.duration_unit || 'minutes',
+            instance_notes: p.instance_notes || null,
           }),
         })
       }
@@ -502,6 +504,37 @@ export default function ClassDetailPage() {
     } catch (err: any) {
       showToast(err.message, 'error')
     }
+  }
+
+  // Check if any localParams differ from DB values
+  const hasUnsaved = !!(classData?.exercises.some(ex => {
+    const lp = localParams[ex.id]
+    if (!lp) return false
+    return (
+      lp.sets          !== (ex.sets?.toString()     || '') ||
+      lp.reps          !== (ex.reps?.toString()     || '') ||
+      lp.weight        !== (ex.weight?.toString()   || '') ||
+      lp.weight_unit   !== (ex.weight_unit          || 'kg') ||
+      lp.instance_notes !== (ex.instance_notes      || '')
+    )
+  }))
+
+  const saveAll = async () => {
+    if (!classData) return
+    const dirty = classData.exercises.filter(ex => {
+      const lp = localParams[ex.id]
+      if (!lp) return false
+      return (
+        lp.sets          !== (ex.sets?.toString()     || '') ||
+        lp.reps          !== (ex.reps?.toString()     || '') ||
+        lp.weight        !== (ex.weight?.toString()   || '') ||
+        lp.weight_unit   !== (ex.weight_unit          || 'kg') ||
+        lp.instance_notes !== (ex.instance_notes      || '')
+      )
+    })
+    if (dirty.length === 0) { showToast(t('没有未保存的更改', 'Nothing to save')); return }
+    await Promise.all(dirty.map(ex => saveField(ex)))
+    showToast(t('已保存', 'Saved ✓'))
   }
 
   const handleDragStart = (id: string) => setDraggedId(id)
@@ -960,6 +993,14 @@ export default function ClassDetailPage() {
                 {reordering && <span style={{ color: 'var(--c-brand)', fontWeight: 'normal', fontSize: '11px', marginLeft: '8px' }}>保存顺序…</span>}
                 {isTrainer && classData.exercises.length > 1 && !reordering && <span style={{ color: '#bbb', fontWeight: 'normal', fontSize: '11px', marginLeft: '8px' }}>拖动 ⠿ 排序</span>}
               </span>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {isTrainer && hasUnsaved && (
+                  <button
+                    onClick={saveAll}
+                    style={{ padding: '5px 14px', background: '#22c55e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                    💾 {t('保存', 'Save')}
+                  </button>
+                )}
               {isTrainer && classData.exercises.length > 0 && (
                 <button onClick={() => {
                     setShowHomework(true)
@@ -970,6 +1011,7 @@ export default function ClassDetailPage() {
                   📋 {t('布置作业', 'Assign HW')}
                 </button>
               )}
+              </div>
             </div>
 
             {/* Exercise rows — 2-row card layout */}
