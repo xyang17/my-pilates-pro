@@ -43,6 +43,7 @@ export default function ExercisesPage() {
   const [activeCategory, setActiveCategory] = useState<string>('__all__')
   const [filterDifficulty, setFilterDifficulty] = useState('')
   const [filterMuscle, setFilterMuscle] = useState('')
+  const [filterSeries, setFilterSeries] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -108,6 +109,11 @@ export default function ExercisesPage() {
     })
   )).sort()
 
+  // Series options (only exercises that have a series)
+  const seriesOptions = Array.from(new Set(
+    exercises.map(ex => exSeries(ex)).filter(Boolean)
+  )).sort()
+
   const filtered = exercises.filter(ex => {
     const matchSearch = !searchTerm ||
       (ex.name_en || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -124,10 +130,12 @@ export default function ExercisesPage() {
       (ex.target_muscles_cn || '').split(',').map((s: string) => s.trim()).includes(filterMuscle) ||
       (ex.target_muscles_en || '').split(',').map((s: string) => s.trim()).includes(filterMuscle)
 
-    return matchSearch && matchCat && matchDiff && matchMuscle
+    const matchSeries = !filterSeries || exSeries(ex) === filterSeries
+
+    return matchSearch && matchCat && matchDiff && matchMuscle && matchSeries
   })
 
-  const isGrouped = activeCategory === '__all__' && !searchTerm && !filterDifficulty && !filterMuscle
+  const isGrouped = activeCategory === '__all__' && !searchTerm && !filterDifficulty && !filterMuscle && !filterSeries
   const grouped: Record<string, { label: string; items: Exercise[] }> = {}
   if (isGrouped) {
     filtered.forEach(ex => {
@@ -220,9 +228,22 @@ export default function ExercisesPage() {
             ))}
           </select>
 
-          {(filterDifficulty || filterMuscle) && (
+          {seriesOptions.length > 0 && (
+            <select
+              value={filterSeries}
+              onChange={e => setFilterSeries(e.target.value)}
+              style={{ flex: 2, padding: '8px 12px', borderRadius: '8px', border: `1px solid ${filterSeries ? 'var(--c-brand)' : '#ddd'}`, fontSize: '13px', backgroundColor: filterSeries ? '#f0eaf8' : 'white', color: filterSeries ? 'var(--c-brand)' : '#555', cursor: 'pointer' }}
+            >
+              <option value="">{t('全部系列', 'All Series')}</option>
+              {seriesOptions.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          )}
+
+          {(filterDifficulty || filterMuscle || filterSeries) && (
             <button
-              onClick={() => { setFilterDifficulty(''); setFilterMuscle('') }}
+              onClick={() => { setFilterDifficulty(''); setFilterMuscle(''); setFilterSeries('') }}
               style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '13px', cursor: 'pointer', background: 'var(--c-card-bg)', color: '#999' }}
             >
               ✕

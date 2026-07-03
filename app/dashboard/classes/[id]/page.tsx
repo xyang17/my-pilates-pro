@@ -118,6 +118,7 @@ export default function ClassDetailPage() {
   const [hwLibFilterType, setHwLibFilterType] = useState('')
   const [hwLibFilterDiff, setHwLibFilterDiff] = useState('')
   const [hwLibFilterMuscle, setHwLibFilterMuscle] = useState('')
+  const [hwLibFilterSeries, setHwLibFilterSeries] = useState('')
   // Client list for student dropdown
   const [clientList, setClientList] = useState<{id:string,name:string,email:string}[]>([])
   // Exercise library (inline)
@@ -125,6 +126,7 @@ export default function ClassDetailPage() {
   const [libFilterType, setLibFilterType] = useState('')
   const [libFilterDiff, setLibFilterDiff] = useState('')
   const [libFilterMuscle, setLibFilterMuscle] = useState('')
+  const [libFilterSeries, setLibFilterSeries] = useState('')
   // Class copy modal
   const [showCopyModal, setShowCopyModal] = useState(false)
   const [copyForm, setCopyForm] = useState({ name: '', date: '', start_time: '', assigned_to: '' })
@@ -1152,11 +1154,13 @@ export default function ClassDetailPage() {
               const allMuscles = [...new Set(
                 availableExercises.flatMap(e => (e.target_muscles_en || '').split(',').map((m: string) => m.trim())).filter(Boolean)
               )].sort() as string[]
+              const allSeries = [...new Set(availableExercises.map(e => e.series_cn || e.series_en).filter(Boolean))].sort() as string[]
 
               const libResults = availableExercises.filter(ex => {
                 if (libFilterType && ex.type_en !== libFilterType) return false
                 if (libFilterDiff && ex.difficulty_en !== libFilterDiff) return false
                 if (libFilterMuscle && !(ex.target_muscles_en || '').split(',').map((m: string) => m.trim()).includes(libFilterMuscle)) return false
+                if (libFilterSeries && (ex.series_cn || ex.series_en) !== libFilterSeries) return false
                 if (libSearch) {
                   const q = libSearch.toLowerCase()
                   return (
@@ -1169,7 +1173,7 @@ export default function ClassDetailPage() {
                 return true
               })
 
-              const activeFilterCount = [libFilterType, libFilterDiff, libFilterMuscle].filter(Boolean).length
+              const activeFilterCount = [libFilterType, libFilterDiff, libFilterMuscle, libFilterSeries].filter(Boolean).length
 
               return (
                 <div style={{ borderTop: '2px dashed #e8dff5', backgroundColor: '#faf8fd', borderRadius: '0 0 8px 8px' }}>
@@ -1201,8 +1205,15 @@ export default function ClassDetailPage() {
                         <option value="">{t('全部肌肉', 'All muscles')}</option>
                         {allMuscles.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
+                      {allSeries.length > 0 && (
+                        <select value={libFilterSeries} onChange={e => setLibFilterSeries(e.target.value)}
+                          style={{ padding: '5px 8px', border: `1px solid ${libFilterSeries ? 'var(--c-brand)' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: libFilterSeries ? '#f0eaf8' : 'white', color: libFilterSeries ? 'var(--c-brand)' : '#666', cursor: 'pointer', flexShrink: 0 }}>
+                          <option value="">{t('全部系列', 'All series')}</option>
+                          {allSeries.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      )}
                       {activeFilterCount > 0 && (
-                        <button onClick={() => { setLibFilterType(''); setLibFilterDiff(''); setLibFilterMuscle('') }}
+                        <button onClick={() => { setLibFilterType(''); setLibFilterDiff(''); setLibFilterMuscle(''); setLibFilterSeries('') }}
                           style={{ padding: '5px 10px', border: '1px solid #ddd', borderRadius: '16px', fontSize: '11px', background: 'var(--c-card-bg)', color: '#999', cursor: 'pointer', flexShrink: 0 }}>
                           {t('清除', 'Clear')}
                         </button>
@@ -1502,12 +1513,14 @@ export default function ClassDetailPage() {
         const allMuscles = [...new Set(
           availableExercises.flatMap(e => (e.target_muscles_en || '').split(',').map((m: string) => m.trim())).filter(Boolean)
         )].sort() as string[]
+        const allSeries = [...new Set(availableExercises.map(e => e.series_cn || e.series_en).filter(Boolean))].sort() as string[]
 
         const hwLibResults = availableExercises.filter(ex => {
           if (alreadyInClass.has(ex.id)) return false
           if (hwLibFilterType && ex.type_en !== hwLibFilterType) return false
           if (hwLibFilterDiff && ex.difficulty_en !== hwLibFilterDiff) return false
           if (hwLibFilterMuscle && !(ex.target_muscles_en || '').split(',').map((m: string) => m.trim()).includes(hwLibFilterMuscle)) return false
+          if (hwLibFilterSeries && (ex.series_cn || ex.series_en) !== hwLibFilterSeries) return false
           if (hwLibSearch) {
             const q = hwLibSearch.toLowerCase()
             return (
@@ -1555,8 +1568,15 @@ export default function ClassDetailPage() {
                     <option value="">{t('全部肌肉', 'All muscles')}</option>
                     {allMuscles.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
-                  {(hwLibFilterType || hwLibFilterDiff || hwLibFilterMuscle) && (
-                    <button onClick={() => { setHwLibFilterType(''); setHwLibFilterDiff(''); setHwLibFilterMuscle('') }}
+                  {allSeries.length > 0 && (
+                    <select value={hwLibFilterSeries} onChange={e => setHwLibFilterSeries(e.target.value)}
+                      style={{ padding: '5px 8px', border: `1px solid ${hwLibFilterSeries ? 'var(--c-brand)' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: hwLibFilterSeries ? '#f0eaf8' : 'white', color: hwLibFilterSeries ? 'var(--c-brand)' : '#666', cursor: 'pointer', flexShrink: 0 }}>
+                      <option value="">{t('全部系列', 'All series')}</option>
+                      {allSeries.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  )}
+                  {(hwLibFilterType || hwLibFilterDiff || hwLibFilterMuscle || hwLibFilterSeries) && (
+                    <button onClick={() => { setHwLibFilterType(''); setHwLibFilterDiff(''); setHwLibFilterMuscle(''); setHwLibFilterSeries('') }}
                       style={{ padding: '5px 10px', border: '1px solid #ddd', borderRadius: '16px', fontSize: '11px', background: 'var(--c-card-bg)', color: '#999', cursor: 'pointer', flexShrink: 0 }}>
                       {t('清除', 'Clear')}
                     </button>
