@@ -264,61 +264,65 @@ export default function ClassDetailPage() {
     }))
   }
 
-  const saveField = async (ex: ClassExercise) => {
+  type ExerciseField = 'sets' | 'reps' | 'weight' | 'weight_unit' | 'duration' | 'duration_unit' | 'instance_notes'
+
+  const saveField = async (ex: ClassExercise, field: ExerciseField) => {
     const p = getLocal(ex)
-    // Skip if nothing changed
-    if (
-      (p.sets          === (ex.sets?.toString()      || '')) &&
-      (p.reps          === (ex.reps?.toString()      || '')) &&
-      (p.weight        === (ex.weight?.toString()    || '')) &&
-      (p.weight_unit   === (ex.weight_unit           || 'kg')) &&
-      (p.duration      === (ex.duration?.toString()  || '')) &&
-      (p.duration_unit === (ex.duration_unit         || 'minutes')) &&
-      (p.instance_notes === (ex.instance_notes       || ''))
-    ) return
+    const current = p[field]
+
+    // Compare to DB value for this specific field only
+    const dbVal = ((): string => {
+      switch (field) {
+        case 'sets':           return ex.sets?.toString()     || ''
+        case 'reps':           return ex.reps?.toString()     || ''
+        case 'weight':         return ex.weight?.toString()   || ''
+        case 'weight_unit':    return ex.weight_unit          || 'kg'
+        case 'duration':       return ex.duration?.toString() || ''
+        case 'duration_unit':  return ex.duration_unit        || 'minutes'
+        case 'instance_notes': return ex.instance_notes       || ''
+      }
+    })()
+    if (current === dbVal) return // no change
+
+    // Convert string → DB type
+    let dbValue: number | string | null
+    switch (field) {
+      case 'sets':     dbValue = current ? parseInt(current)           : null; break
+      case 'reps':     dbValue = current ? parseInt(current)           : null; break
+      case 'weight':   dbValue = current !== '' ? parseFloat(current)  : null; break
+      case 'duration': dbValue = current ? parseInt(current)           : null; break
+      default:         dbValue = current || null
+    }
 
     setSavingIds(prev => new Set(prev).add(ex.id))
     try {
-      const payload = {
-        sets:           p.sets          ? parseInt(p.sets)          : null,
-        reps:           p.reps          ? parseInt(p.reps)          : null,
-        weight:         p.weight !== '' ? parseFloat(p.weight)      : null,
-        weight_unit:    p.weight_unit   || 'kg',
-        duration:       p.duration      ? parseInt(p.duration)      : null,
-        duration_unit:  p.duration_unit || 'minutes',
-        instance_notes: p.instance_notes || null,
-      }
       const res = await fetch(`/api/classes/${classId}/exercises/${ex.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ [field]: dbValue }),
       })
       if (res.ok) {
-        // Patch only this row in classData — no re-fetch, no race conditions
+        // Patch only this one field in classData — never touch localParams
+        // hasUnsaved recalculates automatically: once classData matches localParams, field is clean
         setClassData(prev => {
           if (!prev) return prev
           return {
             ...prev,
             exercises: prev.exercises.map(e => {
               if (e.id !== ex.id) return e
-              return {
-                ...e,
-                sets:           payload.sets           ?? undefined,
-                reps:           payload.reps           ?? undefined,
-                weight:         payload.weight         ?? undefined,
-                weight_unit:    payload.weight_unit,
-                duration:       payload.duration       ?? undefined,
-                duration_unit:  payload.duration_unit,
-                instance_notes: payload.instance_notes ?? undefined,
-              } as ClassExercise
+              const updated = { ...e } as ClassExercise
+              switch (field) {
+                case 'sets':           updated.sets           = (dbValue as number | null) ?? undefined; break
+                case 'reps':           updated.reps           = (dbValue as number | null) ?? undefined; break
+                case 'weight':         updated.weight         = (dbValue as number | null) ?? undefined; break
+                case 'weight_unit':    updated.weight_unit    = current || 'kg';              break
+                case 'duration':       updated.duration       = (dbValue as number | null) ?? undefined; break
+                case 'duration_unit':  updated.duration_unit  = current || 'minutes';         break
+                case 'instance_notes': updated.instance_notes = (dbValue as string | null) ?? undefined; break
+              }
+              return updated
             }),
           }
-        })
-        // Clear local override so hasUnsaved is accurate
-        setLocalParams(prev => {
-          const next = { ...prev }
-          delete next[ex.id]
-          return next
         })
       }
     } catch { /* non-critical */ }
@@ -547,23 +551,69 @@ export default function ClassDetailPage() {
     )
   }))
 
+  // Warn browser when closing/refreshing tab with unsaved changes
+  useEffect(() => {
+    if (!hasUnsaved) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasUnsaved])
+
   const saveAll = async () => {
     if (!classData) return
     const dirty = classData.exercises.filter(ex => {
       const lp = localParams[ex.id]
       if (!lp) return false
       return (
-        lp.sets          !== (ex.sets?.toString()     || '') ||
-        lp.reps          !== (ex.reps?.toString()     || '') ||
-        lp.weight        !== (ex.weight?.toString()   || '') ||
-        lp.weight_unit   !== (ex.weight_unit          || 'kg') ||
-        lp.instance_notes !== (ex.instance_notes      || '')
+        lp.sets           !== (ex.sets?.toString()     || '') ||
+        lp.reps           !== (ex.reps?.toString()     || '') ||
+        lp.weight         !== (ex.weight?.toString()   || '') ||
+        lp.weight_unit    !== (ex.weight_unit          || 'kg') ||
+        lp.instance_notes !== (ex.instance_notes       || '')
       )
     })
     if (dirty.length === 0) { showToast(t('没有未保存的更改', 'Nothing to save')); return }
-    // Sequential saves — avoids concurrent setClassData race conditions
+
     for (const ex of dirty) {
-      await saveField(ex)
+      const p = getLocal(ex)
+      // Build payload with only dirty fields for this exercise
+      const payload: Record<string, unknown> = {}
+      if (p.sets           !== (ex.sets?.toString()     || '')) payload.sets           = p.sets ? parseInt(p.sets) : null
+      if (p.reps           !== (ex.reps?.toString()     || '')) payload.reps           = p.reps ? parseInt(p.reps) : null
+      if (p.weight         !== (ex.weight?.toString()   || '')) payload.weight         = p.weight !== '' ? parseFloat(p.weight) : null
+      if (p.weight_unit    !== (ex.weight_unit          || 'kg')) payload.weight_unit  = p.weight_unit
+      if (p.instance_notes !== (ex.instance_notes       || '')) payload.instance_notes = p.instance_notes || null
+
+      setSavingIds(prev => new Set(prev).add(ex.id))
+      try {
+        const res = await fetch(`/api/classes/${classId}/exercises/${ex.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+          body: JSON.stringify(payload),
+        })
+        if (res.ok) {
+          setClassData(prev => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              exercises: prev.exercises.map(e => {
+                if (e.id !== ex.id) return e
+                const updated = { ...e } as ClassExercise
+                if ('sets'           in payload) updated.sets           = (payload.sets           as number | null) ?? undefined
+                if ('reps'           in payload) updated.reps           = (payload.reps           as number | null) ?? undefined
+                if ('weight'         in payload) updated.weight         = (payload.weight         as number | null) ?? undefined
+                if ('weight_unit'    in payload) updated.weight_unit    = payload.weight_unit as string
+                if ('instance_notes' in payload) updated.instance_notes = (payload.instance_notes as string | null) ?? undefined
+                return updated
+              }),
+            }
+          })
+        }
+      } catch { /* non-critical */ }
+      finally { setSavingIds(prev => { const s = new Set(prev); s.delete(ex.id); return s }) }
     }
     showToast(t(`已保存全部 ${dirty.length} 个动作`, `Saved ${dirty.length} exercises ✓`))
   }
@@ -688,9 +738,15 @@ export default function ClassDetailPage() {
         top: 0,
         zIndex: 10,
       }}>
-        <Link href="/dashboard/classes" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)', flexShrink: 0 }}>
+        <button
+          onClick={() => {
+            if (hasUnsaved && !window.confirm(t('有未保存的内容，确定离开？', 'You have unsaved changes. Leave anyway?'))) return
+            router.push('/dashboard/classes')
+          }}
+          style={{ color: 'var(--c-text-secondary)', background: 'none', border: 'none', padding: 0, fontSize: 'var(--text-sm)', cursor: 'pointer', flexShrink: 0 }}
+        >
           ← 返回
-        </Link>
+        </button>
         <h1 style={{ margin: '0 var(--sp-4)', fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{classData.name}</h1>
         {/* Action button based on status and role */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', flexShrink: 0 }}>
@@ -1125,7 +1181,7 @@ export default function ClassDetailPage() {
                         <input type="number" min="0" max="99" value={p.sets}
                           disabled={!isTrainer}
                           onChange={e => updateLocal(ex.id, 'sets', e.target.value)}
-                          onBlur={() => saveField(ex)}
+                          onBlur={() => saveField(ex, 'sets')}
                           style={inputBase}
                         />
                       </div>
@@ -1135,7 +1191,7 @@ export default function ClassDetailPage() {
                         <input type="number" min="0" max="999" value={p.reps}
                           disabled={!isTrainer}
                           onChange={e => updateLocal(ex.id, 'reps', e.target.value)}
-                          onBlur={() => saveField(ex)}
+                          onBlur={() => saveField(ex, 'reps')}
                           style={inputBase}
                         />
                       </div>
@@ -1146,12 +1202,12 @@ export default function ClassDetailPage() {
                           <input type="number" min="0" step="0.5" value={p.weight}
                             disabled={!isTrainer}
                             onChange={e => updateLocal(ex.id, 'weight', e.target.value)}
-                            onBlur={() => saveField(ex)}
+                            onBlur={() => saveField(ex, 'weight')}
                             style={{ ...inputBase, borderRadius: 'var(--r-sm) 0 0 var(--r-sm)', flex: 1 }}
                           />
                           <select value={p.weight_unit} disabled={!isTrainer}
                             onChange={e => { updateLocal(ex.id, 'weight_unit', e.target.value) }}
-                            onBlur={() => saveField(ex)}
+                            onBlur={() => saveField(ex, 'weight_unit')}
                             style={{ padding: '6px 4px', border: '1px solid var(--c-border)', borderLeft: 'none', borderRadius: '0 var(--r-sm) var(--r-sm) 0', fontSize: '11px', background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', cursor: 'pointer' }}>
                             <option value="kg">kg</option>
                             <option value="lb">lb</option>
@@ -1164,7 +1220,7 @@ export default function ClassDetailPage() {
                         <input type="text" value={p.instance_notes}
                           disabled={!isTrainer}
                           onChange={e => updateLocal(ex.id, 'instance_notes', e.target.value)}
-                          onBlur={() => saveField(ex)}
+                          onBlur={() => saveField(ex, 'instance_notes')}
                           placeholder={t('选填…', 'Optional…')}
                           style={{ ...inputBase, textAlign: 'left' }}
                         />
