@@ -1,6 +1,6 @@
 # MyPilatesPro — Technical Architecture & Decision Log
 
-**Last Updated:** June 28, 2026  
+**Last Updated:** July 4, 2026  
 **Status:** Core Feature Phase — Live at myfitnesspro.co  
 **Project Lead:** Jessica (xyang17)  
 **Repository:** https://github.com/xyang17/my-pilates-pro
@@ -557,6 +557,195 @@ git remote set-url origin git@github.com:xyang17/my-pilates-pro.git
 
 ---
 
+---
+
+### July 4, 2026 — 功能迭代 + 数据完整性修复
+
+#### 新增功能
+
+**1. 动作库删除按钮**
+- 每行右侧新增 ✕ 按钮，点击后软删除（`is_active = false`），不物理删除数据
+- 防误删：点击后立即弹出 `confirm()` 确认，显示动作名称
+- 删除中显示加载状态，防止重复点击
+- 实现位置：`app/dashboard/exercises/page.tsx` → `ExerciseRows` 组件
+
+**2. 动作系列标签（series）**
+- 新增 DB 字段：`master_exercise.series_cn VARCHAR(255)`, `series_en VARCHAR(255)`
+- SQL Migration：`ALTER TABLE master_exercise ADD COLUMN IF NOT EXISTS series_cn ..., ADD COLUMN IF NOT EXISTS series_en ...`
+- 导入 API（`/api/exercises/import/route.ts`）新增 series 字段映射：
+  ```ts
+  series_cn: ex.series_cn || ex.seriesCN || null,
+  series_en: ex.series_en || ex.seriesEN || null,
+  ```
+- 动作库页面：每行名称旁显示紫色系列标签（仅当有值时显示）
+- 系列筛选下拉：动作库页 + 课程详情页的两个动作选择器（课程动作 / 家庭作业额外动作）
+- 新增凯迪拉克初级动作导入表（68条数据，含 series 列）
+
+**3. 手机端触摸拖拽排序**
+- 原 HTML5 drag API 在手机触摸屏不工作，触控面积也太小
+- 方案：全行触摸触发拖拽（排除 input/select/button），配合 `document.addEventListener('touchmove'/'touchend')` 全局监听
+- 目标检测：`document.elementFromPoint(touch.clientX, touch.clientY)` + `data-exercise-id` 属性
+- 防止页面滚动：`{ passive: false }` + `e.preventDefault()`
+- 实现位置：`app/dashboard/classes/[id]/page.tsx` → `useEffect([draggedId])`
+
+**4. 课程计划字段保存重写（per-field save，见下方决策详解）**
+- 彻底修复"填好的数字消失"bug
+- 新增手动 💾 保存按钮（当有未保存改动时显示绿色按钮）
+- 离开页面警告（浏览器 beforeunload + 返回按钮 confirm 对话框）
+- 复制课程时携带当前本地未保存的值（`getLocal(ex)` 而非直接用 `ex`）
+
+---
+
+#### ⭐ 重要决策：课程计划字段保存策略
+
+> **背景：** 课程详情页每个动作都有"组数/次数/配重/备注"等输入框，用户在格子里改完数字需要保存到 DB。这个功能看似简单，但踩了多次坑，最终经过多轮讨论才确定最终方案。以后遇到类似"多行多字段内联编辑 + 自动保存"场景，直接参考此决策。
+
+##### 状态模型
+
+```ts
+// 两层数据：DB 数据（classData）和本地编辑状态（localParams）
+const [classData, setClassData] = useState<ClassData | null>(null)   // DB 的真实值
+const [localParams, setLocalParams] = useState<Record<string, FieldMap>>({}) // 用户正在编辑的临时值
+
+// getLocal：优先用 localParams，fallback 到 DB 值
+const getLocal = (ex: ClassExercise) =>
+  localParams[ex.id] || {
+    sets: ex.sets?.toString() || '',
+    reps: ex.reps?.toString() || '',
+    weight: ex.weight?.toString() || '',
+    weight_unit: ex.weight_unit || 'kg',
+    duration: ex.duration?.toString() || '',
+    duration_unit: ex.duration_unit || 'minutes',
+    instance_notes: ex.instance_notes || '',
+  }
+
+// hasUnsaved：比较 localParams 和 classData，判断是否有未保存内容
+const hasUnsaved = !!(classData?.exercises.some(ex => {
+  const lp = localParams[ex.id]
+  if (!lp) return false
+  return lp.sets !== (ex.sets?.toString() || '') || lp.reps !== ... // 各字段比较
+}))
+```
+
+##### 曾经尝试的方案及问题
+
+| 方案 | 描述 | 核心问题 |
+|------|------|----------|
+| **方案 A：Debounce per-row** | 每行任何字段改动后 350ms 触发保存整行 | 仍有竞争：A 保存飞行中，用户改 B → A 成功后 `delete localParams[ex.id]` 删掉了 B 的值 |
+| **方案 B：onBlur 整行保存** | 失焦时保存整行所有字段 | 同上；且 `delete localParams[ex.id]` 时机不对——A 失焦保存完成时，B 字段可能已经输入新值 |
+| **方案 C：Server-sent events 实时同步** | 每次 DB 变化推送给前端 | 实现复杂，引入 WebSocket/SSE，杀鸡用牛刀 |
+| **方案 D：Zustand/Redux 全局状态** | 用外部状态库管理 | 引入额外依赖，项目规模暂不需要 |
+
+##### ⭐ 最终选择：方案 E — Per-field Save（每字段单独保存）
+
+**核心思路：每个 input 的 `onBlur` 只保存自己那一个字段，API 支持 partial PUT，保存完只更新 classData 对应字段，永远不主动清除 localParams。**
+
+```ts
+type ExerciseField = 'sets' | 'reps' | 'weight' | 'weight_unit' | 'duration' | 'duration_unit' | 'instance_notes'
+
+const saveField = async (ex: ClassExercise, field: ExerciseField) => {
+  const p = getLocal(ex)
+  const current = p[field]
+  const dbVal = /* 取 ex[field] 对应的 string 表示 */
+
+  if (current === dbVal) return // 没变化，跳过
+
+  // 仅发送这一个字段
+  const res = await fetch(`/api/classes/${classId}/exercises/${ex.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ [field]: convertedValue }),  // partial PUT
+  })
+
+  if (res.ok) {
+    // 只更新 classData 中该字段
+    setClassData(prev => ({ ...prev, exercises: prev.exercises.map(e =>
+      e.id !== ex.id ? e : { ...e, [field]: convertedValue }
+    )}))
+    // ⚠️ 不动 localParams！hasUnsaved 自动重算：
+    // 该字段 localParams 值 === 新的 classData 值 → 不再 dirty
+    // 其他字段的 localParams 不受任何影响
+  }
+}
+
+// 每个 input 的 onBlur 传字段名
+<input onBlur={() => saveField(ex, 'sets')} ... />
+<input onBlur={() => saveField(ex, 'reps')} ... />
+<input onBlur={() => saveField(ex, 'weight')} ... />
+<select onBlur={() => saveField(ex, 'weight_unit')} ... />
+<input onBlur={() => saveField(ex, 'instance_notes')} ... />
+```
+
+**为什么这样不会有竞争问题：**
+- 每个字段保存独立，互不干扰
+- 字段 A 保存成功后，只影响 classData.A — 不影响 localParams.B, localParams.C 等
+- 用户同时编辑多个字段时，每个字段有自己的独立 in-flight 请求
+- `localParams` 只会被 `updateLocal`（用户输入）更新，不会被 save 逻辑删除
+
+**API 支持 partial update 的条件（必须满足）：**
+```ts
+// /api/classes/[id]/exercises/[instanceId]/route.ts
+// 只更新显式传入的字段，未传字段保持原值
+const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+if (body.sets !== undefined) updates.sets = body.sets
+if (body.reps !== undefined) updates.reps = body.reps
+// ...
+```
+> **如果 API 是全量覆盖（overwrite all fields），per-field save 会把未传字段清空！** 改用此模式前必须确认 API 是 partial update。
+
+**saveAll（手动保存按钮）的实现：**
+`saveAll` 不调用 `saveField`（避免每字段发一次请求），而是自己对每个 dirty exercise 构建"仅变化字段"的 payload，一次 PUT 搞定：
+```ts
+const saveAll = async () => {
+  for (const ex of dirty) {
+    const payload: Record<string, unknown> = {}
+    if (p.sets !== dbSets) payload.sets = parseInt(p.sets) || null
+    if (p.reps !== dbReps) payload.reps = parseInt(p.reps) || null
+    // ... 只加有变化的字段
+    await fetch(PUT, JSON.stringify(payload))
+    // 更新 classData，不动 localParams
+  }
+}
+```
+
+##### 离开页面警告
+
+```ts
+// 浏览器关闭/刷新/历史跳转
+useEffect(() => {
+  if (!hasUnsaved) return
+  const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+  window.addEventListener('beforeunload', handler)
+  return () => window.removeEventListener('beforeunload', handler)
+}, [hasUnsaved])
+
+// 应用内"返回"按钮：Link 改为 button
+<button onClick={() => {
+  if (hasUnsaved && !window.confirm('有未保存的内容，确定离开？')) return
+  router.push('/dashboard/classes')
+}}>← 返回</button>
+```
+
+##### 经验总结
+
+**以后遇到"多行多字段内联编辑 + 自动保存"，直接用 per-field save。检查清单：**
+1. API 是 partial update（`if (body.field !== undefined) updates.field = ...`）✅
+2. `saveField(ex, fieldName)` 只保存一个字段
+3. 成功后只更新 classData 对应字段，**绝不删 localParams**
+4. `hasUnsaved` 通过 classData vs localParams 对比自动计算
+5. 加 `beforeunload` + in-app 返回按钮的 confirm 防止数据丢失
+
+---
+
+#### 本轮新增的"已知坑"
+
+| 问题 | 原因 | 预防方法 |
+|------|------|----------|
+| TypeScript `null` vs `undefined` 类型错误 | `ClassExercise` 字段是 `number?`（undefined），但 payload 里是 `number \| null` | 用 `(payload.sets as number \| null) ?? undefined` 做转换 |
+| HTML5 drag 手机不工作 | Mobile 浏览器不触发 `dragstart/dragover`，只有 touch 事件 | 用 `onTouchStart` + `document.addEventListener('touchmove', { passive: false })` |
+| 复制课程带旧数据 | 复制时直接用 `ex.sets` 等 DB 值，未保存的本地编辑丢失 | 复制前用 `getLocal(ex)` 取本地值，保证复制的是当前显示的值 |
+
+---
+
 ## Documentation & Knowledge Base
 
 ### How to Keep This Doc Updated
@@ -681,6 +870,7 @@ git add -A && git commit -m "描述本次改动" && git push
 | `authenticated` role 读不到 `public.user` | Supabase 默认不授权 `authenticated` role 读 `public.user`，导致角色查询静默返回 null，前端默认 CLIENT | 每个新表建完必须运行 `GRANT ALL ON TABLE public.xxx TO anon, authenticated, service_role` |
 | git HEAD.lock 在沙盒里无法删除 | Claude 沙盒对 `.git/` 目录权限不足 | 所有 git 操作（add/commit/push）必须在 Jessica 本地终端执行，Claude 只写文件 |
 | CDN 在中国加载失败 | jsdelivr/unpkg 等 CDN 在中国不稳定，动作库 xlsx CDN 导致整个导入页崩溃 | 改用 npm 包：`npm install xlsx`，从 node_modules 导入 |
+| **内联编辑字段消失（saveField 全行删除 bug）** | saveField 完成后 `delete localParams[ex.id]`，连带删除了用户在同行其他字段已输入但尚未保存的值 | **改用 per-field save（见下方决策记录）**，saveField 只更新 classData 对应字段，永不主动删 localParams |
 
 ---
 
@@ -739,6 +929,6 @@ Same as above (set in Vercel project settings)
 
 ---
 
-**Last Updated:** June 28, 2026  
-**Next Review:** July 28, 2026  
-**Status:** Core Features Live — Moving to UI Polish Phase
+**Last Updated:** July 4, 2026  
+**Next Review:** August 4, 2026  
+**Status:** Core Features Live — UI Polish + Data Integrity Hardening Phase
