@@ -330,7 +330,7 @@ export default function WorkoutsPage() {
                             </p>
                             {ex.notes && <p style={{ margin: '3px 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-brand)', fontStyle: 'italic' }}>📌 {ex.notes}</p>}
                           </div>
-                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-brand)', flexShrink: 0 }}>详情 ›</span>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-brand)', flexShrink: 0 }}>{t('详情', 'Details')} ›</span>
                         </div>
                       ))}
 

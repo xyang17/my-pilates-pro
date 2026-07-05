@@ -384,7 +384,7 @@ export default function ClassDetailPage() {
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
         body: JSON.stringify({
           class_id: classId, student_id: homeworkStudentId,
-          title: `${classData?.name} 作业`,
+          title: `${classData?.name} ${t('作业', 'Homework')}`,
           due_date: homeworkDueDate || null, notes: homeworkNotes || null, exercises,
         }),
       })
