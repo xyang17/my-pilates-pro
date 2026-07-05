@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
+import { useLang } from '@/context/LanguageContext'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -54,6 +55,7 @@ interface Client {
 
 export default function ClientDetailPage() {
   const { user, userRole, loading: authLoading } = useAuth()
+  const { lang } = useLang()
   const router = useRouter()
   const params = useParams()
   const clientId = params.id as string
@@ -66,6 +68,8 @@ export default function ClientDetailPage() {
   const [expandedHw, setExpandedHw] = useState<Set<string>>(new Set())
   const [deletingHwId, setDeletingHwId] = useState<string | null>(null)
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
+  const displayTitle = (title: string) =>
+    lang === 'zh' ? title : title.replace(/\s*作业$/, ' Homework')
   // Trainer notes edit
   const [editNotes, setEditNotes] = useState(false)
   const [notesForm, setNotesForm] = useState({ injury_notes: '', goals: '' })
@@ -352,7 +356,7 @@ export default function ClientDetailPage() {
                       {/* Status dot */}
                       <div style={{ width: 10, height: 10, borderRadius: '50%', background: isDone ? 'var(--c-brand)' : isOverdue ? 'var(--c-error)' : 'var(--c-lavender)', flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: '0 0 3px 0', fontWeight: 'bold', fontSize: '14px', color: '#333' }}>{hw.title}</p>
+                        <p style={{ margin: '0 0 3px 0', fontWeight: 'bold', fontSize: '14px', color: '#333' }}>{displayTitle(hw.title)}</p>
                         <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
                           {hw.homework_exercise.length} 个动作
                           {hw.class && ` · ${hw.class.name}`}

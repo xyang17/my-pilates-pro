@@ -139,6 +139,12 @@ export default function WorkoutsPage() {
 
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
 
+  // Translate legacy "作业" suffix in stored titles when in English mode
+  const displayTitle = (title: string) => {
+    if (lang === 'zh') return title
+    return title.replace(/\s*作业$/, ' Homework')
+  }
+
   if (loading || isLoading) return (
     <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--sp-3)' }}>
@@ -245,7 +251,7 @@ export default function WorkoutsPage() {
                         textDecoration: isDone ? 'line-through' : 'none',
                         color: isDone ? 'var(--c-text-hint)' : 'var(--c-text-primary)',
                       }}>
-                        {hw.title}
+                        {displayTitle(hw.title)}
                       </p>
                       <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--c-text-secondary)' }}>
                         {hw.homework_exercise.length} {t('个动作', 'exercises')}
