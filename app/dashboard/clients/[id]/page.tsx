@@ -64,6 +64,8 @@ export default function ClientDetailPage() {
   const [hwLoading, setHwLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'classes' | 'homework'>('classes')
   const [expandedHw, setExpandedHw] = useState<Set<string>>(new Set())
+  const [deletingHwId, setDeletingHwId] = useState<string | null>(null)
+  const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
   // Trainer notes edit
   const [editNotes, setEditNotes] = useState(false)
   const [notesForm, setNotesForm] = useState({ injury_notes: '', goals: '' })
@@ -128,6 +130,23 @@ export default function ClientDetailPage() {
   const toggleHw = (id: string) => setExpandedHw(prev => {
     const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n
   })
+
+  const handleDeleteHomework = async (hw: Homework) => {
+    if (!window.confirm(`确定删除作业「${hw.title}」？此操作无法撤销。`)) return
+    setDeletingHwId(hw.id)
+    try {
+      const res = await fetch(`/api/homework/${hw.id}`, {
+        method: 'DELETE',
+        headers: { 'x-user-id': user?.id || '' },
+      })
+      if (res.ok) setHomework(prev => prev.filter(h => h.id !== hw.id))
+      else alert('删除失败，请重试')
+    } catch {
+      alert('网络错误，请重试')
+    } finally {
+      setDeletingHwId(null)
+    }
+  }
 
   if (authLoading || isLoading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
   if (!client) return (
@@ -281,13 +300,31 @@ export default function ClientDetailPage() {
                 {upcoming.length > 0 && (
                   <div style={{ padding: '14px 20px 0' }}>
                     <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999', fontWeight: '600' }}>即将上课 ({upcoming.length})</p>
-                    {upcoming.map(c => <ClassRow key={c.id} c={c} />)}
+                    {upcoming.map(c => (
+                      <ClassRow key={c.id} c={c}
+                        onDelete={isTrainer ? async () => {
+                          if (!window.confirm(`确定删除课程「${c.name}」？此操作无法撤销。`)) return
+                          const res = await fetch(`/api/classes/${c.id}`, { method: 'DELETE', headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' } })
+                          if (res.ok) setClient(prev => prev ? { ...prev, classes: prev.classes.filter(x => x.id !== c.id) } : prev)
+                          else alert('删除失败，请重试')
+                        } : undefined}
+                      />
+                    ))}
                   </div>
                 )}
                 {past.length > 0 && (
                   <div style={{ padding: '14px 20px 0' }}>
                     <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999', fontWeight: '600' }}>历史课程 ({past.length})</p>
-                    {past.map(c => <ClassRow key={c.id} c={c} />)}
+                    {past.map(c => (
+                      <ClassRow key={c.id} c={c}
+                        onDelete={isTrainer ? async () => {
+                          if (!window.confirm(`确定删除课程「${c.name}」？此操作无法撤销。`)) return
+                          const res = await fetch(`/api/classes/${c.id}`, { method: 'DELETE', headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' } })
+                          if (res.ok) setClient(prev => prev ? { ...prev, classes: prev.classes.filter(x => x.id !== c.id) } : prev)
+                          else alert('删除失败，请重试')
+                        } : undefined}
+                      />
+                    ))}
                   </div>
                 )}
                 <div style={{ height: '16px' }} />
@@ -331,6 +368,25 @@ export default function ClientDetailPage() {
                         {isDone ? '✓ 已完成' : '进行中'}
                       </span>
                       <span style={{ fontSize: '12px', color: '#bbb' }}>{isExpanded ? '▲' : '▼'}</span>
+                      {/* Delete button — trainer only */}
+                      {isTrainer && (
+                        <button
+                          onClick={e => { e.stopPropagation(); handleDeleteHomework(hw) }}
+                          disabled={deletingHwId === hw.id}
+                          title="删除作业"
+                          style={{
+                            width: 26, height: 26, border: 'none', borderRadius: '50%',
+                            background: 'transparent', color: '#ccc', fontSize: 13,
+                            cursor: deletingHwId === hw.id ? 'not-allowed' : 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0, transition: 'background 0.15s, color 0.15s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#ccc' }}
+                        >
+                          {deletingHwId === hw.id ? '…' : '✕'}
+                        </button>
+                      )}
                     </div>
                     {isExpanded && (
                       <div style={{ borderTop: '1px solid var(--c-border)', background: 'var(--c-fill-light)' }}>
@@ -367,25 +423,51 @@ export default function ClientDetailPage() {
   )
 }
 
-function ClassRow({ c }: { c: ClientClass }) {
-  const STATUS_COLOR: Record<string, string> = { planned: '#85C1E9', in_progress: '#F7DC6F', completed: '#82E0AA' }
+function ClassRow({ c, onDelete }: { c: ClientClass; onDelete?: () => void }) {
   const STATUS_LABEL: Record<string, string> = { planned: '未开始', in_progress: '进行中', completed: '已完成' }
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!onDelete) return
+    setDeleting(true)
+    try { await onDelete() }
+    finally { setDeleting(false) }
+  }
+
   return (
-    <Link href={`/dashboard/classes/${c.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f5f5f5' }}>
-        <div style={{ width: 3, height: 40, borderRadius: 2, background: c.color || 'var(--c-lavender)', flexShrink: 0 }} />
-        <div style={{ flex: 1 }}>
-          <p style={{ margin: '0 0 3px 0', fontWeight: 'bold', fontSize: '14px' }}>{c.name}</p>
-          <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
-            {new Date(c.date + 'T12:00:00').toLocaleDateString('zh-CN')}
-            {c.start_time && ` · ${c.start_time.slice(0, 5)}`}
-            {c.discipline && ` · ${c.discipline}`}
-          </p>
-        </div>
-        <span style={{ fontSize: 'var(--text-xs)', padding: '3px 8px', borderRadius: 'var(--r-full)', background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', border: '1px solid var(--c-border)' }}>
-          {STATUS_LABEL[c.status] || c.status}
-        </span>
-      </div>
-    </Link>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f5f5f5' }}>
+      <div style={{ width: 3, height: 40, borderRadius: 2, background: c.color || 'var(--c-lavender)', flexShrink: 0 }} />
+      <Link href={`/dashboard/classes/${c.id}`} style={{ textDecoration: 'none', color: 'inherit', flex: 1, minWidth: 0 }}>
+        <p style={{ margin: '0 0 3px 0', fontWeight: 'bold', fontSize: '14px' }}>{c.name}</p>
+        <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
+          {new Date(c.date + 'T12:00:00').toLocaleDateString('zh-CN')}
+          {c.start_time && ` · ${c.start_time.slice(0, 5)}`}
+          {c.discipline && ` · ${c.discipline}`}
+        </p>
+      </Link>
+      <span style={{ fontSize: 'var(--text-xs)', padding: '3px 8px', borderRadius: 'var(--r-full)', background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', border: '1px solid var(--c-border)', flexShrink: 0 }}>
+        {STATUS_LABEL[c.status] || c.status}
+      </span>
+      {onDelete && (
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          title="删除课程"
+          style={{
+            width: 26, height: 26, border: 'none', borderRadius: '50%',
+            background: 'transparent', color: '#ccc', fontSize: 13,
+            cursor: deleting ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, transition: 'background 0.15s, color 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#ccc' }}
+        >
+          {deleting ? '…' : '✕'}
+        </button>
+      )}
+    </div>
   )
 }

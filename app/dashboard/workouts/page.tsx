@@ -72,6 +72,7 @@ export default function WorkoutsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [completing, setCompleting] = useState<string | null>(null)
+  const [deletingHwId, setDeletingHwId] = useState<string | null>(null)
   // Exercise detail drawer
   const [detailExercise, setDetailExercise] = useState<ExerciseDetail | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
@@ -104,6 +105,23 @@ export default function WorkoutsPage() {
       if (res.ok) fetchHomework()
     } finally {
       setCompleting(null)
+    }
+  }
+
+  const handleDeleteHomework = async (hw: Homework) => {
+    if (!window.confirm(`确定删除作业「${hw.title}」？此操作无法撤销。`)) return
+    setDeletingHwId(hw.id)
+    try {
+      const res = await fetch(`/api/homework/${hw.id}`, {
+        method: 'DELETE',
+        headers: { 'x-user-id': user?.id || '' },
+      })
+      if (res.ok) setHomeworkList(prev => prev.filter(h => h.id !== hw.id))
+      else alert('删除失败，请重试')
+    } catch {
+      alert('网络错误，请重试')
+    } finally {
+      setDeletingHwId(null)
     }
   }
 
@@ -241,6 +259,25 @@ export default function WorkoutsPage() {
                       </p>
                     </div>
                     <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)', flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</span>
+                    {/* Delete button — trainer only */}
+                    {isTrainer && (
+                      <button
+                        onClick={e => { e.stopPropagation(); handleDeleteHomework(hw) }}
+                        disabled={deletingHwId === hw.id}
+                        title={t('删除作业', 'Delete homework')}
+                        style={{
+                          width: 28, height: 28, border: 'none', borderRadius: '50%',
+                          background: 'transparent', color: '#ccc', fontSize: 14,
+                          cursor: deletingHwId === hw.id ? 'not-allowed' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          flexShrink: 0, transition: 'background 0.15s, color 0.15s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#ccc' }}
+                      >
+                        {deletingHwId === hw.id ? '…' : '✕'}
+                      </button>
+                    )}
                   </div>
 
                   {/* Expanded detail */}

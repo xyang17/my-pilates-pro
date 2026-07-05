@@ -33,6 +33,9 @@ export default function ClassesPage() {
   const [classes, setClasses] = useState<ClassItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
 
   useEffect(() => {
     if (!loading && !user) { router.push('/auth/login'); return }
@@ -51,6 +54,26 @@ export default function ClassesPage() {
       setError(err.message)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleDeleteClass = async (cls: ClassItem) => {
+    if (!window.confirm(`确定删除课程「${cls.name}」？此操作无法撤销。`)) return
+    setDeletingId(cls.id)
+    try {
+      const res = await fetch(`/api/classes/${cls.id}`, {
+        method: 'DELETE',
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (res.ok) setClasses(prev => prev.filter(c => c.id !== cls.id))
+      else {
+        const d = await res.json().catch(() => ({}))
+        alert(d.error || '删除失败')
+      }
+    } catch {
+      alert('网络错误，请重试')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -130,14 +153,17 @@ export default function ClassesPage() {
           <div style={{ display: 'grid', gap: 'var(--sp-3)' }}>
             {classes.map(cls => {
               const cfg = S(cls.status)
+              const isDeleting = deletingId === cls.id
               return (
-                <Link key={cls.id} href={`/dashboard/classes/${cls.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <div key={cls.id} style={{ position: 'relative' }}>
                   <div
+                    onClick={() => router.push(`/dashboard/classes/${cls.id}`)}
                     style={{
                       background: 'var(--c-card-bg)',
                       border: '1px solid var(--c-border)',
                       borderRadius: 'var(--r-lg)',
                       padding: 'var(--sp-4) var(--sp-5)',
+                      paddingRight: isTrainer ? '68px' : undefined,
                       display: 'flex',
                       alignItems: 'center',
                       gap: 'var(--sp-4)',
@@ -184,9 +210,31 @@ export default function ClassesPage() {
                       <span>{cfg.dot}</span>{cfg.label}
                     </span>
 
-                    <span style={{ color: 'var(--c-text-hint)', fontSize: 'var(--text-base)', flexShrink: 0 }}>›</span>
+                    {!isTrainer && <span style={{ color: 'var(--c-text-hint)', fontSize: 'var(--text-base)', flexShrink: 0 }}>›</span>}
                   </div>
-                </Link>
+
+                  {/* Delete button — trainer only, absolute positioned */}
+                  {isTrainer && (
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDeleteClass(cls) }}
+                      disabled={isDeleting}
+                      title="删除课程"
+                      style={{
+                        position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
+                        width: 30, height: 30, border: 'none', borderRadius: '50%',
+                        background: 'transparent', color: '#ccc',
+                        fontSize: 15, cursor: isDeleting ? 'not-allowed' : 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'background 0.15s, color 0.15s',
+                        flexShrink: 0,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#ccc' }}
+                    >
+                      {isDeleting ? '…' : '✕'}
+                    </button>
+                  )}
+                </div>
               )
             })}
           </div>

@@ -36,6 +36,31 @@ export async function GET(
   }
 }
 
+// DELETE /api/homework/[id] — delete homework and its exercises (trainer only)
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = req.headers.get('x-user-id')
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { id } = await params
+
+    // Delete child exercises first (in case no cascade)
+    await supabaseAdmin.from('homework_exercise').delete().eq('homework_id', id)
+
+    const { error } = await supabaseAdmin
+      .from('homework')
+      .delete()
+      .eq('id', id)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ message: 'Deleted' })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
 // PATCH /api/homework/[id] — update status (student marks complete)
 export async function PATCH(
   req: NextRequest,
