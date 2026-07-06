@@ -1144,7 +1144,7 @@ export default function ClassDetailPage() {
                           draggable
                           onDragStart={(e) => { e.stopPropagation(); handleDragStart(ex.id) }}
                           onTouchStart={(e) => { e.stopPropagation(); setDraggedId(ex.id) }}
-                          style={{ color: 'var(--c-text-hint)', fontSize: '18px', cursor: 'grab', flexShrink: 0, userSelect: 'none', lineHeight: 1, padding: '4px 8px', touchAction: 'none' }}
+                          style={{ color: 'var(--c-text-hint)', fontSize: '20px', cursor: 'grab', flexShrink: 0, userSelect: 'none', lineHeight: 1, padding: '8px 12px', touchAction: 'none' }}
                           title="拖动排序"
                         >⠿</span>
                       )}
