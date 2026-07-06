@@ -1126,16 +1126,9 @@ export default function ClassDetailPage() {
                 return (
                   <div key={ex.id}
                     data-exercise-id={ex.id}
-                    draggable={isTrainer}
-                    onDragStart={() => handleDragStart(ex.id)}
                     onDragOver={e => handleDragOver(e, ex.id)}
                     onDrop={() => handleDrop(ex.id)}
                     onDragEnd={handleDragEnd}
-                    onTouchStart={isTrainer ? (e: React.TouchEvent) => {
-                      const tag = (e.target as HTMLElement).tagName.toLowerCase()
-                      if (['input', 'select', 'button', 'textarea'].includes(tag)) return
-                      setDraggedId(ex.id)
-                    } : undefined}
                     style={{
                       padding: '10px 14px',
                       borderBottom: i < classData.exercises.length - 1 ? '1px solid var(--c-border)' : 'none',
@@ -1148,7 +1141,10 @@ export default function ClassDetailPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       {isTrainer && (
                         <span
-                          style={{ color: 'var(--c-text-hint)', fontSize: '18px', cursor: 'grab', flexShrink: 0, userSelect: 'none', lineHeight: 1, padding: '4px 6px' }}
+                          draggable
+                          onDragStart={(e) => { e.stopPropagation(); handleDragStart(ex.id) }}
+                          onTouchStart={(e) => { e.stopPropagation(); setDraggedId(ex.id) }}
+                          style={{ color: 'var(--c-text-hint)', fontSize: '18px', cursor: 'grab', flexShrink: 0, userSelect: 'none', lineHeight: 1, padding: '4px 8px', touchAction: 'none' }}
                           title="拖动排序"
                         >⠿</span>
                       )}
