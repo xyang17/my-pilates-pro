@@ -101,7 +101,6 @@ function InlineCalendar({ value, onChange }: { value: string; onChange: (d: stri
 
   return (
     <div style={{ border: '1px solid #e0d5f0', borderRadius: '10px', overflow: 'hidden', background: 'var(--c-card-bg)' }}>
-      {/* Nav */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: '#f9f6fd' }}>
         <button type="button" onClick={() => navToMonth(-1)}
           style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--c-brand)', lineHeight: 1 }}>‹</button>
@@ -111,13 +110,11 @@ function InlineCalendar({ value, onChange }: { value: string; onChange: (d: stri
         <button type="button" onClick={() => navToMonth(1)}
           style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--c-brand)', lineHeight: 1 }}>›</button>
       </div>
-      {/* Weekday headers */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '8px 10px 0' }}>
         {['日','一','二','三','四','五','六'].map(d => (
           <div key={d} style={{ textAlign: 'center', fontSize: '12px', color: '#bbb', paddingBottom: '4px' }}>{d}</div>
         ))}
       </div>
-      {/* Days */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '4px 10px 12px', gap: '2px' }}>
         {cells.map((day, i) => {
           if (!day) return <div key={i} />
@@ -228,6 +225,9 @@ export default function NewClassPage() {
   const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
+  const isPrivate = formData.class_type === 'private'
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login')
@@ -287,6 +287,15 @@ export default function NewClassPage() {
     e.preventDefault()
     setIsLoading(true)
     setError('')
+
+    // Auto-generate name for private class if not filled
+    let submitData = { ...formData }
+    if (isPrivate && !submitData.name.trim()) {
+      const client = clients.find(c => c.id === submitData.assigned_to)
+      const clientLabel = client?.name || client?.email || '学员'
+      submitData.name = `${clientLabel} · ${submitData.date}`
+    }
+
     try {
       const photos = photoUrls.filter((u) => u.trim())
       const res = await fetch('/api/classes', {
@@ -296,7 +305,7 @@ export default function NewClassPage() {
           'x-user-id': user?.id || '',
           'x-user-role': userRole || 'TRAINER',
         },
-        body: JSON.stringify({ ...formData, photos }),
+        body: JSON.stringify({ ...submitData, photos }),
       })
       if (!res.ok) {
         const d = await res.json()
@@ -330,106 +339,115 @@ export default function NewClassPage() {
 
         <form onSubmit={handleSubmit}>
 
-          {/* ── Section 1: Basic Info ── */}
+          {/* ── Step 0: Format (first choice) ── */}
           <section style={s.section}>
-            <h2 style={s.sectionTitle}>基本信息 Basic Info</h2>
-
-            <div style={s.field}>
-              <label style={s.label}><BiLabel cn="课程名称" en="Class Name" /> *</label>
-              <input
-                type="text" name="name" value={formData.name}
-                onChange={handleChange} required
-                placeholder="e.g., Morning Reformer Flow"
-                style={s.input}
-              />
-            </div>
-
-            <div style={s.field}>
-              <label style={s.label}><BiLabel cn="课程类别" en="Discipline" /></label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                {DISCIPLINES.map((d) => (
-                  <button
-                    key={d.value} type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, discipline: d.value }))}
-                    style={{
-                      padding: '10px 6px', textAlign: 'center', cursor: 'pointer',
-                      border: `2px solid ${formData.discipline === d.value ? 'var(--c-brand)' : '#ddd'}`,
-                      borderRadius: '8px',
-                      backgroundColor: formData.discipline === d.value ? '#f3eef9' : 'white',
-                      color: formData.discipline === d.value ? 'var(--c-brand)' : '#555',
-                      fontWeight: formData.discipline === d.value ? 'bold' : 'normal',
-                    }}
-                  >
-                    <div style={{ fontSize: '12px' }}>{d.en}</div>
-                    <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>{d.cn}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={s.field}>
-              <label style={s.label}><BiLabel cn="课程形式" en="Format" /></label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                {(['private', 'group'] as const).map((ct) => (
-                  <button
-                    key={ct} type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, class_type: ct }))}
-                    style={{
-                      padding: '12px', cursor: 'pointer', fontSize: '14px',
-                      border: `2px solid ${formData.class_type === ct ? 'var(--c-brand)' : '#ddd'}`,
-                      borderRadius: '8px',
-                      backgroundColor: formData.class_type === ct ? '#f3eef9' : 'white',
-                      color: formData.class_type === ct ? 'var(--c-brand)' : '#555',
-                      fontWeight: formData.class_type === ct ? 'bold' : 'normal',
-                    }}
-                  >
-                    {ct === 'private' ? '🧘 私教课 Private' : '👥 团课 Group'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Student selector — only for private class */}
-            {formData.class_type === 'private' && (
-              <div style={s.field}>
-                <label style={s.label}><BiLabel cn="学员" en="Student" note="私教课 Private class" /></label>
-                <select
-                  value={formData.assigned_to}
-                  onChange={e => setFormData(prev => ({ ...prev, assigned_to: e.target.value }))}
-                  style={s.input}
+            <h2 style={s.sectionTitle}>课程形式 Format</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {(['private', 'group'] as const).map((ct) => (
+                <button
+                  key={ct} type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, class_type: ct }))}
+                  style={{
+                    padding: '18px 12px', cursor: 'pointer', fontSize: '15px',
+                    border: `2px solid ${formData.class_type === ct ? 'var(--c-brand)' : '#ddd'}`,
+                    borderRadius: '10px',
+                    backgroundColor: formData.class_type === ct ? '#f3eef9' : 'white',
+                    color: formData.class_type === ct ? 'var(--c-brand)' : '#555',
+                    fontWeight: formData.class_type === ct ? 'bold' : 'normal',
+                    textAlign: 'center',
+                  }}
                 >
-                  <option value="">-- 选择学员 Select student --</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>{c.name || c.email}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div style={s.field}>
-              <label style={s.label}><BiLabel cn="难度等级" en="Level" /></label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                {LEVELS.map((l) => (
-                  <button
-                    key={l.value} type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, level: l.value }))}
-                    style={{
-                      padding: '10px', cursor: 'pointer', fontSize: '13px',
-                      border: `2px solid ${formData.level === l.value ? 'var(--c-brand)' : '#ddd'}`,
-                      borderRadius: '8px',
-                      backgroundColor: formData.level === l.value ? '#f3eef9' : 'white',
-                      color: formData.level === l.value ? 'var(--c-brand)' : '#555',
-                      fontWeight: formData.level === l.value ? 'bold' : 'normal',
-                    }}
-                  >
-                    {l.en} <span style={{ color: '#999', fontWeight: 'normal' }}>{l.cn}</span>
-                  </button>
-                ))}
-              </div>
+                  <div style={{ fontSize: '24px', marginBottom: '6px' }}>{ct === 'private' ? '🧘' : '👥'}</div>
+                  <div>{ct === 'private' ? '私教课' : '团课'}</div>
+                  <div style={{ fontSize: '12px', color: formData.class_type === ct ? 'var(--c-brand)' : '#999', marginTop: '2px' }}>
+                    {ct === 'private' ? 'Private' : 'Group'}
+                  </div>
+                </button>
+              ))}
             </div>
           </section>
 
-          {/* ── Section 2: Schedule ── */}
+          {/* ── PRIVATE: Student (required) ── */}
+          {isPrivate && (
+            <section style={s.section}>
+              <h2 style={s.sectionTitle}>选择学员 Student *</h2>
+              <select
+                value={formData.assigned_to}
+                onChange={e => setFormData(prev => ({ ...prev, assigned_to: e.target.value }))}
+                required
+                style={s.input}
+              >
+                <option value="">-- 选择学员 Select student --</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name || c.email}</option>
+                ))}
+              </select>
+            </section>
+          )}
+
+          {/* ── GROUP: Class info (required) ── */}
+          {!isPrivate && (
+            <section style={s.section}>
+              <h2 style={s.sectionTitle}>课程信息 Class Info</h2>
+
+              <div style={s.field}>
+                <label style={s.label}><BiLabel cn="课程名称" en="Class Name" /> *</label>
+                <input
+                  type="text" name="name" value={formData.name}
+                  onChange={handleChange} required={!isPrivate}
+                  placeholder="e.g., 周三普拉提床基础课"
+                  style={s.input}
+                />
+              </div>
+
+              <div style={s.field}>
+                <label style={s.label}><BiLabel cn="课程类别" en="Discipline" /></label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  {DISCIPLINES.map((d) => (
+                    <button
+                      key={d.value} type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, discipline: d.value }))}
+                      style={{
+                        padding: '10px 6px', textAlign: 'center', cursor: 'pointer',
+                        border: `2px solid ${formData.discipline === d.value ? 'var(--c-brand)' : '#ddd'}`,
+                        borderRadius: '8px',
+                        backgroundColor: formData.discipline === d.value ? '#f3eef9' : 'white',
+                        color: formData.discipline === d.value ? 'var(--c-brand)' : '#555',
+                        fontWeight: formData.discipline === d.value ? 'bold' : 'normal',
+                      }}
+                    >
+                      <div style={{ fontSize: '12px' }}>{d.en}</div>
+                      <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>{d.cn}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={s.field}>
+                <label style={s.label}><BiLabel cn="难度等级" en="Level" /></label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  {LEVELS.map((l) => (
+                    <button
+                      key={l.value} type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, level: l.value }))}
+                      style={{
+                        padding: '10px', cursor: 'pointer', fontSize: '13px',
+                        border: `2px solid ${formData.level === l.value ? 'var(--c-brand)' : '#ddd'}`,
+                        borderRadius: '8px',
+                        backgroundColor: formData.level === l.value ? '#f3eef9' : 'white',
+                        color: formData.level === l.value ? 'var(--c-brand)' : '#555',
+                        fontWeight: formData.level === l.value ? 'bold' : 'normal',
+                      }}
+                    >
+                      {l.en} <span style={{ color: '#999', fontWeight: 'normal' }}>{l.cn}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ── Schedule (both) ── */}
           <section style={s.section}>
             <h2 style={s.sectionTitle}>时间安排 Schedule</h2>
 
@@ -449,13 +467,13 @@ export default function NewClassPage() {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: formData.class_type === 'group' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: !isPrivate ? '1fr 1fr 1fr' : '1fr 1fr', gap: '16px' }}>
               <div style={s.field}>
                 <label style={s.label}><BiLabel cn="时长（分钟）" en="Duration (min)" /></label>
                 <input type="number" name="duration" value={formData.duration}
                   onChange={handleChange} min="1" max="480" style={s.input} />
               </div>
-              {formData.class_type === 'group' && (
+              {!isPrivate && (
                 <div style={s.field}>
                   <label style={s.label}><BiLabel cn="最大人数" en="Max Capacity" /></label>
                   <input type="number" name="max_capacity" value={formData.max_capacity}
@@ -470,174 +488,257 @@ export default function NewClassPage() {
             </div>
           </section>
 
-          {/* ── Section 3: Trainer ── */}
-          <section style={s.section}>
-            <h2 style={s.sectionTitle}>授课教练 Trainer</h2>
+          {/* ── Advanced / Optional ── */}
+          <div style={{ marginBottom: '16px' }}>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(v => !v)}
+              style={{
+                width: '100%', padding: '12px', background: 'var(--c-card-bg)',
+                border: '1px dashed #ddd', borderRadius: '10px', cursor: 'pointer',
+                color: '#888', fontSize: '14px', textAlign: 'center',
+              }}
+            >
+              {showAdvanced ? '▲ 收起' : '▼ 更多选项 More options'}{' '}
+              <span style={{ fontSize: '12px' }}>
+                ({isPrivate ? '课程名称、类别、难度、' : ''}描述、备注、教练、图片、颜色)
+              </span>
+            </button>
+          </div>
 
-            <div style={s.field}>
-              <label style={s.label}><BiLabel cn="选择教练" en="Select Trainer" /></label>
-              <select
-                value={formData.trainer_id}
-                onChange={(e) => handleTrainerChange(e.target.value)}
-                style={s.input}
-              >
-                <option value="">-- 选择教练 Select Trainer --</option>
-                {trainers.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </div>
+          {showAdvanced && (
+            <>
+              {/* Private: optional name + discipline + level */}
+              {isPrivate && (
+                <section style={s.section}>
+                  <h2 style={s.sectionTitle}>课程信息 Class Info <span style={{ fontSize: '12px', color: '#aaa', fontWeight: 'normal' }}>可选，不填自动生成</span></h2>
 
-            {selectedTrainer && (
-              <div style={{
-                backgroundColor: '#f9f6fd', border: '1px solid #e0d5f0',
-                borderRadius: '10px', padding: '16px',
-                display: 'flex', gap: '14px', alignItems: 'flex-start',
-              }}>
-                {selectedTrainer.photo_url ? (
-                  <img src={selectedTrainer.photo_url} alt={selectedTrainer.name}
-                    style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                ) : (
+                  <div style={s.field}>
+                    <label style={s.label}><BiLabel cn="课程名称" en="Class Name" note="不填则自动生成" /></label>
+                    <input
+                      type="text" name="name" value={formData.name}
+                      onChange={handleChange}
+                      placeholder="留空则自动生成为「学员名 · 日期」"
+                      style={s.input}
+                    />
+                  </div>
+
+                  <div style={s.field}>
+                    <label style={s.label}><BiLabel cn="课程类别" en="Discipline" /></label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      {DISCIPLINES.map((d) => (
+                        <button
+                          key={d.value} type="button"
+                          onClick={() => setFormData((prev) => ({ ...prev, discipline: d.value }))}
+                          style={{
+                            padding: '10px 6px', textAlign: 'center', cursor: 'pointer',
+                            border: `2px solid ${formData.discipline === d.value ? 'var(--c-brand)' : '#ddd'}`,
+                            borderRadius: '8px',
+                            backgroundColor: formData.discipline === d.value ? '#f3eef9' : 'white',
+                            color: formData.discipline === d.value ? 'var(--c-brand)' : '#555',
+                            fontWeight: formData.discipline === d.value ? 'bold' : 'normal',
+                          }}
+                        >
+                          <div style={{ fontSize: '12px' }}>{d.en}</div>
+                          <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>{d.cn}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={s.field}>
+                    <label style={s.label}><BiLabel cn="难度等级" en="Level" /></label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      {LEVELS.map((l) => (
+                        <button
+                          key={l.value} type="button"
+                          onClick={() => setFormData((prev) => ({ ...prev, level: l.value }))}
+                          style={{
+                            padding: '10px', cursor: 'pointer', fontSize: '13px',
+                            border: `2px solid ${formData.level === l.value ? 'var(--c-brand)' : '#ddd'}`,
+                            borderRadius: '8px',
+                            backgroundColor: formData.level === l.value ? '#f3eef9' : 'white',
+                            color: formData.level === l.value ? 'var(--c-brand)' : '#555',
+                            fontWeight: formData.level === l.value ? 'bold' : 'normal',
+                          }}
+                        >
+                          {l.en} <span style={{ color: '#999', fontWeight: 'normal' }}>{l.cn}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* Description & Notes */}
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>课程描述 Description</h2>
+
+                <div style={s.field}>
+                  <label style={s.label}><BiLabel cn="课程介绍" en="About This Class" /></label>
+                  <textarea
+                    name="description" value={formData.description}
+                    onChange={handleChange} rows={4}
+                    placeholder="描述这节课的内容、特色、适合人群..."
+                    style={{ ...s.input, fontFamily: 'sans-serif', resize: 'vertical' }}
+                  />
+                </div>
+
+                <div style={s.field}>
+                  <label style={s.label}>
+                    <BiLabel cn="内部备注" en="Internal Notes" note="仅教练可见 Trainer only" />
+                  </label>
+                  <textarea
+                    name="notes" value={formData.notes}
+                    onChange={handleChange} rows={2}
+                    placeholder="课程特殊安排、客户注意事项等..."
+                    style={{ ...s.input, fontFamily: 'sans-serif', resize: 'vertical' }}
+                  />
+                </div>
+              </section>
+
+              {/* Trainer */}
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>授课教练 Trainer</h2>
+
+                <div style={s.field}>
+                  <select
+                    value={formData.trainer_id}
+                    onChange={(e) => handleTrainerChange(e.target.value)}
+                    style={s.input}
+                  >
+                    <option value="">-- 选择教练 Select Trainer --</option>
+                    {trainers.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedTrainer && (
                   <div style={{
-                    width: '56px', height: '56px', borderRadius: '50%', flexShrink: 0,
-                    backgroundColor: 'var(--c-brand)', color: 'white',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '22px', fontWeight: 'bold',
+                    backgroundColor: '#f9f6fd', border: '1px solid #e0d5f0',
+                    borderRadius: '10px', padding: '16px',
+                    display: 'flex', gap: '14px', alignItems: 'flex-start',
                   }}>
-                    {selectedTrainer.name?.[0] || '?'}
+                    {selectedTrainer.photo_url ? (
+                      <img src={selectedTrainer.photo_url} alt={selectedTrainer.name}
+                        style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                    ) : (
+                      <div style={{
+                        width: '56px', height: '56px', borderRadius: '50%', flexShrink: 0,
+                        backgroundColor: 'var(--c-brand)', color: 'white',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '22px', fontWeight: 'bold',
+                      }}>
+                        {selectedTrainer.name?.[0] || '?'}
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', fontSize: '15px' }}>{selectedTrainer.name}</p>
+                      {selectedTrainer.certificate && (
+                        <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--c-brand)' }}>
+                          🏆 {selectedTrainer.certificate}
+                        </p>
+                      )}
+                      {selectedTrainer.bio && (
+                        <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#666', lineHeight: '1.5' }}>
+                          {selectedTrainer.bio.length > 120
+                            ? selectedTrainer.bio.slice(0, 120) + '...'
+                            : selectedTrainer.bio}
+                        </p>
+                      )}
+                      <Link href={`/dashboard/trainers/${selectedTrainer.id}`}
+                        style={{ fontSize: '12px', color: 'var(--c-brand)', textDecoration: 'none' }}>
+                        查看详情 View Profile →
+                      </Link>
+                    </div>
                   </div>
                 )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', fontSize: '15px' }}>{selectedTrainer.name}</p>
-                  {selectedTrainer.certificate && (
-                    <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--c-brand)' }}>
-                      🏆 {selectedTrainer.certificate}
-                    </p>
-                  )}
-                  {selectedTrainer.bio && (
-                    <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#666', lineHeight: '1.5' }}>
-                      {selectedTrainer.bio.length > 120
-                        ? selectedTrainer.bio.slice(0, 120) + '...'
-                        : selectedTrainer.bio}
-                    </p>
-                  )}
-                  <Link href={`/dashboard/trainers/${selectedTrainer.id}`}
-                    style={{ fontSize: '12px', color: 'var(--c-brand)', textDecoration: 'none' }}>
-                    查看详情 View Profile →
-                  </Link>
-                </div>
-              </div>
-            )}
-          </section>
+              </section>
 
-          {/* ── Section 4: Description ── */}
-          <section style={s.section}>
-            <h2 style={s.sectionTitle}>课程描述 Description</h2>
+              {/* Media */}
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>课程图片 Media</h2>
 
-            <div style={s.field}>
-              <label style={s.label}><BiLabel cn="课程介绍" en="About This Class" /></label>
-              <textarea
-                name="description" value={formData.description}
-                onChange={handleChange} rows={4}
-                placeholder="描述这节课的内容、特色、适合人群... / Describe what students will experience..."
-                style={{ ...s.input, fontFamily: 'sans-serif', resize: 'vertical' }}
-              />
-            </div>
-
-            <div style={s.field}>
-              <label style={s.label}>
-                <BiLabel cn="内部备注" en="Internal Notes" note="仅教练可见 Trainer only" />
-              </label>
-              <textarea
-                name="notes" value={formData.notes}
-                onChange={handleChange} rows={2}
-                placeholder="课程特殊安排、客户注意事项等... / Special arrangements, client notes..."
-                style={{ ...s.input, fontFamily: 'sans-serif', resize: 'vertical' }}
-              />
-            </div>
-          </section>
-
-          {/* ── Section 5: Media ── */}
-          <section style={s.section}>
-            <h2 style={s.sectionTitle}>课程图片 Media</h2>
-
-            <div style={s.field}>
-              <label style={s.label}>
-                <BiLabel cn="封面图" en="Cover Image" note="粘贴图片链接 Paste image URL" />
-              </label>
-              <input
-                type="url" name="cover_image_url" value={formData.cover_image_url}
-                onChange={handleChange} placeholder="https://..."
-                style={s.input}
-              />
-              {formData.cover_image_url && (
-                <img
-                  src={formData.cover_image_url} alt="cover preview"
-                  style={{ marginTop: '8px', width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '6px' }}
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-                />
-              )}
-            </div>
-
-            <div style={s.field}>
-              <label style={s.label}>
-                <BiLabel cn="课程照片" en="Photos" note="最多5张 Up to 5" />
-              </label>
-              {photoUrls.map((url, i) => (
-                <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <div style={s.field}>
+                  <label style={s.label}>
+                    <BiLabel cn="封面图" en="Cover Image" note="粘贴图片链接" />
+                  </label>
                   <input
-                    type="url" value={url}
-                    onChange={(e) => {
-                      const next = [...photoUrls]
-                      next[i] = e.target.value
-                      setPhotoUrls(next)
-                    }}
-                    placeholder={`照片链接 Photo URL ${i + 1}`}
-                    style={{ ...s.input, margin: 0, flex: 1 }}
+                    type="url" name="cover_image_url" value={formData.cover_image_url}
+                    onChange={handleChange} placeholder="https://..."
+                    style={s.input}
                   />
-                  {i > 0 && (
+                  {formData.cover_image_url && (
+                    <img
+                      src={formData.cover_image_url} alt="cover preview"
+                      style={{ marginTop: '8px', width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '6px' }}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                    />
+                  )}
+                </div>
+
+                <div style={s.field}>
+                  <label style={s.label}>
+                    <BiLabel cn="课程照片" en="Photos" note="最多5张" />
+                  </label>
+                  {photoUrls.map((url, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                      <input
+                        type="url" value={url}
+                        onChange={(e) => {
+                          const next = [...photoUrls]
+                          next[i] = e.target.value
+                          setPhotoUrls(next)
+                        }}
+                        placeholder={`照片链接 Photo URL ${i + 1}`}
+                        style={{ ...s.input, margin: 0, flex: 1 }}
+                      />
+                      {i > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setPhotoUrls((prev) => prev.filter((_, idx) => idx !== i))}
+                          style={{ padding: '8px 12px', border: 'none', background: '#ffebee', color: '#c62828', borderRadius: '6px', cursor: 'pointer', flexShrink: 0 }}
+                        >✕</button>
+                      )}
+                    </div>
+                  ))}
+                  {photoUrls.length < 5 && (
                     <button
                       type="button"
-                      onClick={() => setPhotoUrls((prev) => prev.filter((_, idx) => idx !== i))}
-                      style={{ padding: '8px 12px', border: 'none', background: '#ffebee', color: '#c62828', borderRadius: '6px', cursor: 'pointer', flexShrink: 0 }}
-                    >✕</button>
+                      onClick={() => setPhotoUrls((prev) => [...prev, ''])}
+                      style={{ padding: '8px 16px', border: '1px dashed var(--c-brand)', backgroundColor: 'transparent', color: 'var(--c-brand)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                    >
+                      + 添加照片 Add Photo
+                    </button>
                   )}
                 </div>
-              ))}
-              {photoUrls.length < 5 && (
-                <button
-                  type="button"
-                  onClick={() => setPhotoUrls((prev) => [...prev, ''])}
-                  style={{ padding: '8px 16px', border: '1px dashed var(--c-brand)', backgroundColor: 'transparent', color: 'var(--c-brand)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
-                >
-                  + 添加照片 Add Photo
-                </button>
-              )}
-            </div>
-          </section>
+              </section>
 
-          {/* ── Section 6: Color Tag ── */}
-          <section style={s.section}>
-            <h2 style={s.sectionTitle}>颜色标签 Color Tag</h2>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              {COLORS.map((c) => (
-                <button
-                  key={c} type="button"
-                  onClick={() => setFormData((prev) => ({ ...prev, color: c }))}
-                  style={{
-                    width: '36px', height: '36px', borderRadius: '50%',
-                    backgroundColor: c, cursor: 'pointer',
-                    border: formData.color === c ? '3px solid #333' : '3px solid transparent',
-                    outline: formData.color === c ? '2px solid white' : 'none',
-                    outlineOffset: '-4px',
-                  }}
-                />
-              ))}
-            </div>
-            <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#999' }}>
-              用于日历视图区分课程 Used to distinguish classes in calendar view
-            </p>
-          </section>
+              {/* Color Tag */}
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>颜色标签 Color Tag</h2>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {COLORS.map((c) => (
+                    <button
+                      key={c} type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, color: c }))}
+                      style={{
+                        width: '36px', height: '36px', borderRadius: '50%',
+                        backgroundColor: c, cursor: 'pointer',
+                        border: formData.color === c ? '3px solid #333' : '3px solid transparent',
+                        outline: formData.color === c ? '2px solid white' : 'none',
+                        outlineOffset: '-4px',
+                      }}
+                    />
+                  ))}
+                </div>
+                <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#999' }}>
+                  用于日历视图区分课程
+                </p>
+              </section>
+            </>
+          )}
 
           {/* ── Submit ── */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px', paddingBottom: '40px' }}>
@@ -651,7 +752,7 @@ export default function NewClassPage() {
               type="submit" disabled={isLoading}
               style={{ padding: '14px', backgroundColor: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: '8px', cursor: isLoading ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '15px', opacity: isLoading ? 0.6 : 1 }}
             >
-              {isLoading ? '创建中... Creating...' : '创建课程 Create Class'}
+              {isLoading ? '创建中...' : `创建${isPrivate ? '私教课' : '团课'} Create`}
             </button>
           </div>
 
