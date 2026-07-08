@@ -94,7 +94,9 @@ export default function ClassDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [availableExercises, setAvailableExercises] = useState<any[]>([])
-  const [activeTab, setActiveTab] = useState<'exercises' | 'student-notes'>('exercises')
+  const [activeTab, setActiveTab] = useState<'exercises' | 'student-notes' | 'distributed'>('exercises')
+  const [distributedHomework, setDistributedHomework] = useState<any[]>([])
+  const [loadingDistributed, setLoadingDistributed] = useState(false)
   const [studentNotes, setStudentNotes] = useState<StudentNote[]>([])
   // Spreadsheet inline editing
   const [localParams, setLocalParams] = useState<Record<string, {sets:string,reps:string,weight:string,weight_unit:string,duration:string,duration_unit:string,instance_notes:string}>>({})
@@ -110,6 +112,10 @@ export default function ClassDetailPage() {
   const [homeworkNotes, setHomeworkNotes] = useState('')
   const [homeworkStudentId, setHomeworkStudentId] = useState('')
   const [homeworkSubmitting, setHomeworkSubmitting] = useState(false)
+  // Group class distribute
+  const [showDistribute, setShowDistribute] = useState(false)
+  const [distributeSelected, setDistributeSelected] = useState<Set<string>>(new Set())
+  const [distributing, setDistributing] = useState(false)
   // Homework extra exercises (non-class)
   const [hwExtraSearch, setHwExtraSearch] = useState('')
   const [hwExtraSelected, setHwExtraSelected] = useState<Set<string>>(new Set())
@@ -174,6 +180,9 @@ export default function ClassDetailPage() {
   useEffect(() => {
     if (activeTab === 'student-notes' && classData) {
       fetchStudentNotes()
+    }
+    if (activeTab === 'distributed' && classData) {
+      fetchDistributedHomework()
     }
   }, [activeTab, classData])
 
@@ -244,6 +253,18 @@ export default function ClassDetailPage() {
       })
       if (res.ok) setStudentNotes(await res.json())
     } catch { /* non-critical */ }
+  }
+
+  const fetchDistributedHomework = async () => {
+    if (loadingDistributed) return
+    setLoadingDistributed(true)
+    try {
+      const res = await fetch(`/api/homework?class_id=${classId}`, {
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (res.ok) setDistributedHomework(await res.json())
+    } catch { /* non-critical */ }
+    finally { setLoadingDistributed(false) }
   }
 
   // Spreadsheet helpers
@@ -402,6 +423,27 @@ export default function ClassDetailPage() {
       showToast(t('作业已布置！', 'Homework assigned!'))
     } catch (err: any) { showToast(err.message, 'error') }
     finally { setHomeworkSubmitting(false) }
+  }
+
+  const handleDistribute = async () => {
+    if (distributeSelected.size === 0) return
+    setDistributing(true)
+    try {
+      const res = await fetch(`/api/classes/${classId}/distribute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({ client_ids: Array.from(distributeSelected) }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to distribute')
+      setShowDistribute(false)
+      setDistributeSelected(new Set())
+      const msg = data.skipped > 0
+        ? t(`已发送 ${data.created} 人，${data.skipped} 人之前已发过（跳过）`, `Sent to ${data.created}, skipped ${data.skipped} (already sent)`)
+        : t(`已发送给 ${data.created} 位学员`, `Sent to ${data.created} clients`)
+      showToast(msg)
+    } catch (err: any) { showToast(err.message, 'error') }
+    finally { setDistributing(false) }
   }
 
   const openCopyModal = () => {
@@ -1047,12 +1089,12 @@ export default function ClassDetailPage() {
         {/* Tabs (group class trainer view shows student notes tab) */}
         {isTrainer && isGroupClass && (
           <div style={{ display: 'flex', gap: '2px', marginBottom: '0', borderBottom: '2px solid #eee' }}>
-            {(['exercises', 'student-notes'] as const).map((tab) => (
+            {(['exercises', 'distributed', 'student-notes'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 style={{
-                  padding: '10px 20px',
+                  padding: '10px 16px',
                   border: 'none',
                   background: 'none',
                   cursor: 'pointer',
@@ -1060,10 +1102,13 @@ export default function ClassDetailPage() {
                   color: activeTab === tab ? 'var(--c-brand)' : '#666',
                   borderBottom: activeTab === tab ? '2px solid var(--c-brand)' : '2px solid transparent',
                   marginBottom: '-2px',
-                  fontSize: '14px',
+                  fontSize: '13px',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                {tab === 'exercises' ? `动作列表 (${classData.exercises.length})` : `学员笔记 (${studentNotes.length})`}
+                {tab === 'exercises' ? `动作 (${classData.exercises.length})`
+                  : tab === 'distributed' ? `学员记录 (${distributedHomework.length})`
+                  : `学员笔记 (${studentNotes.length})`}
               </button>
             ))}
           </div>
@@ -1089,14 +1134,23 @@ export default function ClassDetailPage() {
                   </button>
                 )}
               {isTrainer && classData.exercises.length > 0 && (
-                <button onClick={() => {
-                    setShowHomework(true)
-                    fetchClients()
-                    if (classData?.assigned_to) setHomeworkStudentId(classData.assigned_to)
-                  }}
-                  style={{ padding: '5px 12px', background: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}>
-                  📋 {t('布置作业', 'Assign HW')}
-                </button>
+                <>
+                  {isGroupClass ? (
+                    <button onClick={() => { setShowDistribute(true); fetchClients() }}
+                      style={{ padding: '5px 12px', background: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}>
+                      📤 {t('分发给学员', 'Distribute')}
+                    </button>
+                  ) : (
+                    <button onClick={() => {
+                        setShowHomework(true)
+                        fetchClients()
+                        if (classData?.assigned_to) setHomeworkStudentId(classData.assigned_to)
+                      }}
+                      style={{ padding: '5px 12px', background: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}>
+                      📋 {t('布置作业', 'Assign HW')}
+                    </button>
+                  )}
+                </>
               )}
               </div>
             </div>
@@ -1344,6 +1398,64 @@ export default function ClassDetailPage() {
           </div>
         )}
 
+        {/* Distributed Records Tab */}
+        {activeTab === 'distributed' && (
+          <div style={{ background: 'var(--c-card-bg)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
+            {loadingDistributed ? (
+              <p style={{ textAlign: 'center', color: 'var(--c-text-hint)', padding: '32px 0' }}>加载中…</p>
+            ) : distributedHomework.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--c-text-hint)' }}>
+                <p style={{ margin: '0 0 8px', fontSize: '15px' }}>还没有分发记录</p>
+                <p style={{ margin: 0, fontSize: '13px' }}>点「📤 分发给学员」发送计划</p>
+              </div>
+            ) : (
+              distributedHomework.map((hw: any) => {
+                const hasAnyNote = hw.homework_exercise?.some((e: any) => e.client_note)
+                return (
+                  <div key={hw.id} style={{ borderBottom: '1px solid var(--c-border)', padding: '16px 20px' }}>
+                    {/* Client header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasAnyNote ? '12px' : 0 }}>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 600, fontSize: '14px', color: 'var(--c-text-primary)' }}>
+                          {hw.student?.name || hw.student?.email || '学员'}
+                        </p>
+                        <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--c-text-secondary)' }}>
+                          {hw.homework_exercise?.length || 0} 个动作
+                          {hw.due_date && ` · 截止 ${new Date(hw.due_date + 'T12:00:00').toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}`}
+                        </p>
+                      </div>
+                      <span style={{
+                        fontSize: '12px', padding: '3px 8px', borderRadius: '20px',
+                        background: hasAnyNote ? 'var(--c-lavender)' : 'var(--c-fill-light)',
+                        color: hasAnyNote ? 'var(--c-brand)' : 'var(--c-text-hint)',
+                      }}>
+                        {hasAnyNote ? '已写备注' : '暂无备注'}
+                      </span>
+                    </div>
+
+                    {/* Exercise notes (only show if any client_note exists) */}
+                    {hasAnyNote && hw.homework_exercise
+                      ?.filter((e: any) => e.client_note)
+                      .sort((a: any, b: any) => a.order_num - b.order_num)
+                      .map((ex: any) => (
+                        <div key={ex.id} style={{ display: 'flex', gap: '10px', marginBottom: '8px', paddingLeft: '8px' }}>
+                          <div style={{ width: 3, borderRadius: 2, background: 'var(--c-brand)', flexShrink: 0 }} />
+                          <div>
+                            <p style={{ margin: '0 0 2px', fontSize: '12px', color: 'var(--c-text-secondary)', fontWeight: 500 }}>
+                              {lang === 'zh' ? (ex.master_exercise?.name_cn || ex.master_exercise?.name_en) : (ex.master_exercise?.name_en || ex.master_exercise?.name_cn)}
+                            </p>
+                            <p style={{ margin: 0, fontSize: '13px', color: 'var(--c-text-primary)' }}>{ex.client_note}</p>
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
+
                 {/* Student Notes Tab (trainer view of group class) */}
         {activeTab === 'student-notes' && (
           <div style={{ background: 'var(--c-card-bg)', borderRadius: '0 0 8px 8px', padding: '20px' }}>
@@ -1480,6 +1592,81 @@ export default function ClassDetailPage() {
           </div>
         )
       })()}
+
+      {/* Distribute to Group Clients Modal */}
+      {showDistribute && classData && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 700, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--c-card-bg)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            {/* Header */}
+            <div style={{ padding: '20px', borderBottom: '1px solid var(--c-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div>
+                <h2 style={{ margin: '0 0 2px 0', fontSize: '17px' }}>📤 {t('分发团课计划', 'Distribute Group Plan')}</h2>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--c-text-secondary)' }}>{t('选择要发送的学员', 'Select clients to send to')}</p>
+              </div>
+              <button onClick={() => { setShowDistribute(false); setDistributeSelected(new Set()) }}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--c-text-secondary)', padding: '4px 8px' }}>✕</button>
+            </div>
+
+            {/* Client list */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
+              {clientList.length === 0 ? (
+                <p style={{ textAlign: 'center', color: 'var(--c-text-hint)', padding: '24px 0' }}>{t('没有学员', 'No clients found')}</p>
+              ) : (
+                <>
+                  {/* Select all */}
+                  <div
+                    onClick={() => {
+                      if (distributeSelected.size === clientList.length) {
+                        setDistributeSelected(new Set())
+                      } else {
+                        setDistributeSelected(new Set(clientList.map(c => c.id)))
+                      }
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--c-border)', marginBottom: '4px', cursor: 'pointer' }}>
+                    <div style={{ width: 22, height: 22, borderRadius: '4px', border: '2px solid var(--c-brand)', background: distributeSelected.size === clientList.length ? 'var(--c-brand)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {distributeSelected.size === clientList.length && <span style={{ color: 'white', fontSize: '13px', fontWeight: 700 }}>✓</span>}
+                    </div>
+                    <span style={{ fontSize: '14px', color: 'var(--c-text-secondary)', fontWeight: 500 }}>{t('全选', 'Select all')} ({clientList.length})</span>
+                  </div>
+
+                  {clientList.map(c => {
+                    const checked = distributeSelected.has(c.id)
+                    return (
+                      <div key={c.id}
+                        onClick={() => {
+                          const next = new Set(distributeSelected)
+                          checked ? next.delete(c.id) : next.add(c.id)
+                          setDistributeSelected(next)
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--c-fill-light)', cursor: 'pointer' }}>
+                        <div style={{ width: 22, height: 22, borderRadius: '4px', border: `2px solid ${checked ? 'var(--c-brand)' : 'var(--c-border)'}`, background: checked ? 'var(--c-brand)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                          {checked && <span style={{ color: 'white', fontSize: '13px', fontWeight: 700 }}>✓</span>}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontWeight: 600, fontSize: '14px', color: 'var(--c-text-primary)' }}>{c.name || c.email}</p>
+                          {c.name && <p style={{ margin: 0, fontSize: '12px', color: 'var(--c-text-secondary)' }}>{c.email}</p>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--c-border)', display: 'flex', gap: '10px', flexShrink: 0 }}>
+              <button onClick={() => { setShowDistribute(false); setDistributeSelected(new Set()) }}
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--c-border)', background: 'transparent', cursor: 'pointer', fontSize: '14px' }}>
+                {t('取消', 'Cancel')}
+              </button>
+              <button onClick={handleDistribute} disabled={distributeSelected.size === 0 || distributing}
+                style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', background: 'var(--c-brand)', color: 'white', cursor: distributeSelected.size > 0 && !distributing ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '14px', opacity: distributeSelected.size > 0 && !distributing ? 1 : 0.5 }}>
+                {distributing ? t('发送中…', 'Sending…') : `${t('分发给', 'Send to')} ${distributeSelected.size} ${t('位学员', 'clients')}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Copy Class Modal */}
       {showCopyModal && classData && (

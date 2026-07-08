@@ -14,7 +14,8 @@ interface HomeworkExercise {
   weight_unit: string
   duration?: number
   duration_unit: string
-  notes?: string
+  notes?: string        // trainer's instruction (read-only)
+  client_note?: string  // client's own note (editable)
   order_num: number
   master_exercise: {
     id: string
@@ -76,6 +77,9 @@ export default function WorkoutsPage() {
   // Exercise detail drawer
   const [detailExercise, setDetailExercise] = useState<ExerciseDetail | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
+  // Client notes per exercise (keyed by homework_exercise.id)
+  const [localNotes, setLocalNotes] = useState<Record<string, string>>({})
+  const [savingNoteIds, setSavingNoteIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!loading && !user) { router.push('/auth/login'); return }
@@ -91,6 +95,23 @@ export default function WorkoutsPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const saveClientNote = async (hwId: string, exId: string, note: string) => {
+    setSavingNoteIds(prev => new Set(prev).add(exId))
+    try {
+      await fetch(`/api/homework/${hwId}/exercises/${exId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({ client_note: note || null }),
+      })
+      // Update local list so it persists without re-fetch
+      setHomeworkList(prev => prev.map(h => h.id !== hwId ? h : {
+        ...h,
+        homework_exercise: h.homework_exercise.map(e => e.id !== exId ? e : { ...e, client_note: note || undefined })
+      }))
+    } catch { /* silent */ }
+    finally { setSavingNoteIds(prev => { const s = new Set(prev); s.delete(exId); return s }) }
   }
 
   const handleComplete = async (hw: Homework) => {
@@ -302,43 +323,72 @@ export default function WorkoutsPage() {
                       )}
 
                       {/* Exercise list */}
-                      {[...hw.homework_exercise].sort((a, b) => a.order_num - b.order_num).map((ex, i) => (
-                        <div key={ex.id}
-                          onClick={() => openDetail(ex.master_exercise.id)}
-                          style={{
-                            display: 'flex', gap: 'var(--sp-3)',
-                            padding: 'var(--sp-3) var(--sp-4)',
+                      {[...hw.homework_exercise].sort((a, b) => a.order_num - b.order_num).map((ex, i) => {
+                        const noteKey = ex.id
+                        const localNote = localNotes[noteKey] ?? (ex.client_note || '')
+                        const hasNote = localNote.trim().length > 0
+                        const isSavingNote = savingNoteIds.has(noteKey)
+                        return (
+                          <div key={ex.id} style={{
                             borderBottom: i < hw.homework_exercise.length - 1 ? '1px solid var(--c-border)' : 'none',
-                            alignItems: 'center',
-                            cursor: 'pointer',
                           }}>
-                          <div style={{
-                            width: 36, height: 36, borderRadius: 'var(--r-md)',
-                            background: 'var(--c-fill-light)',
-                            overflow: 'hidden', flexShrink: 0,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            {ex.master_exercise.featured_image_url
-                              ? <img src={ex.master_exercise.featured_image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              : <span style={{ fontSize: 16 }}>🏋️</span>}
+                            {/* Exercise row — tap to open detail */}
+                            <div
+                              onClick={() => openDetail(ex.master_exercise.id)}
+                              style={{ display: 'flex', gap: 'var(--sp-3)', padding: 'var(--sp-3) var(--sp-4)', alignItems: 'center', cursor: 'pointer' }}>
+                              <div style={{ width: 36, height: 36, borderRadius: 'var(--r-md)', background: 'var(--c-fill-light)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {ex.master_exercise.featured_image_url
+                                  ? <img src={ex.master_exercise.featured_image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  : <span style={{ fontSize: 16 }}>🏋️</span>}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <p style={{ margin: '0 0 2px', fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)' }}>
+                                  {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
+                                </p>
+                                <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--c-text-secondary)' }}>
+                                  {[
+                                    ex.sets && `${ex.sets} ${t('组', 'sets')}`,
+                                    ex.reps && `× ${ex.reps} ${t('次', 'reps')}`,
+                                    ex.weight && `${ex.weight} ${ex.weight_unit}`,
+                                    ex.duration && `${ex.duration} ${ex.duration_unit === 'seconds' ? t('秒', 'sec') : t('分钟', 'min')}`,
+                                  ].filter(Boolean).join(' · ') || t('按个人节奏完成', 'At your own pace')}
+                                </p>
+                                {ex.notes && <p style={{ margin: '3px 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-brand)', fontStyle: 'italic' }}>📌 {ex.notes}</p>}
+                              </div>
+                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-brand)', flexShrink: 0 }}>{t('详情', 'Details')} ›</span>
+                            </div>
+
+                            {/* Client note row — stop propagation so it doesn't open detail */}
+                            <div onClick={e => e.stopPropagation()} style={{ padding: '0 var(--sp-4) var(--sp-3)', paddingLeft: 'calc(var(--sp-4) + 36px + var(--sp-3))' }}>
+                              <textarea
+                                value={localNote}
+                                onChange={e => setLocalNotes(prev => ({ ...prev, [noteKey]: e.target.value }))}
+                                onBlur={() => {
+                                  if (localNote !== (ex.client_note || '')) {
+                                    saveClientNote(hw.id, ex.id, localNote)
+                                  }
+                                }}
+                                placeholder={t('添加备注（弹簧调整、感受等）', 'Add note (spring, feedback…)')}
+                                rows={hasNote ? 2 : 1}
+                                style={{
+                                  width: '100%', boxSizing: 'border-box',
+                                  padding: '6px 10px',
+                                  borderRadius: '8px',
+                                  border: '1px solid var(--c-border)',
+                                  background: 'var(--c-fill-light)',
+                                  fontSize: 'var(--text-xs)',
+                                  color: 'var(--c-text-primary)',
+                                  resize: 'none',
+                                  outline: 'none',
+                                  fontFamily: 'inherit',
+                                  lineHeight: 1.5,
+                                  opacity: isSavingNote ? 0.6 : 1,
+                                }}
+                              />
+                            </div>
                           </div>
-                          <div style={{ flex: 1 }}>
-                            <p style={{ margin: '0 0 2px', fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)' }}>
-                              {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
-                            </p>
-                            <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--c-text-secondary)' }}>
-                              {[
-                                ex.sets && `${ex.sets} ${t('组', 'sets')}`,
-                                ex.reps && `× ${ex.reps} ${t('次', 'reps')}`,
-                                ex.weight && `${ex.weight} ${ex.weight_unit}`,
-                                ex.duration && `${ex.duration} ${ex.duration_unit === 'seconds' ? t('秒', 'sec') : t('分钟', 'min')}`,
-                              ].filter(Boolean).join(' · ') || t('按个人节奏完成', 'At your own pace')}
-                            </p>
-                            {ex.notes && <p style={{ margin: '3px 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-brand)', fontStyle: 'italic' }}>📌 {ex.notes}</p>}
-                          </div>
-                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-brand)', flexShrink: 0 }}>{t('详情', 'Details')} ›</span>
-                        </div>
-                      ))}
+                        )
+                      })}
 
                       {/* Complete button (student only) */}
                       {!isTrainer && (

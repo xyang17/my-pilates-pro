@@ -18,17 +18,21 @@ export async function GET(req: NextRequest) {
       .select(`
         *,
         class:class_id(id, name, date, discipline),
+        student:student_id(id, name, email, photo_url),
         homework_exercise(
-          id, sets, reps, weight, weight_unit, duration, duration_unit, notes, order_num,
+          id, sets, reps, weight, weight_unit, duration, duration_unit, notes, client_note, order_num,
           master_exercise:exercise_id(id, name_cn, name_en, featured_image_url, type_cn, type_en)
         )
       `)
       .order('created_at', { ascending: false })
 
     if (userRole === 'ADMIN' || userRole === 'TRAINER') {
-      // Allow trainers to filter by student_id (for client profile page)
       const studentId = req.nextUrl.searchParams.get('student_id')
-      if (studentId) {
+      const classId   = req.nextUrl.searchParams.get('class_id')
+      if (classId) {
+        // All homework distributed from a specific class (for trainer's "学员记录" tab)
+        query = query.eq('class_id', classId)
+      } else if (studentId) {
         query = query.eq('student_id', studentId)
       } else {
         query = query.eq('created_by', userId)
