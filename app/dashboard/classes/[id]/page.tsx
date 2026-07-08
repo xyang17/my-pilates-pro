@@ -147,6 +147,11 @@ export default function ClassDetailPage() {
   const [savingInfo, setSavingInfo] = useState(false)
   // Assigned client profile (private class)
   const [assignedClient, setAssignedClient] = useState<{ id: string; name: string; email: string; photo_url?: string; bio?: string; injury_notes?: string; goals?: string } | null>(null)
+  // Group class enrollment roster
+  const [enrollments, setEnrollments] = useState<{ id: string; enrolled_at: string; student: { id: string; name: string; email: string; photo_url?: string } }[]>([])
+  const [loadingEnrollments, setLoadingEnrollments] = useState(false)
+  const [showAddEnrollment, setShowAddEnrollment] = useState(false)
+  const [enrollmentSearch, setEnrollmentSearch] = useState('')
 
   const { lang, t } = useLang()
   const { showToast } = useToast()
@@ -163,6 +168,12 @@ export default function ClassDetailPage() {
       if (isTrainer) fetchAvailableExercises()
     }
   }, [user, authLoading])
+
+  useEffect(() => {
+    if (classData?.class_type === 'group' && isTrainer && user) {
+      fetchEnrollments()
+    }
+  }, [classData?.id, classData?.class_type, isTrainer, user])
 
   // Fetch assigned client profile when class data arrives
   useEffect(() => {
@@ -241,6 +252,43 @@ export default function ClassDetailPage() {
       })
       if (res.ok) setClientList(await res.json())
     } catch { /* non-critical */ }
+  }
+
+  const fetchEnrollments = async () => {
+    if (loadingEnrollments) return
+    setLoadingEnrollments(true)
+    try {
+      const res = await fetch(`/api/classes/${classId}/enrollments`, {
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (res.ok) setEnrollments(await res.json())
+    } catch { /* non-critical */ }
+    finally { setLoadingEnrollments(false) }
+  }
+
+  const handleAddEnrollment = async (studentId: string) => {
+    try {
+      const res = await fetch(`/api/classes/${classId}/enrollments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({ student_id: studentId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '添加失败')
+      setEnrollments(prev => [...prev, data])
+      setEnrollmentSearch('')
+    } catch (err: any) { showToast(err.message, 'error') }
+  }
+
+  const handleRemoveEnrollment = async (studentId: string) => {
+    try {
+      const res = await fetch(`/api/classes/${classId}/enrollments/${studentId}`, {
+        method: 'DELETE',
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (!res.ok) throw new Error('移除失败')
+      setEnrollments(prev => prev.filter(e => e.student.id !== studentId))
+    } catch (err: any) { showToast(err.message, 'error') }
   }
 
   const fetchStudentNotes = async () => {
@@ -1083,6 +1131,93 @@ export default function ClassDetailPage() {
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Group class student roster */}
+        {isTrainer && isGroupClass && (
+          <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 'var(--sp-4)', marginBottom: 'var(--sp-4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: enrollments.length > 0 ? '12px' : '0' }}>
+              <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--c-text-primary)' }}>
+                👥 学员名单 <span style={{ fontWeight: 'normal', color: 'var(--c-text-hint)', fontSize: '13px' }}>({enrollments.length} 人)</span>
+              </span>
+              <button
+                onClick={() => { setShowAddEnrollment(v => !v); fetchClients(); setEnrollmentSearch('') }}
+                style={{ padding: '5px 14px', background: showAddEnrollment ? 'var(--c-fill-light)' : 'var(--c-brand)', color: showAddEnrollment ? 'var(--c-text-secondary)' : 'white', border: showAddEnrollment ? '1px solid var(--c-border)' : 'none', borderRadius: 'var(--r-sm)', fontSize: '13px', cursor: 'pointer', fontWeight: 500 }}>
+                {showAddEnrollment ? '取消' : '+ 添加学员'}
+              </button>
+            </div>
+
+            {/* Enrolled students list */}
+            {enrollments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: showAddEnrollment ? '12px' : '0' }}>
+                {enrollments.map(e => (
+                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px 5px 6px', background: 'var(--c-fill-light)', borderRadius: '20px', border: '1px solid var(--c-border)' }}>
+                    {e.student.photo_url ? (
+                      <img src={e.student.photo_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--c-brand)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                        {(e.student.name || e.student.email)?.[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <span style={{ fontSize: '13px', color: 'var(--c-text-primary)', fontWeight: 500 }}>{e.student.name || e.student.email}</span>
+                    <button
+                      onClick={() => handleRemoveEnrollment(e.student.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-hint)', fontSize: '14px', lineHeight: 1, padding: '0 0 0 2px' }}
+                      title="移除">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {enrollments.length === 0 && !showAddEnrollment && (
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--c-text-hint)' }}>暂无学员，点「+ 添加学员」添加</p>
+            )}
+
+            {/* Add student search */}
+            {showAddEnrollment && (
+              <div>
+                <input
+                  type="text"
+                  placeholder="搜索学员姓名或邮箱…"
+                  value={enrollmentSearch}
+                  onChange={e => setEnrollmentSearch(e.target.value)}
+                  autoFocus
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--c-border)', borderRadius: 'var(--r-sm)', fontSize: '13px', boxSizing: 'border-box', marginBottom: '8px' }}
+                />
+                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {clientList
+                    .filter(c => {
+                      const enrolled = enrollments.some(e => e.student.id === c.id)
+                      if (enrolled) return false
+                      if (!enrollmentSearch) return true
+                      const q = enrollmentSearch.toLowerCase()
+                      return (c.name || '').toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+                    })
+                    .map(c => (
+                      <div key={c.id}
+                        onClick={() => handleAddEnrollment(c.id)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: 'var(--r-sm)', cursor: 'pointer', transition: 'background 0.1s' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--c-fill-light)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--c-brand)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, flexShrink: 0 }}>
+                          {(c.name || c.email)?.[0]?.toUpperCase()}
+                        </div>
+                        <div>
+                          <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--c-text-primary)' }}>{c.name || c.email}</p>
+                          {c.name && <p style={{ margin: 0, fontSize: '11px', color: 'var(--c-text-hint)' }}>{c.email}</p>}
+                        </div>
+                        <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--c-brand)', fontWeight: 500 }}>+ 添加</span>
+                      </div>
+                    ))
+                  }
+                  {clientList.filter(c => !enrollments.some(e => e.student.id === c.id)).length === 0 && (
+                    <p style={{ textAlign: 'center', color: 'var(--c-text-hint)', fontSize: '13px', padding: '16px 0', margin: 0 }}>所有学员都已在名单中</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
