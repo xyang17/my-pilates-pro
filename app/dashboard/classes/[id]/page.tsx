@@ -6,6 +6,7 @@ import { useToast } from '@/context/ToastContext'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 interface MasterExercise {
   id: string
@@ -258,35 +259,61 @@ export default function ClassDetailPage() {
     if (loadingEnrollments) return
     setLoadingEnrollments(true)
     try {
-      const res = await fetch(`/api/classes/${classId}/enrollments`, {
-        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
-      })
-      if (res.ok) setEnrollments(await res.json())
+      // Step 1: get enrollments
+      const { data: rows, error: e1 } = await supabase
+        .from('class_enrollment')
+        .select('id, enrolled_at, student_id')
+        .eq('class_id', classId)
+        .order('enrolled_at', { ascending: true })
+      if (e1 || !rows || rows.length === 0) { setEnrollments([]); return }
+
+      // Step 2: fetch user details
+      const ids = rows.map((r: any) => r.student_id)
+      const { data: users } = await supabase
+        .from('user')
+        .select('id, name, email, photo_url')
+        .in('id', ids)
+      const map: Record<string, any> = {}
+      for (const u of users || []) map[u.id] = u
+
+      setEnrollments(rows.map((r: any) => ({
+        id: r.id,
+        enrolled_at: r.enrolled_at,
+        student: map[r.student_id] || { id: r.student_id, name: '', email: '', photo_url: null },
+      })))
     } catch { /* non-critical */ }
     finally { setLoadingEnrollments(false) }
   }
 
   const handleAddEnrollment = async (studentId: string) => {
     try {
-      const res = await fetch(`/api/classes/${classId}/enrollments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
-        body: JSON.stringify({ student_id: studentId }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || '添加失败')
-      setEnrollments(prev => [...prev, data])
+      const { data: row, error } = await supabase
+        .from('class_enrollment')
+        .insert([{ class_id: classId, student_id: studentId }])
+        .select('id, enrolled_at, student_id')
+        .single()
+      if (error) {
+        if (error.code === '23505') throw new Error('该学员已在名单中')
+        throw new Error(error.message)
+      }
+      const { data: student } = await supabase
+        .from('user')
+        .select('id, name, email, photo_url')
+        .eq('id', studentId)
+        .single()
+      setEnrollments(prev => [...prev, { id: row.id, enrolled_at: row.enrolled_at, student: student! }])
       setEnrollmentSearch('')
     } catch (err: any) { showToast(err.message, 'error') }
   }
 
   const handleRemoveEnrollment = async (studentId: string) => {
     try {
-      const res = await fetch(`/api/classes/${classId}/enrollments/${studentId}`, {
-        method: 'DELETE',
-        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
-      })
-      if (!res.ok) throw new Error('移除失败')
+      const { error } = await supabase
+        .from('class_enrollment')
+        .delete()
+        .eq('class_id', classId)
+        .eq('student_id', studentId)
+      if (error) throw new Error(error.message)
       setEnrollments(prev => prev.filter(e => e.student.id !== studentId))
     } catch (err: any) { showToast(err.message, 'error') }
   }
