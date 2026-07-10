@@ -154,6 +154,8 @@ export default function ClassDetailPage() {
   const [loadingEnrollments, setLoadingEnrollments] = useState(false)
   const [showAddEnrollment, setShowAddEnrollment] = useState(false)
   const [enrollmentSearch, setEnrollmentSearch] = useState('')
+  // AI features
+  const [aiSuggestingTheme, setAiSuggestingTheme] = useState(false)
 
   const { lang, t } = useLang()
   const { showToast } = useToast()
@@ -605,6 +607,27 @@ export default function ClassDetailPage() {
     }
   }
 
+  const handleAISuggestTheme = async () => {
+    if (!classData || aiSuggestingTheme) return
+    const exercises = classData.exercises
+    if (exercises.length === 0) { showToast('请先添加动作', 'error'); return }
+    setAiSuggestingTheme(true)
+    try {
+      const res = await fetch('/api/ai/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        body: JSON.stringify({
+          type: 'theme',
+          exercises: exercises.map(e => ({ name_cn: e.master_exercise.name_cn, name_en: e.master_exercise.name_en })),
+        }),
+      })
+      const data = await res.json()
+      if (data.result) setInfoForm(p => ({ ...p, discipline: data.result }))
+      else showToast(data.error || 'AI 建议失败', 'error')
+    } catch { showToast('AI 请求失败', 'error') }
+    finally { setAiSuggestingTheme(false) }
+  }
+
   const openEditInfo = () => {
     if (!classData) return
     if (classData.class_type === 'private') fetchClients()
@@ -959,8 +982,18 @@ export default function ClassDetailPage() {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>类别</label>
-                  <input value={infoForm.discipline} onChange={e => setInfoForm(p => ({ ...p, discipline: e.target.value }))}
-                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} />
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <input value={infoForm.discipline} onChange={e => setInfoForm(p => ({ ...p, discipline: e.target.value }))}
+                      style={{ flex: 1, padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} />
+                    <button
+                      type="button"
+                      onClick={handleAISuggestTheme}
+                      disabled={aiSuggestingTheme}
+                      title="根据动作列表 AI 建议主题"
+                      style={{ padding: '7px 10px', border: '1px solid var(--c-border-em)', borderRadius: '6px', background: aiSuggestingTheme ? '#f0edf7' : 'var(--c-fill-light)', color: 'var(--c-brand)', cursor: aiSuggestingTheme ? 'not-allowed' : 'pointer', fontSize: '13px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {aiSuggestingTheme ? '…' : '✨ AI建议'}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>难度</label>

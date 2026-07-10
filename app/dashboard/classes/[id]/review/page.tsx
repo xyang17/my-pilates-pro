@@ -55,6 +55,7 @@ export default function ClassReviewPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [error, setError] = useState('')
+  const [aiGenerating, setAiGenerating] = useState(false)
 
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
 
@@ -179,6 +180,41 @@ export default function ClassReviewPage() {
       setError(err.message)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleAIGenerateSummary = async () => {
+    if (aiGenerating) return
+    setAiGenerating(true)
+    try {
+      const res = await fetch('/api/ai/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        body: JSON.stringify({
+          type: 'summary',
+          exercises: exercises.map(ex => ({
+            name_cn: ex.master_exercise.name_cn,
+            name_en: ex.master_exercise.name_en,
+            sets: ex.sets,
+            reps: ex.reps,
+            weight: ex.weight,
+            weight_unit: ex.weight_unit,
+            actual_sets: ex.actual_sets,
+            actual_reps: ex.actual_reps,
+            actual_weight: ex.actual_weight,
+            instance_notes: ex.instance_notes,
+            post_note: ex.post_note,
+          })),
+          classNotes: classData?.notes || '',
+        }),
+      })
+      const data = await res.json()
+      if (data.result) setPostSummary(data.result)
+      else setError(data.error || 'AI 生成失败')
+    } catch {
+      setError('AI 请求失败，请稍后重试')
+    } finally {
+      setAiGenerating(false)
     }
   }
 
@@ -374,9 +410,29 @@ export default function ClassReviewPage() {
 
         {/* Overall summary */}
         <div style={{ background: 'var(--c-card-bg)', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
-          <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', color: '#444' }}>整体课程总结</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <p style={{ margin: 0, fontWeight: 'bold', color: '#444' }}>整体课程总结</p>
+            {!isCompleted && (
+              <button
+                onClick={handleAIGenerateSummary}
+                disabled={aiGenerating}
+                style={{
+                  padding: '5px 12px',
+                  border: '1px solid var(--c-border-em)',
+                  borderRadius: '6px',
+                  background: aiGenerating ? '#f0edf7' : 'var(--c-fill-light)',
+                  color: 'var(--c-brand)',
+                  cursor: aiGenerating ? 'not-allowed' : 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                }}
+              >
+                {aiGenerating ? '✨ 生成中…' : '✨ AI生成总结'}
+              </button>
+            )}
+          </div>
           <textarea
-            rows={4}
+            rows={5}
             placeholder="例：学员今天状态很好，核心力量明显进步。下次可以增加难度，尝试单腿训练..."
             value={postSummary}
             disabled={isCompleted}
@@ -394,6 +450,11 @@ export default function ClassReviewPage() {
               backgroundColor: isCompleted ? '#fafafa' : 'white',
             }}
           />
+          {aiGenerating && (
+            <p style={{ margin: '6px 0 0', fontSize: '12px', color: 'var(--c-brand)', opacity: 0.7 }}>
+              AI 正在分析课程数据并生成总结…
+            </p>
+          )}
         </div>
 
         {/* Action buttons */}
