@@ -138,6 +138,7 @@ export default function ClassDetailPage() {
   const [showCopyModal, setShowCopyModal] = useState(false)
   const [copyForm, setCopyForm] = useState({ name: '', date: '', start_time: '', assigned_to: '' })
   const [copying, setCopying] = useState(false)
+  const [copyExercises, setCopyExercises] = useState<ClassExercise[]>([])
   // Drag-to-reorder
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -521,9 +522,8 @@ export default function ClassDetailPage() {
     finally { setDistributing(false) }
   }
 
-  const openCopyModal = () => {
+  const openCopyModal = async () => {
     if (!classData) return
-    // Strip existing " (复制)" suffix to avoid stacking
     const baseName = classData.name.replace(/\s*\(复制\)+$/, '')
     fetchClients()
     setCopyForm({
@@ -532,6 +532,21 @@ export default function ClassDetailPage() {
       start_time: classData.start_time?.slice(0, 5) || '',
       assigned_to: classData.assigned_to || '',
     })
+    // Re-fetch exercises fresh from DB so copy always reflects latest saved state
+    try {
+      const res = await fetch(`/api/classes/${classId}`, {
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (res.ok) {
+        const fresh = await res.json()
+        const sorted = (fresh.exercises || []).sort((a: ClassExercise, b: ClassExercise) => a.order - b.order)
+        setCopyExercises(sorted)
+      } else {
+        setCopyExercises([...classData.exercises].sort((a, b) => a.order - b.order))
+      }
+    } catch {
+      setCopyExercises([...classData.exercises].sort((a, b) => a.order - b.order))
+    }
     setShowCopyModal(true)
   }
 
@@ -562,22 +577,20 @@ export default function ClassDetailPage() {
       if (!res.ok) throw new Error('复制课程失败')
       const newClass = await res.json()
 
-      // Copy all exercises — use getLocal to include any unsaved local edits
-      const sorted = [...classData.exercises].sort((a, b) => a.order - b.order)
-      for (const ex of sorted) {
-        const p = getLocal(ex)
+      // Copy exercises in user-selected order using fresh DB values
+      for (const ex of copyExercises) {
         await fetch(`/api/classes/${newClass.id}/exercises`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
           body: JSON.stringify({
-            exercise_id: ex.exercise_id,
-            sets:          p.sets          ? parseInt(p.sets)          : null,
-            reps:          p.reps          ? parseInt(p.reps)          : null,
-            weight:        p.weight        ? parseFloat(p.weight)      : null,
-            weight_unit:   p.weight_unit   || 'kg',
-            duration:      p.duration      ? parseInt(p.duration)      : null,
-            duration_unit: p.duration_unit || 'minutes',
-            instance_notes: p.instance_notes || null,
+            exercise_id:    ex.exercise_id,
+            sets:           ex.sets          ?? null,
+            reps:           ex.reps          ?? null,
+            weight:         ex.weight        ?? null,
+            weight_unit:    ex.weight_unit   || 'kg',
+            duration:       ex.duration      ?? null,
+            duration_unit:  ex.duration_unit || 'minutes',
+            instance_notes: ex.instance_notes || null,
           }),
         })
       }
@@ -1894,26 +1907,57 @@ export default function ClassDetailPage() {
                 </label>
               )}
 
-              {/* Exercise preview */}
+              {/* Exercise list — editable (delete + reorder) */}
               <div style={{ marginBottom: '8px' }}>
                 <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#888', fontWeight: '600' }}>
-                  {t('动作列表', 'Exercises')} ({classData.exercises.length})
-                  <span style={{ fontWeight: 'normal', color: '#bbb', marginLeft: '6px', fontSize: '12px' }}>{t('创建后可修改', 'Editable after creation')}</span>
+                  {t('动作列表', 'Exercises')} ({copyExercises.length})
+                  <span style={{ fontWeight: 'normal', color: '#bbb', marginLeft: '6px', fontSize: '12px' }}>{t('可删除或调整顺序', 'Remove or reorder')}</span>
                 </p>
                 <div style={{ backgroundColor: '#f9f6fc', borderRadius: '10px', overflow: 'hidden' }}>
-                  {classData.exercises.map((ex, i) => (
-                    <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: i < classData.exercises.length - 1 ? '1px solid #eee' : 'none' }}>
+                  {copyExercises.map((ex, i) => (
+                    <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderBottom: i < copyExercises.length - 1 ? '1px solid #eee' : 'none' }}>
+                      {/* Up/Down */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', flexShrink: 0 }}>
+                        <button
+                          onClick={() => {
+                            if (i === 0) return
+                            const arr = [...copyExercises]
+                            ;[arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]
+                            setCopyExercises(arr)
+                          }}
+                          disabled={i === 0}
+                          style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? '#ddd' : '#999', fontSize: '12px', padding: '0', lineHeight: 1 }}>▲</button>
+                        <button
+                          onClick={() => {
+                            if (i === copyExercises.length - 1) return
+                            const arr = [...copyExercises]
+                            ;[arr[i], arr[i + 1]] = [arr[i + 1], arr[i]]
+                            setCopyExercises(arr)
+                          }}
+                          disabled={i === copyExercises.length - 1}
+                          style={{ background: 'none', border: 'none', cursor: i === copyExercises.length - 1 ? 'default' : 'pointer', color: i === copyExercises.length - 1 ? '#ddd' : '#999', fontSize: '12px', padding: '0', lineHeight: 1 }}>▼</button>
+                      </div>
+                      {/* Index badge */}
                       <span style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'var(--c-brand)', color: 'white', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 'bold' }}>
+                      {/* Name + params */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
                         </p>
                         <p style={{ margin: 0, fontSize: '11px', color: '#999' }}>
                           {[ex.sets && `${ex.sets}组`, ex.reps && `×${ex.reps}次`, ex.weight && `${ex.weight}${ex.weight_unit}`].filter(Boolean).join(' · ') || t('未设置参数', 'No params')}
                         </p>
                       </div>
+                      {/* Delete */}
+                      <button
+                        onClick={() => setCopyExercises(prev => prev.filter((_, idx) => idx !== i))}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '16px', padding: '2px 4px', flexShrink: 0 }}
+                        title={t('移除', 'Remove')}>✕</button>
                     </div>
                   ))}
+                  {copyExercises.length === 0 && (
+                    <p style={{ padding: '16px', textAlign: 'center', color: '#bbb', fontSize: '13px', margin: 0 }}>{t('所有动作已移除', 'All exercises removed')}</p>
+                  )}
                 </div>
               </div>
             </div>
