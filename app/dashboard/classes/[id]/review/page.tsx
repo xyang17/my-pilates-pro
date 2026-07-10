@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
+import { useLang } from '@/context/LanguageContext'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
@@ -57,6 +58,7 @@ export default function ClassReviewPage() {
   const [error, setError] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
 
+  const { lang } = useLang()
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
 
   useEffect(() => {
@@ -192,6 +194,7 @@ export default function ClassReviewPage() {
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
         body: JSON.stringify({
           type: 'summary',
+          lang,
           exercises: exercises.map(ex => ({
             name_cn: ex.master_exercise.name_cn,
             name_en: ex.master_exercise.name_en,

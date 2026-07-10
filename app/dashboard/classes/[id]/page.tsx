@@ -618,6 +618,7 @@ export default function ClassDetailPage() {
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
         body: JSON.stringify({
           type: 'theme',
+          lang,
           exercises: exercises.map(e => ({ name_cn: e.master_exercise.name_cn, name_en: e.master_exercise.name_en })),
         }),
       })
