@@ -50,7 +50,7 @@ export default function DashboardPage() {
         zIndex: 10,
       }}>
         <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', letterSpacing: '-0.2px' }}>
-          MyPilatesPro
+          MyFitnessPro
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)' }}>
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>

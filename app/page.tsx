@@ -30,7 +30,7 @@ export default function Home() {
         color: 'var(--c-text-primary)',
         letterSpacing: '-0.5px',
       }}>
-        MyPilatesPro
+        MyFitnessPro
       </h1>
 
       <p style={{

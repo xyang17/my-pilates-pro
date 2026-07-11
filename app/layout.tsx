@@ -5,7 +5,7 @@ import { LangProvider } from "@/context/LanguageContext";
 import { ToastProvider } from "@/context/ToastContext";
 
 export const metadata: Metadata = {
-  title: "MyPilatesPro",
+  title: "MyFitnessPro",
   description: "Pilates & Fitness Training App",
 };
 

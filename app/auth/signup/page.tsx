@@ -65,7 +65,7 @@ export default function SignupPage() {
           color: 'var(--c-text-primary)',
           letterSpacing: '-0.3px',
         }}>
-          MyPilatesPro
+          MyFitnessPro
         </h1>
         <p style={{
           margin: 'var(--sp-1) 0 0',
