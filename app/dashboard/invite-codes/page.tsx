@@ -11,6 +11,7 @@ interface InviteCode {
   role: 'TRAINER' | 'CLIENT'
   label: string | null
   used_by: string | null
+  used_by_name: string | null
   used_at: string | null
   expires_at: string | null
   created_at: string
@@ -27,15 +28,15 @@ export default function InviteCodesPage() {
   const [newLabel, setNewLabel] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
 
-  const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
+  const isAdmin = userRole === 'ADMIN'
 
   useEffect(() => {
-    if (!authLoading && (!user || !isTrainer)) router.push('/dashboard')
-  }, [user, authLoading, isTrainer])
+    if (!authLoading && (!user || !isAdmin)) router.push('/dashboard')
+  }, [user, authLoading, isAdmin])
 
   useEffect(() => {
-    if (user && isTrainer) fetchCodes()
-  }, [user, isTrainer])
+    if (user && isAdmin) fetchCodes()
+  }, [user, isAdmin])
 
   const fetchCodes = async () => {
     setLoading(true)
@@ -178,7 +179,8 @@ export default function InviteCodesPage() {
                       <div style={{ fontSize: 12, color: '#aaa' }}>
                         {c.label && <span style={{ marginRight: 10 }}>📝 {c.label}</span>}
                         {c.expires_at && <span>到期：{new Date(c.expires_at).toLocaleDateString('zh-CN')}</span>}
-                        {c.used_at && <span style={{ marginLeft: 10 }}>使用于 {new Date(c.used_at).toLocaleDateString('zh-CN')}</span>}
+                        {c.used_by_name && <span style={{ marginLeft: 10 }}>→ {c.used_by_name}</span>}
+                        {c.used_at && <span style={{ marginLeft: 6 }}>({new Date(c.used_at).toLocaleDateString('zh-CN')})</span>}
                       </div>
                     </div>
 

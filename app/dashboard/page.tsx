@@ -30,7 +30,9 @@ export default function DashboardPage() {
     { icon: '📋', title: t('课后作业', 'Homework'), desc: t('布置课后练习任务（开发中）', 'Assign homework exercises (coming soon)'), href: '/dashboard/workouts' },
     ...(userRole === 'ADMIN' || userRole === 'TRAINER' ? [
       { icon: '👥', title: t('学员管理', 'Clients'), desc: t('查看学员列表和课程记录', 'Manage client profiles and history'), href: '/dashboard/clients' },
-      { icon: '🔑', title: t('邀请码', 'Invite Codes'), desc: t('生成邀请码，邀请教练或学员注册', 'Generate codes to invite trainers & clients'), href: '/dashboard/invite-codes' },
+    ] : []),
+    ...(userRole === 'ADMIN' ? [
+      { icon: '🔑', title: t('邀请码管理', 'Invite Codes'), desc: t('生成邀请码，邀请教练或学员注册', 'Generate codes to invite trainers & clients'), href: '/dashboard/invite-codes' },
     ] : []),
     { icon: '👤', title: t('我的主页', 'My Profile'), desc: t('查看个人信息', 'View your profile'), href: '/dashboard/profile' },
   ]
