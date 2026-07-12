@@ -8,11 +8,13 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, name } = await req.json()
+    const { email, password, name, role } = await req.json()
 
     if (!email || !password || !name) {
       return NextResponse.json({ error: 'Email, password, and name are required' }, { status: 400 })
     }
+
+    const userRole = role === 'TRAINER' ? 'TRAINER' : 'CLIENT'
 
     // Create auth user
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -31,7 +33,7 @@ export async function POST(req: NextRequest) {
     // Insert into user table
     const { error: dbError } = await supabaseAdmin
       .from('user')
-      .insert([{ id: userId, email, name, role: 'CLIENT' }])
+      .insert([{ id: userId, email, name, role: userRole }])
 
     if (dbError) {
       // Rollback: delete the auth user
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: dbError.message }, { status: 400 })
     }
 
-    return NextResponse.json({ message: 'Account created successfully' }, { status: 201 })
+    return NextResponse.json({ message: 'Account created successfully', userId }, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
