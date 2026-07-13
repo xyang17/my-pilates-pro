@@ -1,33 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
 async function callClaude(prompt: string): Promise<string> {
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY 未配置，请在 Vercel 环境变量中添加后重新部署')
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY 未配置，请在 Vercel 环境变量中添加后重新部署')
   }
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  })
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 512 },
+      }),
+    }
+  )
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`Anthropic API 错误 (${res.status}): ${err}`)
+    throw new Error(`Gemini API 错误 (${res.status}): ${err}`)
   }
 
   const data = await res.json()
-  return data.content?.[0]?.text?.trim() || ''
+  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
 }
 
 export async function POST(req: NextRequest) {
