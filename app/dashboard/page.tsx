@@ -31,7 +31,9 @@ export default function DashboardPage() {
     ...(userRole === 'ADMIN' || userRole === 'TRAINER' ? [
       { icon: '👥', title: t('学员管理', 'Clients'), desc: t('查看学员列表和课程记录', 'Manage client profiles and history'), href: '/dashboard/clients' },
       { icon: '🧪', title: t('身体测试', 'Body Assessment'), desc: t('记录学员身体成分、心肺和抗阻数据', 'Track body composition, cardio & strength'), href: '/dashboard/assessments' },
+      { icon: '📋', title: t('我的训练计划', 'My Plans'), desc: t('规划训练方案，可选择公开给学员', 'Create training programs for yourself & clients'), href: '/dashboard/plans' },
     ] : []),
+    { icon: '🏆', title: t('训练方案', 'Programs'), desc: t('浏览公开的训练计划', 'Browse training programs'), href: '/dashboard/programs' },
     ...(userRole === 'ADMIN' ? [
       { icon: '🔑', title: t('邀请码管理', 'Invite Codes'), desc: t('生成邀请码，邀请教练或学员注册', 'Generate codes to invite trainers & clients'), href: '/dashboard/invite-codes' },
     ] : []),
