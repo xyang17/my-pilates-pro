@@ -6,14 +6,16 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-function generateCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let code = ''
-  for (let i = 0; i < 8; i++) {
-    if (i === 4) code += '-'
-    code += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return code // XXXX-XXXX
+const ROLE_PREFIX: Record<string, string> = {
+  TRAINER: 'TRN',
+  CLIENT:  'CLT',
+  ADMIN:   'ADM',
+}
+
+function generateCode(role: string): string {
+  const prefix = ROLE_PREFIX[role] || 'CLT'
+  const digits = () => Math.floor(100 + Math.random() * 900).toString() // 3-digit
+  return `MFP-${prefix}-${digits()}-${digits()}` // e.g. MFP-TRN-847-291
 }
 
 // POST /api/invite-codes — only ADMIN can generate
@@ -29,13 +31,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { role = 'CLIENT', label = '', expiresInDays = 30 } = body
 
-    if (!['TRAINER', 'CLIENT'].includes(role)) {
+    if (!['TRAINER', 'CLIENT', 'ADMIN'].includes(role)) {
       return NextResponse.json({ error: '无效角色' }, { status: 400 })
     }
 
     let code = ''
     for (let attempt = 0; attempt < 5; attempt++) {
-      const candidate = generateCode()
+      const candidate = generateCode(role)
       const { data } = await supabaseAdmin
         .from('invite_code').select('id').eq('code', candidate).maybeSingle()
       if (!data) { code = candidate; break }

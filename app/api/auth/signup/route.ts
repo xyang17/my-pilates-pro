@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email, password, and name are required' }, { status: 400 })
     }
 
-    const userRole = role === 'TRAINER' ? 'TRAINER' : 'CLIENT'
+    const userRole = role === 'TRAINER' ? 'TRAINER' : role === 'ADMIN' ? 'ADMIN' : 'CLIENT'
 
     // Create auth user
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({

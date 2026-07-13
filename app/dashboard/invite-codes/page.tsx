@@ -8,7 +8,7 @@ import Link from 'next/link'
 interface InviteCode {
   id: string
   code: string
-  role: 'TRAINER' | 'CLIENT'
+  role: 'TRAINER' | 'CLIENT' | 'ADMIN'
   label: string | null
   used_by: string | null
   used_by_name: string | null
@@ -24,7 +24,7 @@ export default function InviteCodesPage() {
   const [codes, setCodes] = useState<InviteCode[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
-  const [newRole, setNewRole] = useState<'CLIENT' | 'TRAINER'>('CLIENT')
+  const [newRole, setNewRole] = useState<string>('CLIENT')
   const [newLabel, setNewLabel] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
 
@@ -112,8 +112,9 @@ export default function InviteCodesPage() {
                 onChange={e => setNewRole(e.target.value as 'CLIENT' | 'TRAINER')}
                 style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 14 }}
               >
-                <option value="CLIENT">🧑 学员</option>
-                <option value="TRAINER">🏋️ 教练</option>
+                <option value="CLIENT">🧑 学员 (MFP-CLT)</option>
+                <option value="TRAINER">🏋️ 教练 (MFP-TRN)</option>
+                <option value="ADMIN">🏢 场馆管理员 (MFP-ADM)</option>
               </select>
             </div>
             <div>
@@ -173,7 +174,7 @@ export default function InviteCodesPage() {
                           {st.text}
                         </span>
                         <span style={{ fontSize: 11, color: '#999', background: '#f5f5f5', padding: '2px 7px', borderRadius: 10 }}>
-                          {c.role === 'TRAINER' ? '🏋️ 教练' : '🧑 学员'}
+                          {c.role === 'TRAINER' ? '🏋️ 教练' : c.role === 'ADMIN' ? '🏢 场馆管理员' : '🧑 学员'}
                         </span>
                       </div>
                       <div style={{ fontSize: 12, color: '#aaa' }}>

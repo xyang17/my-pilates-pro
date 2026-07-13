@@ -205,17 +205,26 @@ export default function LoginPage() {
         </form>
 
         {/* 注册链接 */}
-        <p style={{
-          marginTop: 'var(--sp-6)',
-          textAlign: 'center',
-          fontSize: 'var(--text-sm)',
-          color: 'var(--c-text-secondary)',
-        }}>
-          还没有账号？{' '}
-          <Link href="/auth/signup" style={{ color: 'var(--c-brand)', textDecoration: 'none', fontWeight: 500 }}>
-            立即注册
-          </Link>
-        </p>
+        <div style={{ marginTop: 'var(--sp-6)', textAlign: 'center' }}>
+          <p style={{ margin: '0 0 8px', fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>
+            还没有账号？{' '}
+            <Link href="/auth/signup" style={{ color: 'var(--c-brand)', textDecoration: 'none', fontWeight: 500 }}>
+              立即注册
+            </Link>
+          </p>
+          <p style={{
+            margin: 0,
+            fontSize: '12px',
+            color: 'var(--c-text-hint)',
+            background: 'var(--c-fill-light)',
+            border: '1px solid var(--c-border)',
+            borderRadius: 'var(--r-sm)',
+            padding: '8px 12px',
+            lineHeight: 1.6,
+          }}>
+            🔑 注册需要邀请码，请联系你的教练或场馆管理员获取
+          </p>
+        </div>
       </div>
     </div>
   )

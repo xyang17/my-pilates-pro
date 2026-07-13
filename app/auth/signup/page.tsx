@@ -131,8 +131,8 @@ export default function SignupPage() {
                   setError('')
                 }}
                 onBlur={() => checkInviteCode(inviteCode)}
-                placeholder="XXXX-XXXX"
-                maxLength={9}
+                placeholder="MFP-CLT-XXX-XXX"
+                maxLength={15}
                 required
                 style={{
                   width: '100%', padding: '12px var(--sp-4)',
@@ -147,7 +147,7 @@ export default function SignupPage() {
               )}
               {inviteStatus === 'valid' && (
                 <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: '#4CAF50' }}>
-                  ✓ {inviteRole === 'TRAINER' ? '教练账号' : '学员账号'}
+                  ✓ {inviteRole === 'TRAINER' ? '教练账号' : inviteRole === 'ADMIN' ? '管理员账号' : '学员账号'}
                 </span>
               )}
               {inviteStatus === 'invalid' && (
