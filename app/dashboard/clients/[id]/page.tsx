@@ -62,9 +62,11 @@ export default function ClientDetailPage() {
 
   const [client, setClient] = useState<Client | null>(null)
   const [homework, setHomework] = useState<Homework[]>([])
+  const [assessments, setAssessments] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [hwLoading, setHwLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'classes' | 'homework'>('classes')
+  const [aLoading, setALoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<'classes' | 'homework' | 'assessments'>('classes')
   const [expandedHw, setExpandedHw] = useState<Set<string>>(new Set())
   const [deletingHwId, setDeletingHwId] = useState<string | null>(null)
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
@@ -82,6 +84,7 @@ export default function ClientDetailPage() {
 
   useEffect(() => {
     if (activeTab === 'homework' && homework.length === 0 && user) fetchHomework()
+    if (activeTab === 'assessments' && assessments.length === 0 && user) fetchAssessments()
   }, [activeTab, user])
 
   const fetchClient = async () => {
@@ -116,6 +119,18 @@ export default function ClientDetailPage() {
       alert(err.message)
     } finally {
       setSavingNotes(false)
+    }
+  }
+
+  const fetchAssessments = async () => {
+    setALoading(true)
+    try {
+      const res = await fetch(`/api/assessments?clientId=${clientId}`, {
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (res.ok) setAssessments(await res.json())
+    } finally {
+      setALoading(false)
     }
   }
 
@@ -281,6 +296,7 @@ export default function ClientDetailPage() {
           {([
             { key: 'classes', label: `课程记录 (${client.classes.length})` },
             { key: 'homework', label: `作业 (${homework.length || '…'})` },
+            { key: 'assessments', label: `测试记录 (${assessments.length || '…'})` },
           ] as const).map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               style={{
@@ -417,6 +433,65 @@ export default function ClientDetailPage() {
                       </div>
                     )}
                   </div>
+                )
+              })
+            )}
+          </div>
+        )}
+
+        {/* Assessments tab */}
+        {activeTab === 'assessments' && (
+          <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
+            {/* Go to full assessment page */}
+            {isTrainer && (
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--c-border)', display: 'flex', justifyContent: 'flex-end' }}>
+                <Link
+                  href={`/dashboard/assessments/${clientId}`}
+                  style={{ fontSize: 13, color: 'var(--c-brand)', border: '1px solid var(--c-brand)', borderRadius: 6, padding: '5px 14px', textDecoration: 'none', fontWeight: 500 }}
+                >
+                  ＋ 新建 / 编辑测试
+                </Link>
+              </div>
+            )}
+            {aLoading ? (
+              <p style={{ padding: '40px', textAlign: 'center', color: '#bbb', margin: 0 }}>加载中…</p>
+            ) : assessments.length === 0 ? (
+              <p style={{ padding: '40px', textAlign: 'center', color: '#bbb', margin: 0 }}>暂无测试记录</p>
+            ) : (
+              assessments.map((a, i) => {
+                const metrics = [
+                  a.weight && `体重 ${a.weight}kg`,
+                  a.body_fat_pct && `体脂 ${a.body_fat_pct}%`,
+                  a.muscle_mass && `肌肉 ${a.muscle_mass}kg`,
+                  a.resting_hr && `静息HR ${a.resting_hr}bpm`,
+                ].filter(Boolean).slice(0, 3)
+                return (
+                  <Link
+                    key={a.id}
+                    href={`/dashboard/assessments/${clientId}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '14px 20px',
+                      borderBottom: i < assessments.length - 1 ? '1px solid var(--c-border)' : 'none',
+                      textDecoration: 'none', color: 'inherit',
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', marginBottom: 4 }}>
+                        {new Date(a.assessed_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </div>
+                      {metrics.length > 0 && (
+                        <div style={{ fontSize: 12, color: '#aaa' }}>
+                          {metrics.join(' · ')}
+                          {(a.photo_urls?.length > 0) && ` · 📷 ${a.photo_urls.length}张`}
+                        </div>
+                      )}
+                      {a.notes && (
+                        <div style={{ fontSize: 12, color: '#bbb', marginTop: 2 }}>💬 {a.notes}</div>
+                      )}
+                    </div>
+                    <span style={{ color: 'var(--c-text-hint)', fontSize: 18 }}>›</span>
+                  </Link>
                 )
               })
             )}
