@@ -57,6 +57,7 @@ export default function ClassReviewPage() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [error, setError] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiError, setAiError] = useState('')
 
   const { lang } = useLang()
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
@@ -98,7 +99,8 @@ export default function ClassReviewPage() {
           actual_sets: ex.actual_sets ?? '',
           actual_reps: ex.actual_reps ?? '',
           actual_weight: ex.actual_weight ?? '',
-          post_note: ex.post_note || '',
+          // Pre-fill from planned notes if no post_note yet
+          post_note: ex.post_note ?? ex.instance_notes ?? '',
           master_exercise: ex.master_exercise,
         }))
       )
@@ -124,10 +126,12 @@ export default function ClassReviewPage() {
           'x-user-id': user?.id || '',
         },
         body: JSON.stringify({
-          actual_sets:   ex.actual_sets   === '' ? null : Number(ex.actual_sets),
-          actual_reps:   ex.actual_reps   === '' ? null : Number(ex.actual_reps),
-          actual_weight: ex.actual_weight === '' ? null : Number(ex.actual_weight),
-          post_note:     ex.post_note || null,
+          actual_sets:    ex.actual_sets   === '' ? null : Number(ex.actual_sets),
+          actual_reps:    ex.actual_reps   === '' ? null : Number(ex.actual_reps),
+          actual_weight:  ex.actual_weight === '' ? null : Number(ex.actual_weight),
+          post_note:      ex.post_note || null,
+          // Keep instance_notes in sync — edits here update the plan too
+          instance_notes: ex.post_note || null,
         }),
       })
       setSaveStatus('saved')
@@ -153,10 +157,11 @@ export default function ClassReviewPage() {
               'x-user-id': user?.id || '',
             },
             body: JSON.stringify({
-              actual_sets:   ex.actual_sets   === '' ? null : Number(ex.actual_sets),
-              actual_reps:   ex.actual_reps   === '' ? null : Number(ex.actual_reps),
-              actual_weight: ex.actual_weight === '' ? null : Number(ex.actual_weight),
-              post_note:     ex.post_note || null,
+              actual_sets:    ex.actual_sets   === '' ? null : Number(ex.actual_sets),
+              actual_reps:    ex.actual_reps   === '' ? null : Number(ex.actual_reps),
+              actual_weight:  ex.actual_weight === '' ? null : Number(ex.actual_weight),
+              post_note:      ex.post_note || null,
+              instance_notes: ex.post_note || null,
             }),
           })
         )
@@ -188,6 +193,7 @@ export default function ClassReviewPage() {
   const handleAIGenerateSummary = async () => {
     if (aiGenerating) return
     setAiGenerating(true)
+    setAiError('')
     try {
       const res = await fetch('/api/ai/suggest', {
         method: 'POST',
@@ -212,10 +218,13 @@ export default function ClassReviewPage() {
         }),
       })
       const data = await res.json()
-      if (data.result) setPostSummary(data.result)
-      else setError(data.error || 'AI 生成失败')
+      if (data.result) {
+        setPostSummary(data.result)
+      } else {
+        setAiError(data.error || 'AI 生成失败，请重试')
+      }
     } catch {
-      setError('AI 请求失败，请稍后重试')
+      setAiError('AI 请求失败，请检查网络后重试')
     } finally {
       setAiGenerating(false)
     }
@@ -457,6 +466,11 @@ export default function ClassReviewPage() {
             <p style={{ margin: '6px 0 0', fontSize: '12px', color: 'var(--c-brand)', opacity: 0.7 }}>
               AI 正在分析课程数据并生成总结…
             </p>
+          )}
+          {aiError && (
+            <div style={{ margin: '8px 0 0', padding: '8px 12px', background: '#fff3e0', border: '1px solid #ffe0b2', borderRadius: 6, fontSize: 12, color: '#e65100' }}>
+              ⚠️ {aiError}
+            </div>
           )}
         </div>
 
