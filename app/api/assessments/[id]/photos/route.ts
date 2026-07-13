@@ -9,8 +9,9 @@ const supabaseAdmin = createClient(
 const BUCKET = 'assessment-photos'
 
 // POST /api/assessments/[id]/photos — upload photo, returns public URL
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const userId = req.headers.get('x-user-id')
     const userRole = req.headers.get('x-user-role')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     const ext = file.name.split('.').pop() || 'jpg'
-    const path = `${params.id}/${Date.now()}.${ext}`
+    const path = `${id}/${Date.now()}.${ext}`
 
     const arrayBuffer = await file.arrayBuffer()
     const { error: uploadError } = await supabaseAdmin.storage
@@ -52,13 +53,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     // Append URL to the assessment's photo_urls array
     const { data: existing } = await supabaseAdmin
-      .from('body_assessment').select('photo_urls').eq('id', params.id).single()
+      .from('body_assessment').select('photo_urls').eq('id', id).single()
 
     const currentUrls: string[] = existing?.photo_urls || []
     await supabaseAdmin
       .from('body_assessment')
       .update({ photo_urls: [...currentUrls, publicUrl] })
-      .eq('id', params.id)
+      .eq('id', id)
 
     return NextResponse.json({ url: publicUrl })
   } catch (err: any) {
@@ -67,8 +68,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 // DELETE /api/assessments/[id]/photos — remove a photo URL
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const userId = req.headers.get('x-user-id')
     const userRole = req.headers.get('x-user-role')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -78,13 +80,13 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 })
 
     const { data: existing } = await supabaseAdmin
-      .from('body_assessment').select('photo_urls').eq('id', params.id).single()
+      .from('body_assessment').select('photo_urls').eq('id', id).single()
 
     const filtered = (existing?.photo_urls || []).filter((u: string) => u !== url)
     await supabaseAdmin
       .from('body_assessment')
       .update({ photo_urls: filtered })
-      .eq('id', params.id)
+      .eq('id', id)
 
     // Also delete from storage
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!

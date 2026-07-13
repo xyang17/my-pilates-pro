@@ -7,15 +7,16 @@ const supabaseAdmin = createClient(
 )
 
 // GET /api/assessments/[id]
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const userId = req.headers.get('x-user-id')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { data, error } = await supabaseAdmin
       .from('body_assessment')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 404 })
@@ -26,8 +27,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // PUT /api/assessments/[id]
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const userId = req.headers.get('x-user-id')
     const userRole = req.headers.get('x-user-role')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -36,12 +38,12 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const body = await req.json()
 
     // Remove read-only fields
-    const { id, created_at, trainer_id, client_id, ...updateFields } = body
+    const { id: _id, created_at, trainer_id, client_id, ...updateFields } = body
 
     const { data, error } = await supabaseAdmin
       .from('body_assessment')
       .update(updateFields)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single()
 
