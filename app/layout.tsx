@@ -3,6 +3,10 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { LangProvider } from "@/context/LanguageContext";
 import { ToastProvider } from "@/context/ToastContext";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "MyFitnessPro",
@@ -15,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={cn("font-sans", geist.variable)}>
       <body className="min-h-full flex flex-col">
         <LangProvider><AuthProvider><ToastProvider>{children}</ToastProvider></AuthProvider></LangProvider>
       </body>

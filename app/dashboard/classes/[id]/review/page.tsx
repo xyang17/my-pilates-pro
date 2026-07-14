@@ -58,6 +58,7 @@ export default function ClassReviewPage() {
   const [error, setError] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
 
   const { lang } = useLang()
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
@@ -262,6 +263,7 @@ export default function ClassReviewPage() {
   }
 
   const isCompleted = classData.status === 'completed'
+  const readOnly = isCompleted && !isEditing
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
@@ -327,7 +329,7 @@ export default function ClassReviewPage() {
                       min="0"
                       placeholder={ex.sets != null ? String(ex.sets) : '—'}
                       value={ex.actual_sets}
-                      disabled={isCompleted}
+                      disabled={readOnly}
                       onChange={(e) => updateExercise(ex.id, 'actual_sets', e.target.value)}
                       onBlur={() => saveExercise(ex)}
                       style={{
@@ -337,7 +339,7 @@ export default function ClassReviewPage() {
                         borderRadius: '4px',
                         fontSize: '14px',
                         boxSizing: 'border-box',
-                        backgroundColor: isCompleted ? '#fafafa' : 'white',
+                        backgroundColor: readOnly ? '#fafafa' : 'white',
                       }}
                     />
                   </div>
@@ -351,7 +353,7 @@ export default function ClassReviewPage() {
                       min="0"
                       placeholder={ex.reps != null ? String(ex.reps) : '—'}
                       value={ex.actual_reps}
-                      disabled={isCompleted}
+                      disabled={readOnly}
                       onChange={(e) => updateExercise(ex.id, 'actual_reps', e.target.value)}
                       onBlur={() => saveExercise(ex)}
                       style={{
@@ -361,7 +363,7 @@ export default function ClassReviewPage() {
                         borderRadius: '4px',
                         fontSize: '14px',
                         boxSizing: 'border-box',
-                        backgroundColor: isCompleted ? '#fafafa' : 'white',
+                        backgroundColor: readOnly ? '#fafafa' : 'white',
                       }}
                     />
                   </div>
@@ -376,7 +378,7 @@ export default function ClassReviewPage() {
                       step="0.5"
                       placeholder={ex.weight != null ? String(ex.weight) : '—'}
                       value={ex.actual_weight}
-                      disabled={isCompleted}
+                      disabled={readOnly}
                       onChange={(e) => updateExercise(ex.id, 'actual_weight', e.target.value)}
                       onBlur={() => saveExercise(ex)}
                       style={{
@@ -386,7 +388,7 @@ export default function ClassReviewPage() {
                         borderRadius: '4px',
                         fontSize: '14px',
                         boxSizing: 'border-box',
-                        backgroundColor: isCompleted ? '#fafafa' : 'white',
+                        backgroundColor: readOnly ? '#fafafa' : 'white',
                       }}
                     />
                   </div>
@@ -399,7 +401,7 @@ export default function ClassReviewPage() {
                     rows={2}
                     placeholder="例：右侧髋关节有点紧，下次注意..."
                     value={ex.post_note}
-                    disabled={isCompleted}
+                    disabled={readOnly}
                     onChange={(e) => updateExercise(ex.id, 'post_note', e.target.value)}
                     onBlur={() => saveExercise(ex)}
                     style={{
@@ -411,7 +413,7 @@ export default function ClassReviewPage() {
                       boxSizing: 'border-box',
                       fontFamily: 'sans-serif',
                       resize: 'vertical',
-                      backgroundColor: isCompleted ? '#fafafa' : 'white',
+                      backgroundColor: readOnly ? '#fafafa' : 'white',
                     }}
                   />
                 </div>
@@ -424,7 +426,7 @@ export default function ClassReviewPage() {
         <div style={{ background: 'var(--c-card-bg)', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <p style={{ margin: 0, fontWeight: 'bold', color: '#444' }}>整体课程总结</p>
-            {!isCompleted && (
+            {!readOnly && (
               <button
                 onClick={handleAIGenerateSummary}
                 disabled={aiGenerating}
@@ -447,7 +449,7 @@ export default function ClassReviewPage() {
             rows={5}
             placeholder="例：学员今天状态很好，核心力量明显进步。下次可以增加难度，尝试单腿训练..."
             value={postSummary}
-            disabled={isCompleted}
+            disabled={readOnly}
             onChange={(e) => setPostSummary(e.target.value)}
             onBlur={handleSaveDraft}
             style={{
@@ -459,7 +461,7 @@ export default function ClassReviewPage() {
               boxSizing: 'border-box',
               fontFamily: 'sans-serif',
               resize: 'vertical',
-              backgroundColor: isCompleted ? '#fafafa' : 'white',
+              backgroundColor: readOnly ? '#fafafa' : 'white',
             }}
           />
           {aiGenerating && (
@@ -493,16 +495,97 @@ export default function ClassReviewPage() {
           >
             {isSaving ? '保存中...' : '✓ 完成本课'}
           </button>
+        ) : isEditing ? (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={async () => {
+                setIsSaving(true)
+                try {
+                  await Promise.all(
+                    exercises.map((ex) =>
+                      fetch(`/api/classes/${classId}/exercises/${ex.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+                        body: JSON.stringify({
+                          actual_sets:    ex.actual_sets   === '' ? null : Number(ex.actual_sets),
+                          actual_reps:    ex.actual_reps   === '' ? null : Number(ex.actual_reps),
+                          actual_weight:  ex.actual_weight === '' ? null : Number(ex.actual_weight),
+                          post_note:      ex.post_note || null,
+                          instance_notes: ex.post_note || null,
+                        }),
+                      })
+                    )
+                  )
+                  await fetch(`/api/classes/${classId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+                    body: JSON.stringify({ post_summary: postSummary || null }),
+                  })
+                  setIsEditing(false)
+                  setSaveStatus('saved')
+                  setTimeout(() => setSaveStatus('idle'), 1500)
+                } catch {
+                  setError('保存失败，请重试')
+                } finally {
+                  setIsSaving(false)
+                }
+              }}
+              disabled={isSaving}
+              style={{
+                flex: 1,
+                padding: '14px',
+                backgroundColor: isSaving ? '#bbb' : '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isSaving ? '保存中...' : '✓ 保存修改'}
+            </button>
+            <button
+              onClick={() => { setIsEditing(false); fetchClassData() }}
+              style={{
+                padding: '14px 20px',
+                backgroundColor: 'var(--c-fill-light)',
+                color: 'var(--c-text-secondary)',
+                border: '1px solid var(--c-border)',
+                borderRadius: '8px',
+                fontSize: '15px',
+                cursor: 'pointer',
+              }}
+            >
+              取消
+            </button>
+          </div>
         ) : (
-          <div style={{
-            padding: '14px',
-            backgroundColor: '#E8F5E9',
-            color: '#2E7D32',
-            borderRadius: '8px',
-            textAlign: 'center',
-            fontWeight: 'bold',
-          }}>
-            ✓ 本课已完成记录
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{
+              padding: '14px',
+              backgroundColor: '#E8F5E9',
+              color: '#2E7D32',
+              borderRadius: '8px',
+              textAlign: 'center',
+              fontWeight: 'bold',
+            }}>
+              ✓ 本课已完成记录
+            </div>
+            <button
+              onClick={() => setIsEditing(true)}
+              style={{
+                padding: '10px',
+                backgroundColor: 'var(--c-fill-light)',
+                color: 'var(--c-text-secondary)',
+                border: '1px solid var(--c-border)',
+                borderRadius: '8px',
+                fontSize: '14px',
+                cursor: 'pointer',
+              }}
+            >
+              ✏️ 编辑修改
+            </button>
           </div>
         )}
       </main>
