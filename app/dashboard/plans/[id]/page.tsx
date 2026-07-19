@@ -71,6 +71,7 @@ export default function PlanEditorPage() {
   const [activeDayId, setActiveDayId] = useState<string | null>(null)
   const [exercises, setExercises] = useState<MasterExercise[]>([])
   const [exSearch, setExSearch] = useState('')
+  const [exFilter, setExFilter] = useState<'recent' | 'all'>('all')
 
   // Publishing toggle
   const [publishing, setPublishing] = useState(false)
@@ -170,6 +171,13 @@ export default function PlanEditorPage() {
           days: prev.days.map(d => d.id === dayId ? { ...d, exercises: [...d.exercises, newEx] } : d),
         }
       })
+      // Save to recent exercises in localStorage
+      try {
+        const RECENT_KEY = 'mfp_recent_exercises'
+        const recent: MasterExercise[] = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
+        const updated = [ex, ...recent.filter(r => r.id !== ex.id)].slice(0, 15)
+        localStorage.setItem(RECENT_KEY, JSON.stringify(updated))
+      } catch {}
     }
     setExSearch('')
   }
@@ -207,9 +215,22 @@ export default function PlanEditorPage() {
     })
   }
 
-  const filteredEx = exercises.filter(e =>
-    e.name_cn.includes(exSearch) || e.name_en.toLowerCase().includes(exSearch.toLowerCase())
-  ).slice(0, 20)
+  const recentExercises: MasterExercise[] = (() => {
+    if (exercises.length === 0) return []
+    try {
+      const stored: MasterExercise[] = JSON.parse(localStorage.getItem('mfp_recent_exercises') || '[]')
+      const ids = new Set(exercises.map(e => e.id))
+      return stored.filter(r => ids.has(r.id))
+    } catch { return [] }
+  })()
+
+  const filteredEx = exFilter === 'recent'
+    ? (exSearch
+        ? recentExercises.filter(e => e.name_cn.includes(exSearch) || e.name_en.toLowerCase().includes(exSearch.toLowerCase()))
+        : recentExercises)
+    : exercises.filter(e =>
+        e.name_cn.includes(exSearch) || e.name_en.toLowerCase().includes(exSearch.toLowerCase())
+      ).slice(0, 20)
 
   if (authLoading || loading) return <div style={{ padding: 40, textAlign: 'center' }}>加载中…</div>
   if (!plan) return <div style={{ padding: 40, textAlign: 'center' }}>计划未找到</div>
@@ -320,7 +341,7 @@ export default function PlanEditorPage() {
               <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--c-text-primary)', flex: 1 }}>{day.label}</span>
               <span style={{ fontSize: 12, color: '#aaa' }}>{day.exercises.length} 个动作</span>
               <button
-                onClick={() => { setActiveDayId(activeDayId === day.id ? null : day.id); setExSearch(''); loadExercises() }}
+                onClick={() => { setActiveDayId(activeDayId === day.id ? null : day.id); setExSearch(''); setExFilter('all'); loadExercises() }}
                 style={{ padding: '4px 12px', background: 'var(--c-brand)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
                 ＋ 动作
               </button>
@@ -335,22 +356,45 @@ export default function PlanEditorPage() {
             {/* Exercise picker */}
             {activeDayId === day.id && (
               <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--c-border)', background: '#fafafa' }}>
+                {/* Filter tabs */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  {([['recent', '⏱ 最近动作'], ['all', '全部']] as const).map(([val, label]) => (
+                    <button key={val} onClick={() => { setExFilter(val); setExSearch('') }}
+                      style={{
+                        padding: '4px 12px', border: '1px solid', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontWeight: exFilter === val ? 600 : 400,
+                        background: exFilter === val ? 'var(--c-brand)' : 'transparent',
+                        color: exFilter === val ? '#fff' : 'var(--c-text-secondary)',
+                        borderColor: exFilter === val ? 'var(--c-brand)' : 'var(--c-border)',
+                      }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <input
                   autoFocus
                   value={exSearch}
                   onChange={e => setExSearch(e.target.value)}
-                  placeholder="搜索动作名称…"
+                  placeholder={exFilter === 'recent' ? '在最近动作中搜索…' : '搜索动作名称…'}
                   style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', marginBottom: 8 }}
                 />
                 <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {filteredEx.length === 0 && <p style={{ fontSize: 12, color: '#bbb', margin: 0 }}>{exercises.length === 0 ? '加载中…' : '没有匹配的动作'}</p>}
+                  {filteredEx.length === 0 && (
+                    <p style={{ fontSize: 12, color: '#bbb', margin: 0 }}>
+                      {exercises.length === 0 ? '加载中…' : exFilter === 'recent' ? '还没有最近使用的动作，先从「全部」选一个吧' : '没有匹配的动作'}
+                    </p>
+                  )}
                   {filteredEx.map(ex => (
                     <button key={ex.id} onClick={() => handleAddExercise(day.id, ex)}
-                      style={{ textAlign: 'left', padding: '6px 10px', border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer', fontSize: 13 }}
+                      style={{ textAlign: 'left', padding: '6px 10px', border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--c-fill-mid)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <span style={{ fontWeight: 500 }}>{ex.name_cn}</span>
-                      {ex.name_cn !== ex.name_en && <span style={{ color: '#aaa', marginLeft: 6, fontSize: 11 }}>{ex.name_en}</span>}
+                      {ex.category && (
+                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', flexShrink: 0 }}>
+                          {ex.category}
+                        </span>
+                      )}
+                      {ex.name_cn !== ex.name_en && <span style={{ color: '#aaa', fontSize: 11, marginLeft: 'auto' }}>{ex.name_en}</span>}
                     </button>
                   ))}
                 </div>
@@ -368,8 +412,13 @@ export default function PlanEditorPage() {
               }}>
                 <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--c-lavender)', color: '#fff', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                     {ex.master_exercise?.name_cn || '未知动作'}
+                    {ex.master_exercise?.category && (
+                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', fontWeight: 400 }}>
+                        {ex.master_exercise.category}
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {[
