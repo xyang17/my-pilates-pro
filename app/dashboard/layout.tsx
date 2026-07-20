@@ -67,6 +67,7 @@ const clientNav: NavGroup[] = [
     items: [
       { label: '首页',     href: '/dashboard',           icon: Home },
       { label: '我的课程', href: '/dashboard/classes',   icon: Dumbbell },
+      { label: '课后作业', href: '/dashboard/workouts',  icon: ClipboardList },
       { label: '训练方案', href: '/dashboard/programs',  icon: Trophy },
       { label: '我的主页', href: '/dashboard/profile',   icon: User },
     ],
@@ -82,10 +83,11 @@ const trainerTabs = [
 ]
 
 const clientTabs = [
-  { label: '首页',  href: '/dashboard',          icon: Home },
-  { label: '课程',  href: '/dashboard/classes',  icon: Dumbbell },
-  { label: '方案',  href: '/dashboard/programs', icon: Trophy },
-  { label: '我的',  href: '/dashboard/profile',  icon: User },
+  { label: '首页',  href: '/dashboard',           icon: Home },
+  { label: '课程',  href: '/dashboard/classes',   icon: Dumbbell },
+  { label: '作业',  href: '/dashboard/workouts',  icon: ClipboardList },
+  { label: '方案',  href: '/dashboard/programs',  icon: Trophy },
+  { label: '我的',  href: '/dashboard/profile',   icon: User },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
