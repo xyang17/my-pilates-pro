@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     const { data: classes } = await supabaseAdmin
       .from('class')
       .select('id')
-      .eq('trainer_id', userId)
+      .eq('created_by', userId)
 
     if (!classes || classes.length === 0) return NextResponse.json([])
 
