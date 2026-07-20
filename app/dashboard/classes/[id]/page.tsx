@@ -12,6 +12,8 @@ interface MasterExercise {
   id: string
   name_en: string
   name_cn: string
+  series_cn?: string
+  series_en?: string
 }
 
 interface ClassExercise {
@@ -440,6 +442,17 @@ export default function ClassDetailPage() {
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
         throw new Error(errData.error || `HTTP ${res.status}`)
+      }
+      // Save to recent exercises in localStorage
+      const fullEx = availableExercises.find(e => e.id === exerciseId)
+      if (fullEx) {
+        try {
+          const RECENT_KEY = 'mfp_recent_exercises'
+          const recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
+          const simplified = { id: fullEx.id, name_cn: fullEx.name_cn, name_en: fullEx.name_en, category: fullEx.series_cn || fullEx.type_cn || '' }
+          const updated = [simplified, ...recent.filter((r: any) => r.id !== exerciseId)].slice(0, 15)
+          localStorage.setItem(RECENT_KEY, JSON.stringify(updated))
+        } catch {}
       }
       setAddSearch('')
       fetchClassData()
@@ -1415,9 +1428,16 @@ export default function ClassDetailPage() {
                         {i + 1}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--c-text-primary)' }}>
-                          {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
-                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 1 }}>
+                          <p style={{ margin: 0, fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--c-text-primary)' }}>
+                            {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
+                          </p>
+                          {(ex.master_exercise.series_cn || ex.master_exercise.series_en) && (
+                            <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', fontWeight: 400, whiteSpace: 'nowrap' }}>
+                              {lang === 'zh' ? (ex.master_exercise.series_cn || ex.master_exercise.series_en) : (ex.master_exercise.series_en || ex.master_exercise.series_cn)}
+                            </span>
+                          )}
+                        </div>
                         {(ex.actual_sets != null || ex.actual_weight != null) && (
                           <p style={{ margin: '2px 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-brand)' }}>
                             ✓ {[ex.actual_sets && `${ex.actual_sets}${t('组','sets')}`, ex.actual_reps && `×${ex.actual_reps}`, ex.actual_weight && `${ex.actual_weight}kg`].filter(Boolean).join(' ')}
@@ -1500,24 +1520,32 @@ export default function ClassDetailPage() {
               )].sort() as string[]
               const allSeries = [...new Set(availableExercises.map(e => e.series_cn || e.series_en).filter(Boolean))].sort() as string[]
 
-              const libResults = availableExercises.filter(ex => {
-                if (libFilterType && ex.type_en !== libFilterType) return false
-                if (libFilterDiff && ex.difficulty_en !== libFilterDiff) return false
-                if (libFilterMuscle && !(ex.target_muscles_en || '').split(',').map((m: string) => m.trim()).includes(libFilterMuscle)) return false
-                if (libFilterSeries && (ex.series_cn || ex.series_en) !== libFilterSeries) return false
-                if (libSearch) {
-                  const q = libSearch.toLowerCase()
-                  return (
-                    (ex.name_cn || '').includes(libSearch) ||
-                    (ex.name_en || '').toLowerCase().includes(q) ||
-                    (ex.target_muscles_cn || '').includes(libSearch) ||
-                    (ex.target_muscles_en || '').toLowerCase().includes(q)
-                  )
-                }
-                return true
-              })
-
               const activeFilterCount = [libFilterType, libFilterDiff, libFilterMuscle, libFilterSeries].filter(Boolean).length
+              const noFilter = !libSearch && activeFilterCount === 0
+
+              // When nothing is typed/filtered, show recent exercises by default
+              const recentIds: string[] = (() => {
+                try { return JSON.parse(localStorage.getItem('mfp_recent_exercises') || '[]').map((e: any) => e.id) } catch { return [] }
+              })()
+
+              const libResults = noFilter
+                ? availableExercises.filter(e => recentIds.includes(e.id)).sort((a, b) => recentIds.indexOf(a.id) - recentIds.indexOf(b.id))
+                : availableExercises.filter(ex => {
+                    if (libFilterType && ex.type_en !== libFilterType) return false
+                    if (libFilterDiff && ex.difficulty_en !== libFilterDiff) return false
+                    if (libFilterMuscle && !(ex.target_muscles_en || '').split(',').map((m: string) => m.trim()).includes(libFilterMuscle)) return false
+                    if (libFilterSeries && (ex.series_cn || ex.series_en) !== libFilterSeries) return false
+                    if (libSearch) {
+                      const q = libSearch.toLowerCase()
+                      return (
+                        (ex.name_cn || '').includes(libSearch) ||
+                        (ex.name_en || '').toLowerCase().includes(q) ||
+                        (ex.target_muscles_cn || '').includes(libSearch) ||
+                        (ex.target_muscles_en || '').toLowerCase().includes(q)
+                      )
+                    }
+                    return true
+                  })
 
               return (
                 <div style={{ borderTop: '2px dashed #e8dff5', backgroundColor: '#faf8fd', borderRadius: '0 0 8px 8px' }}>
@@ -1531,7 +1559,9 @@ export default function ClassDetailPage() {
                         onChange={e => setLibSearch(e.target.value)}
                         style={{ flex: 1, padding: '7px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px', outline: 'none', background: 'var(--c-card-bg)' }}
                       />
-                      <span style={{ fontSize: '12px', color: '#999', whiteSpace: 'nowrap' }}>{libResults.length} {t('个', '')}</span>
+                      <span style={{ fontSize: '12px', color: '#999', whiteSpace: 'nowrap' }}>
+                        {noFilter ? `⏱ 最近 ${libResults.length} 个` : `${libResults.length} ${t('个', '')}`}
+                      </span>
                     </div>
                     <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
                       <select value={libFilterType} onChange={e => setLibFilterType(e.target.value)}
@@ -1568,7 +1598,9 @@ export default function ClassDetailPage() {
                   {/* Results list */}
                   <div style={{ maxHeight: '320px', overflowY: 'auto', padding: '0 14px 10px' }}>
                     {libResults.length === 0 && (
-                      <p style={{ textAlign: 'center', color: '#bbb', padding: '20px 0', fontSize: '13px', margin: 0 }}>{t('没有匹配动作', 'No matches')}</p>
+                      <p style={{ textAlign: 'center', color: '#bbb', padding: '20px 0', fontSize: '13px', margin: 0 }}>
+                        {noFilter ? t('还没有最近动作，先添加一个吧', 'No recent exercises yet') : t('没有匹配动作', 'No matches')}
+                      </p>
                     )}
                     {libResults.map(ex => {
                       const added = alreadyAdded.has(ex.id)

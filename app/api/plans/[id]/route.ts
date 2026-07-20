@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (dayIds.length > 0) {
       const { data: exData } = await supabaseAdmin
         .from('training_plan_exercise')
-        .select('*, master_exercise(id, name_cn, name_en, category)')
+        .select('*, master_exercise(id, name_cn, name_en, category, series_cn, series_en)')
         .in('plan_day_id', dayIds)
         .order('order_num')
       exercises = exData || []

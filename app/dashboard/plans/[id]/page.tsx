@@ -15,7 +15,7 @@ interface Exercise {
   rest_sec: number | null
   notes: string | null
   order_num: number
-  master_exercise: { id: string; name_cn: string; name_en: string; category: string } | null
+  master_exercise: { id: string; name_cn: string; name_en: string; category: string; series_cn?: string; series_en?: string } | null
 }
 
 interface Day {
@@ -42,6 +42,8 @@ interface MasterExercise {
   name_cn: string
   name_en: string
   category: string
+  series_cn?: string
+  series_en?: string
 }
 
 const LEVEL_OPTIONS = [
@@ -71,7 +73,7 @@ export default function PlanEditorPage() {
   const [activeDayId, setActiveDayId] = useState<string | null>(null)
   const [exercises, setExercises] = useState<MasterExercise[]>([])
   const [exSearch, setExSearch] = useState('')
-  const [exFilter, setExFilter] = useState<'recent' | 'all'>('all')
+  const [exFilter, setExFilter] = useState<'recent' | 'all'>('recent')
 
   // Publishing toggle
   const [publishing, setPublishing] = useState(false)
@@ -389,9 +391,9 @@ export default function PlanEditorPage() {
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--c-fill-mid)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <span style={{ fontWeight: 500 }}>{ex.name_cn}</span>
-                      {ex.category && (
+                      {(ex.series_cn || ex.category) && (
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', flexShrink: 0 }}>
-                          {ex.category}
+                          {ex.series_cn || ex.category}
                         </span>
                       )}
                       {ex.name_cn !== ex.name_en && <span style={{ color: '#aaa', fontSize: 11, marginLeft: 'auto' }}>{ex.name_en}</span>}
@@ -414,9 +416,9 @@ export default function PlanEditorPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                     {ex.master_exercise?.name_cn || '未知动作'}
-                    {ex.master_exercise?.category && (
+                    {(ex.master_exercise?.series_cn || ex.master_exercise?.category) && (
                       <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', fontWeight: 400 }}>
-                        {ex.master_exercise.category}
+                        {ex.master_exercise.series_cn || ex.master_exercise.category}
                       </span>
                     )}
                   </div>
