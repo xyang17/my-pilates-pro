@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
     // Step 1: get all class IDs for this trainer
     const { data: classes } = await supabaseAdmin
-      .from('fitness_class')
+      .from('class')
       .select('id')
       .eq('trainer_id', userId)
 
