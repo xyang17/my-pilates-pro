@@ -23,7 +23,7 @@ export async function GET(
         *,
         exercises:class_exercise_instance(
           *,
-          master_exercise(id, name_en, name_cn, series_cn, series_en, featured_image_url, description_en, description_cn)
+          master_exercise(id, name_en, name_cn, type_cn, type_en, difficulty_cn, featured_image_url, description_en, description_cn)
         )
       `)
       .eq('id', id)

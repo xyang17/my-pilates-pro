@@ -15,7 +15,7 @@ interface Exercise {
   rest_sec: number | null
   notes: string | null
   order_num: number
-  master_exercise: { id: string; name_cn: string; name_en: string; category: string; series_cn?: string; series_en?: string } | null
+  master_exercise: { id: string; name_cn: string; name_en: string; category: string; type_cn?: string; type_en?: string } | null
 }
 
 interface Day {
@@ -42,8 +42,8 @@ interface MasterExercise {
   name_cn: string
   name_en: string
   category: string
-  series_cn?: string
-  series_en?: string
+  type_cn?: string
+  type_en?: string
 }
 
 const LEVEL_OPTIONS = [
@@ -74,6 +74,7 @@ export default function PlanEditorPage() {
   const [exercises, setExercises] = useState<MasterExercise[]>([])
   const [exSearch, setExSearch] = useState('')
   const [exFilter, setExFilter] = useState<'recent' | 'all'>('recent')
+  const [recentExIds, setRecentExIds] = useState<string[]>([])
 
   // Publishing toggle
   const [publishing, setPublishing] = useState(false)
@@ -104,8 +105,15 @@ export default function PlanEditorPage() {
 
   const loadExercises = async () => {
     if (exercises.length > 0) return
-    const res = await fetch('/api/exercises', { headers })
-    if (res.ok) setExercises(await res.json())
+    const [exRes, recRes] = await Promise.all([
+      fetch('/api/exercises', { headers }),
+      fetch('/api/exercises/recent', { headers }),
+    ])
+    if (exRes.ok) setExercises(await exRes.json())
+    if (recRes.ok) {
+      const recData = await recRes.json()
+      setRecentExIds(recData.map((e: any) => e.id))
+    }
   }
 
   const handleSaveMeta = async () => {
@@ -173,13 +181,8 @@ export default function PlanEditorPage() {
           days: prev.days.map(d => d.id === dayId ? { ...d, exercises: [...d.exercises, newEx] } : d),
         }
       })
-      // Save to recent exercises in localStorage
-      try {
-        const RECENT_KEY = 'mfp_recent_exercises'
-        const recent: MasterExercise[] = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
-        const updated = [ex, ...recent.filter(r => r.id !== ex.id)].slice(0, 15)
-        localStorage.setItem(RECENT_KEY, JSON.stringify(updated))
-      } catch {}
+      // Prepend to recent list in state (will be refreshed from DB on next open)
+      setRecentExIds(prev => [ex.id, ...prev.filter(id => id !== ex.id)].slice(0, 15))
     }
     setExSearch('')
   }
@@ -217,14 +220,9 @@ export default function PlanEditorPage() {
     })
   }
 
-  const recentExercises: MasterExercise[] = (() => {
-    if (exercises.length === 0) return []
-    try {
-      const stored: MasterExercise[] = JSON.parse(localStorage.getItem('mfp_recent_exercises') || '[]')
-      const ids = new Set(exercises.map(e => e.id))
-      return stored.filter(r => ids.has(r.id))
-    } catch { return [] }
-  })()
+  const recentExercises: MasterExercise[] = recentExIds
+    .map(id => exercises.find(e => e.id === id))
+    .filter(Boolean) as MasterExercise[]
 
   const filteredEx = exFilter === 'recent'
     ? (exSearch
@@ -391,9 +389,9 @@ export default function PlanEditorPage() {
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--c-fill-mid)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <span style={{ fontWeight: 500 }}>{ex.name_cn}</span>
-                      {(ex.series_cn || ex.category) && (
+                      {(ex.type_cn || ex.category) && (
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', flexShrink: 0 }}>
-                          {ex.series_cn || ex.category}
+                          {ex.type_cn || ex.category}
                         </span>
                       )}
                       {ex.name_cn !== ex.name_en && <span style={{ color: '#aaa', fontSize: 11, marginLeft: 'auto' }}>{ex.name_en}</span>}
@@ -416,9 +414,9 @@ export default function PlanEditorPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                     {ex.master_exercise?.name_cn || '未知动作'}
-                    {(ex.master_exercise?.series_cn || ex.master_exercise?.category) && (
+                    {(ex.master_exercise?.type_cn || ex.master_exercise?.category) && (
                       <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', fontWeight: 400 }}>
-                        {ex.master_exercise.series_cn || ex.master_exercise.category}
+                        {ex.master_exercise.type_cn || ex.master_exercise.category}
                       </span>
                     )}
                   </div>

@@ -12,8 +12,9 @@ interface MasterExercise {
   id: string
   name_en: string
   name_cn: string
-  series_cn?: string
-  series_en?: string
+  type_cn?: string
+  type_en?: string
+  difficulty_cn?: string
 }
 
 interface ClassExercise {
@@ -136,6 +137,7 @@ export default function ClassDetailPage() {
   const [libFilterDiff, setLibFilterDiff] = useState('')
   const [libFilterMuscle, setLibFilterMuscle] = useState('')
   const [libFilterSeries, setLibFilterSeries] = useState('')
+  const [recentExIds, setRecentExIds] = useState<string[]>([])
   // Class copy modal
   const [showCopyModal, setShowCopyModal] = useState(false)
   const [copyForm, setCopyForm] = useState({ name: '', date: '', start_time: '', assigned_to: '' })
@@ -171,7 +173,7 @@ export default function ClassDetailPage() {
     }
     if (user) {
       fetchClassData()
-      if (isTrainer) fetchAvailableExercises()
+      if (isTrainer) { fetchAvailableExercises(); fetchRecentExercises() }
     }
   }, [user, authLoading])
 
@@ -246,6 +248,18 @@ export default function ClassDetailPage() {
       if (res.ok) {
         const data = await res.json()
         setAvailableExercises(data)
+      }
+    } catch { /* non-critical */ }
+  }
+
+  const fetchRecentExercises = async () => {
+    try {
+      const res = await fetch('/api/exercises/recent', {
+        headers: { 'x-user-id': user?.id || '' },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setRecentExIds(data.map((e: any) => e.id))
       }
     } catch { /* non-critical */ }
   }
@@ -443,19 +457,9 @@ export default function ClassDetailPage() {
         const errData = await res.json().catch(() => ({}))
         throw new Error(errData.error || `HTTP ${res.status}`)
       }
-      // Save to recent exercises in localStorage
-      const fullEx = availableExercises.find(e => e.id === exerciseId)
-      if (fullEx) {
-        try {
-          const RECENT_KEY = 'mfp_recent_exercises'
-          const recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
-          const simplified = { id: fullEx.id, name_cn: fullEx.name_cn, name_en: fullEx.name_en, category: fullEx.series_cn || fullEx.type_cn || '' }
-          const updated = [simplified, ...recent.filter((r: any) => r.id !== exerciseId)].slice(0, 15)
-          localStorage.setItem(RECENT_KEY, JSON.stringify(updated))
-        } catch {}
-      }
       setAddSearch('')
       fetchClassData()
+      fetchRecentExercises() // refresh recent list after adding
     } catch (err: any) {
       showToast(err.message, 'error')
     } finally {
@@ -1432,9 +1436,9 @@ export default function ClassDetailPage() {
                           <p style={{ margin: 0, fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--c-text-primary)' }}>
                             {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
                           </p>
-                          {(ex.master_exercise.series_cn || ex.master_exercise.series_en) && (
+                          {(ex.master_exercise.type_cn || ex.master_exercise.type_en) && (
                             <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', fontWeight: 400, whiteSpace: 'nowrap' }}>
-                              {lang === 'zh' ? (ex.master_exercise.series_cn || ex.master_exercise.series_en) : (ex.master_exercise.series_en || ex.master_exercise.series_cn)}
+                              {lang === 'zh' ? (ex.master_exercise.type_cn || ex.master_exercise.type_en) : (ex.master_exercise.type_en || ex.master_exercise.type_cn)}
                             </span>
                           )}
                         </div>
@@ -1523,13 +1527,8 @@ export default function ClassDetailPage() {
               const activeFilterCount = [libFilterType, libFilterDiff, libFilterMuscle, libFilterSeries].filter(Boolean).length
               const noFilter = !libSearch && activeFilterCount === 0
 
-              // When nothing is typed/filtered, show recent exercises by default
-              const recentIds: string[] = (() => {
-                try { return JSON.parse(localStorage.getItem('mfp_recent_exercises') || '[]').map((e: any) => e.id) } catch { return [] }
-              })()
-
               const libResults = noFilter
-                ? availableExercises.filter(e => recentIds.includes(e.id)).sort((a, b) => recentIds.indexOf(a.id) - recentIds.indexOf(b.id))
+                ? availableExercises.filter(e => recentExIds.includes(e.id)).sort((a, b) => recentExIds.indexOf(a.id) - recentExIds.indexOf(b.id))
                 : availableExercises.filter(ex => {
                     if (libFilterType && ex.type_en !== libFilterType) return false
                     if (libFilterDiff && ex.difficulty_en !== libFilterDiff) return false
