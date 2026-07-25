@@ -413,8 +413,19 @@ export default function PlanEditorPage() {
                 <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--c-lavender)', color: '#fff', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {ex.master_exercise?.name_cn || '未知动作'}
-                    {(ex.master_exercise?.type_cn || ex.master_exercise?.category) && (
+                    {ex.master_exercise ? (
+                      <a
+                        href={`/dashboard/exercises/${ex.master_exercise.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: 'var(--c-text-primary)', textDecoration: 'none' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-brand)')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-primary)')}
+                      >
+                        {ex.master_exercise.name_cn || ex.master_exercise.name_en || '未知动作'}
+                      </a>
+                    ) : '未知动作'}
+                    {ex.master_exercise && (ex.master_exercise.type_cn || ex.master_exercise.category) && (
                       <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)', fontWeight: 400 }}>
                         {ex.master_exercise.type_cn || ex.master_exercise.category}
                       </span>

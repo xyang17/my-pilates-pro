@@ -40,6 +40,7 @@ interface ExerciseDetail {
   name_cn: string
   name_en: string
   featured_image_url?: string
+  gif_url?: string
   type_cn?: string
   type_en?: string
   difficulty_cn?: string
@@ -471,11 +472,14 @@ export default function WorkoutsPage() {
                   </div>
                 </div>
 
-                {/* Featured image */}
-                {detailExercise.featured_image_url && (
-                  <div style={{ background: 'var(--c-fill-light)' }}>
-                    <img src={detailExercise.featured_image_url} alt={detailExercise.name_en}
-                      style={{ width: '100%', maxHeight: 200, objectFit: 'cover' }} />
+                {/* GIF 优先，无 GIF 则用静态图 */}
+                {(detailExercise.gif_url || detailExercise.featured_image_url) && (
+                  <div style={{ background: 'var(--c-fill-light)', display: 'flex', justifyContent: 'center' }}>
+                    <img
+                      src={detailExercise.gif_url || detailExercise.featured_image_url}
+                      alt={detailExercise.name_en}
+                      style={{ width: '100%', maxHeight: 260, objectFit: 'contain' }}
+                    />
                   </div>
                 )}
 

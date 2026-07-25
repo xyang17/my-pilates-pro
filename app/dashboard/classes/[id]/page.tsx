@@ -1767,7 +1767,14 @@ export default function ClassDetailPage() {
                           {selected && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
                         </div>
                         <div style={{ flex: 1 }}>
-                          <p style={{ margin: '0 0 2px 0', fontWeight: 'bold', fontSize: '14px' }}>{ex.master_exercise.name_cn || ex.master_exercise.name_en}</p>
+                          <p style={{ margin: '0 0 2px 0', fontWeight: 'bold', fontSize: '14px' }}>
+                            <a href={`/dashboard/exercises/${ex.master_exercise.id}`} target="_blank" rel="noopener noreferrer"
+                              style={{ color: 'inherit', textDecoration: 'none' }}
+                              onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-brand)')}
+                              onMouseLeave={e => (e.currentTarget.style.color = 'inherit')}>
+                              {ex.master_exercise.name_cn || ex.master_exercise.name_en}
+                            </a>
+                          </p>
                           <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
                             {[ex.sets && `${ex.sets}组`, ex.reps && `${ex.reps}次`, ex.weight && `${ex.weight}${ex.weight_unit}`].filter(Boolean).join(' · ') || t('未设置参数', 'No params')}
                           </p>
@@ -2007,7 +2014,12 @@ export default function ClassDetailPage() {
                       {/* Name + params */}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
+                          <a href={`/dashboard/exercises/${ex.master_exercise.id}`} target="_blank" rel="noopener noreferrer"
+                            style={{ color: 'inherit', textDecoration: 'none' }}
+                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-brand)')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'inherit')}>
+                            {lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn)}
+                          </a>
                         </p>
                         <p style={{ margin: 0, fontSize: '11px', color: '#999' }}>
                           {[ex.sets && `${ex.sets}组`, ex.reps && `×${ex.reps}次`, ex.weight && `${ex.weight}${ex.weight_unit}`].filter(Boolean).join(' · ') || t('未设置参数', 'No params')}

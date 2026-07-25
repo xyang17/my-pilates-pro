@@ -30,12 +30,15 @@ interface MasterExercise {
   instructions_en?: string
   instructions_cn?: string
   featured_image_url?: string
+  gif_url?: string
   type_en?: string
   type_cn?: string
   difficulty_en?: string
   difficulty_cn?: string
   target_muscles_en?: string
   target_muscles_cn?: string
+  equipment_en?: string
+  equipment_cn?: string
   default_sets?: number
   default_reps?: number
   default_weight?: number
@@ -48,8 +51,26 @@ interface MasterExercise {
   notes?: ExerciseNote[]
 }
 
+// 把长段指导语按句子拆成步骤列表
+function parseSteps(text: string): string[] {
+  if (!text) return []
+  // 先尝试按数字序号拆（"1. xxx 2. xxx"）
+  const numbered = text.match(/\d+\.\s[^0-9]+/g)
+  if (numbered && numbered.length > 1) return numbered.map(s => s.replace(/^\d+\.\s*/, '').trim())
+  // 否则按句号/。拆
+  return text.split(/[。\.]\s+/).map(s => s.trim()).filter(Boolean)
+}
+
+const TAG_STYLE: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  padding: '4px 10px', borderRadius: 20,
+  fontSize: 12, fontWeight: 500,
+  background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)',
+  whiteSpace: 'nowrap',
+}
+
 export default function ExerciseDetailPage() {
-  const { user, userRole, loading: authLoading } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const router = useRouter()
   const params = useParams()
   const exerciseId = params.id as string
@@ -57,41 +78,33 @@ export default function ExerciseDetailPage() {
   const [exercise, setExercise] = useState<MasterExercise | null>(null)
   const [notes, setNotes] = useState<ExerciseNote[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [fetchError, setFetchError] = useState('')
   const [newNote, setNewNote] = useState('')
-  const [noteAuthorType, setNoteAuthorType] = useState<'trainer' | 'client'>('trainer')
   const [isSubmittingNote, setIsSubmittingNote] = useState(false)
-  const [language, setLanguage] = useState<'en' | 'zh'>('en') // Language toggle: English or Chinese
+  const [lang, setLang] = useState<'cn' | 'en'>('cn')
+  const [gifPaused, setGifPaused] = useState(false)
+
   const isOwner = user && exercise && user.id === exercise.created_by
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/auth/login')
-      return
-    }
-
-    if (user) {
-      fetchExercise()
-    }
+    if (!authLoading && !user) { router.push('/auth/login'); return }
+    if (user) fetchExercise()
   }, [user, authLoading])
 
   const fetchExercise = async () => {
     try {
-      const response = await fetch(`/api/exercises/${exerciseId}`, {
-        headers: {
-          'x-user-id': user?.id || '',
-        },
+      const res = await fetch(`/api/exercises/${exerciseId}`, {
+        headers: { 'x-user-id': user?.id || '' },
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch exercise')
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `HTTP ${res.status}`)
       }
-
-      const data = await response.json()
+      const data = await res.json()
       setExercise(data)
       setNotes(data.notes || [])
     } catch (err: any) {
-      setError(err.message)
+      setFetchError(err.message)
     } finally {
       setIsLoading(false)
     }
@@ -100,411 +113,307 @@ export default function ExerciseDetailPage() {
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newNote.trim()) return
-
     setIsSubmittingNote(true)
-
     try {
-      const response = await fetch(`/api/exercises/${exerciseId}/notes`, {
+      const res = await fetch(`/api/exercises/${exerciseId}/notes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-user-id': user?.id || '',
-          'x-user-name': user?.user_metadata?.name || user?.email || 'Anonymous',
+          'x-user-name': user?.user_metadata?.name || user?.email || '匿名',
         },
-        body: JSON.stringify({
-          content: newNote,
-          authorType: noteAuthorType,
-        }),
+        body: JSON.stringify({ content: newNote, authorType: 'trainer' }),
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to add note')
-      }
-
-      const addedNote = await response.json()
-      setNotes((prev) => [addedNote, ...prev])
+      if (!res.ok) throw new Error('添加失败')
+      const added = await res.json()
+      setNotes(prev => [added, ...prev])
       setNewNote('')
     } catch (err: any) {
-      setError(err.message)
+      alert(err.message)
     } finally {
       setIsSubmittingNote(false)
     }
   }
 
+  /* ── Loading ── */
   if (authLoading || isLoading) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--c-text-hint)' }}>
+        加载中…
+      </div>
+    )
   }
 
-  if (!exercise) {
+  /* ── Error / Not Found ── */
+  if (fetchError || !exercise) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <p>Exercise not found</p>
-        <Link href="/dashboard/exercises" style={{ color: 'var(--c-brand)' }}>
-          ← Back to Exercises
+      <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+        <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--c-text-primary)', margin: '0 0 8px' }}>
+          找不到该动作
+        </p>
+        {fetchError && (
+          <p style={{ fontSize: 12, color: 'var(--c-text-hint)', margin: '0 0 20px' }}>
+            {fetchError}
+          </p>
+        )}
+        <Link href="/dashboard/exercises" style={{ color: 'var(--c-brand)', fontSize: 14, textDecoration: 'none' }}>
+          ← 返回动作库
         </Link>
       </div>
     )
   }
 
+  const name    = lang === 'cn' ? (exercise.name_cn || exercise.name_en) : exercise.name_en
+  const nameAlt = lang === 'cn' ? exercise.name_en : (exercise.name_cn || '')
+  const type    = lang === 'cn' ? exercise.type_cn    : exercise.type_en
+  const equip   = lang === 'cn' ? exercise.equipment_cn : exercise.equipment_en
+  const muscle  = lang === 'cn' ? exercise.target_muscles_cn : exercise.target_muscles_en
+  const diff    = lang === 'cn' ? exercise.difficulty_cn : exercise.difficulty_en
+  const descr   = lang === 'cn' ? exercise.description_cn  : exercise.description_en
+  const instrRaw = lang === 'cn' ? exercise.instructions_cn : exercise.instructions_en
+  const steps   = instrRaw ? parseSteps(instrRaw) : []
+  const mediaUrl = exercise.gif_url || exercise.featured_image_url || exercise.images?.[0]?.image_url
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
-      {/* Header */}
-      <header style={{ background: 'var(--c-card-bg)', borderBottom: '1px solid var(--c-border)', padding: '0 var(--sp-5)', height: 56, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--sp-3)', position: 'sticky', top: 0, zIndex: 10 }}>
-        <Link href="/dashboard/exercises" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)', flexShrink: 0 }}>
-          ← 返回
+
+      {/* ── Header ── */}
+      <header style={{
+        background: 'var(--c-card-bg)', borderBottom: '1px solid var(--c-border)',
+        padding: '0 var(--sp-5)', height: 56,
+        display: 'flex', alignItems: 'center', gap: 12,
+        position: 'sticky', top: 0, zIndex: 10,
+      }}>
+        <Link href="/dashboard/exercises" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 13, flexShrink: 0 }}>
+          ← 动作库
         </Link>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--c-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {language === 'en' ? exercise.name_en : exercise.name_cn}
+          <h1 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--c-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {name}
           </h1>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--sp-2)', alignItems: 'center', flexShrink: 0 }}>
-          {/* Language Toggle */}
-          <div style={{ display: 'flex', gap: 4, background: 'var(--c-fill-light)', borderRadius: 'var(--r-sm)', padding: 4 }}>
-            <button
-              onClick={() => setLanguage('en')}
-              style={{
-                padding: '4px 10px',
-                background: language === 'en' ? 'var(--c-card-bg)' : 'transparent',
-                color: language === 'en' ? 'var(--c-brand)' : 'var(--c-text-secondary)',
-                border: 'none',
-                borderRadius: 'var(--r-sm)',
-                cursor: 'pointer',
-                fontSize: 'var(--text-xs)',
-                fontWeight: language === 'en' ? 600 : 400,
-              }}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setLanguage('zh')}
-              style={{
-                padding: '4px 10px',
-                background: language === 'zh' ? 'var(--c-card-bg)' : 'transparent',
-                color: language === 'zh' ? 'var(--c-brand)' : 'var(--c-text-secondary)',
-                border: 'none',
-                borderRadius: 'var(--r-sm)',
-                cursor: 'pointer',
-                fontSize: 'var(--text-xs)',
-                fontWeight: language === 'zh' ? 600 : 400,
-              }}
-            >
-              中文
-            </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+          {/* Language toggle */}
+          <div style={{ display: 'flex', background: 'var(--c-fill-light)', borderRadius: 8, padding: 3, gap: 2 }}>
+            {(['cn', 'en'] as const).map(l => (
+              <button key={l} onClick={() => setLang(l)} style={{
+                padding: '3px 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                background: lang === l ? 'var(--c-card-bg)' : 'transparent',
+                color: lang === l ? 'var(--c-brand)' : 'var(--c-text-hint)',
+                fontWeight: lang === l ? 600 : 400,
+              }}>
+                {l === 'cn' ? '中文' : 'EN'}
+              </button>
+            ))}
           </div>
-
-          {/* Edit Button (only for owner) */}
           {isOwner && (
-            <Link
-              href={`/dashboard/exercises/${exercise.id}/edit`}
-              style={{
-                padding: '6px 12px',
-                background: 'var(--c-fill-light)',
-                color: 'var(--c-text-primary)',
-                textDecoration: 'none',
-                borderRadius: 'var(--r-sm)',
-                border: '1px solid var(--c-border)',
-                fontSize: 'var(--text-sm)',
-              }}
-            >
-              ✏️ 编辑
+            <Link href={`/dashboard/exercises/${exercise.id}/edit`} style={{
+              padding: '5px 12px', background: 'var(--c-fill-light)',
+              color: 'var(--c-text-secondary)', textDecoration: 'none',
+              borderRadius: 8, border: '1px solid var(--c-border)', fontSize: 13,
+            }}>
+              编辑
             </Link>
           )}
         </div>
       </header>
 
-      {/* Main Content */}
-      <main style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
-        {error && (
+      <main style={{ maxWidth: 720, margin: '0 auto', padding: '0 0 80px' }}>
+
+        {/* ── Media ── */}
+        {mediaUrl ? (
           <div style={{
-            backgroundColor: '#ffebee',
-            color: '#c62828',
-            padding: '15px',
-            borderRadius: '4px',
-            marginBottom: '20px',
-          }}>
-            {error}
+            background: 'var(--c-fill-light)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            minHeight: 260, overflow: 'hidden',
+            cursor: exercise.gif_url ? 'pointer' : 'default',
+          }}
+            onClick={() => exercise.gif_url && setGifPaused(p => !p)}
+            title={exercise.gif_url ? '点击暂停/播放' : undefined}
+          >
+            <img
+              src={gifPaused && exercise.gif_url ? (exercise.featured_image_url || exercise.images?.[0]?.image_url || mediaUrl) : mediaUrl}
+              alt={name}
+              style={{ width: '100%', maxHeight: 320, objectFit: 'contain' }}
+            />
+          </div>
+        ) : (
+          <div style={{ background: 'var(--c-fill-light)', height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-text-hint)', fontSize: 13 }}>
+            暂无图片
           </div>
         )}
 
-        {/* Exercise Info */}
-        <div style={{
-          background: 'var(--c-card-bg)',
-          borderRadius: '8px',
-          overflow: 'hidden',
-          marginBottom: '30px',
-        }}>
-          {/* Image Gallery */}
-          {exercise.images && exercise.images.length > 0 ? (
-            <div style={{
-              background: 'var(--c-page-bg)',
-              padding: '20px',
-              minHeight: '300px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}>
-              <img
-                src={exercise.images[0].image_url}
-                alt={exercise.name_en}
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '300px',
-                  objectFit: 'cover',
-                  marginBottom: '15px',
-                  borderRadius: '4px',
-                }}
-              />
-              {exercise.images[0].caption && (
-                <p style={{ margin: 0, fontSize: '13px', color: '#666', textAlign: 'center' }}>
-                  {exercise.images[0].caption}
-                </p>
-              )}
-              {exercise.images.length > 1 && (
-                <div style={{ marginTop: '15px', fontSize: '12px', color: '#999' }}>
-                  {exercise.images.length} images available
-                </div>
-              )}
-            </div>
-          ) : (
-            <div style={{
-              background: 'var(--c-page-bg)',
-              padding: '60px 20px',
-              textAlign: 'center',
-              color: '#999',
-            }}>
-              📸 No images yet
-            </div>
+        {/* ── Name block ── */}
+        <div style={{ padding: '20px var(--sp-5) 0' }}>
+          <h2 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: 'var(--c-text-primary)' }}>
+            {name}
+          </h2>
+          {nameAlt && (
+            <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--c-text-hint)' }}>{nameAlt}</p>
           )}
 
-          {/* Info */}
-          <div style={{ padding: '30px' }}>
-            {/* Exercise Attributes */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-              gap: '15px',
-              marginBottom: '20px',
-              paddingBottom: '20px',
-              borderBottom: '1px solid #eee',
-            }}>
-              {(language === 'en' ? exercise.type_en : exercise.type_cn) && (
-                <div>
-                  <p style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#999', textTransform: 'uppercase' }}>TYPE</p>
-                  <p style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: '#333' }}>
-                    {language === 'en' ? exercise.type_en : exercise.type_cn}
-                  </p>
-                </div>
-              )}
-              {(language === 'en' ? exercise.difficulty_en : exercise.difficulty_cn) && (
-                <div>
-                  <p style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#999', textTransform: 'uppercase' }}>DIFFICULTY</p>
-                  <p style={{
-                    margin: 0,
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    color: (language === 'en' ? exercise.difficulty_en : exercise.difficulty_cn) === 'Beginner' || (language === 'en' ? exercise.difficulty_en : exercise.difficulty_cn) === '初级' ? '#4CAF50' : (language === 'en' ? exercise.difficulty_en : exercise.difficulty_cn) === 'Intermediate' || (language === 'en' ? exercise.difficulty_en : exercise.difficulty_cn) === '中级' ? '#FF9800' : '#F44336',
-                  }}>
-                    {language === 'en' ? exercise.difficulty_en : exercise.difficulty_cn}
-                  </p>
-                </div>
-              )}
-              {(language === 'en' ? exercise.target_muscles_en : exercise.target_muscles_cn) && (
-                <div>
-                  <p style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#999', textTransform: 'uppercase' }}>TARGET MUSCLES</p>
-                  <p style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: '#333' }}>
-                    {language === 'en' ? exercise.target_muscles_en : exercise.target_muscles_cn}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {(language === 'en' ? exercise.description_en : exercise.description_cn) && (
-              <div style={{ marginBottom: '20px' }}>
-                <h3 style={{ margin: '0 0 10px 0', color: '#666' }}>Description</h3>
-                <p style={{ margin: 0, lineHeight: '1.6' }}>{language === 'en' ? exercise.description_en : exercise.description_cn}</p>
-              </div>
+          {/* Tags */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
+            {type   && <span style={TAG_STYLE}>🏷 {type}</span>}
+            {equip  && <span style={TAG_STYLE}>🏋️ {equip}</span>}
+            {muscle && <span style={TAG_STYLE}>💪 {muscle}</span>}
+            {diff   && (
+              <span style={{
+                ...TAG_STYLE,
+                color: diff === '初级' || diff === 'Beginner' ? '#16a34a'
+                  : diff === '中级' || diff === 'Intermediate' ? '#d97706' : '#dc2626',
+                background: diff === '初级' || diff === 'Beginner' ? '#dcfce7'
+                  : diff === '中级' || diff === 'Intermediate' ? '#fef3c7' : '#fee2e2',
+              }}>⚡ {diff}</span>
             )}
-
-            {(language === 'en' ? exercise.instructions_en : exercise.instructions_cn) && (
-              <div style={{ marginBottom: '20px' }}>
-                <h3 style={{ margin: '0 0 10px 0', color: '#666' }}>{language === 'en' ? 'How to Perform' : '如何执行'}</h3>
-                <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
-                  {language === 'en' ? exercise.instructions_en : exercise.instructions_cn}
-                </p>
-              </div>
-            )}
-
-            {(exercise.default_sets || exercise.default_reps || exercise.default_weight || exercise.default_duration) && (
-              <div style={{
-                marginTop: '20px',
-                paddingTop: '20px',
-                borderTop: '1px solid #eee',
-              }}>
-                <h3 style={{ margin: '0 0 10px 0', color: '#666' }}>Default Parameters</h3>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                  gap: '15px',
-                }}>
-                  {exercise.default_sets && (
-                    <div>
-                      <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>SETS</p>
-                      <p style={{ margin: '5px 0 0 0', fontSize: '16px', fontWeight: 'bold' }}>
-                        {exercise.default_sets}
-                      </p>
-                    </div>
-                  )}
-                  {exercise.default_reps && (
-                    <div>
-                      <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>REPS</p>
-                      <p style={{ margin: '5px 0 0 0', fontSize: '16px', fontWeight: 'bold' }}>
-                        {exercise.default_reps}
-                      </p>
-                    </div>
-                  )}
-                  {exercise.default_weight && (
-                    <div>
-                      <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>WEIGHT</p>
-                      <p style={{ margin: '5px 0 0 0', fontSize: '16px', fontWeight: 'bold' }}>
-                        {exercise.default_weight} {exercise.default_weight_unit}
-                      </p>
-                    </div>
-                  )}
-                  {exercise.default_duration && (
-                    <div>
-                      <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>DURATION</p>
-                      <p style={{ margin: '5px 0 0 0', fontSize: '16px', fontWeight: 'bold' }}>
-                        {exercise.default_duration} {exercise.default_duration_unit}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <p style={{ margin: '20px 0 0 0', fontSize: '12px', color: '#999' }}>
-              Created: {new Date(exercise.created_at).toLocaleDateString()}
-            </p>
           </div>
         </div>
 
-        {/* Notes Section */}
-        <div style={{
-          background: 'var(--c-card-bg)',
-          borderRadius: '8px',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            background: 'var(--c-page-bg)',
-            padding: '20px',
-            borderBottom: '1px solid #ddd',
-          }}>
-            <h2 style={{ margin: 0 }}>Notes & Feedback ({notes.length})</h2>
-            <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#666' }}>
-              Trainer and client notes are visible to all. Share tips and improvements here!
-            </p>
+        {/* ── Content card ── */}
+        <div style={{ margin: '0 var(--sp-5)', background: 'var(--c-card-bg)', borderRadius: 'var(--r-lg)', border: '1px solid var(--c-border)', overflow: 'hidden', marginBottom: 16 }}>
+
+          {/* Default params */}
+          {(exercise.default_sets || exercise.default_reps || exercise.default_weight || exercise.default_duration) && (
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--c-border)', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+              {exercise.default_sets && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--c-brand)' }}>{exercise.default_sets}</div>
+                  <div style={{ fontSize: 11, color: 'var(--c-text-hint)', marginTop: 2 }}>组</div>
+                </div>
+              )}
+              {exercise.default_reps && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--c-brand)' }}>{exercise.default_reps}</div>
+                  <div style={{ fontSize: 11, color: 'var(--c-text-hint)', marginTop: 2 }}>次</div>
+                </div>
+              )}
+              {exercise.default_weight && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--c-brand)' }}>{exercise.default_weight}</div>
+                  <div style={{ fontSize: 11, color: 'var(--c-text-hint)', marginTop: 2 }}>{exercise.default_weight_unit || 'kg'}</div>
+                </div>
+              )}
+              {exercise.default_duration && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--c-brand)' }}>{exercise.default_duration}</div>
+                  <div style={{ fontSize: 11, color: 'var(--c-text-hint)', marginTop: 2 }}>{exercise.default_duration_unit || '秒'}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Description */}
+          {descr && (
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--c-border)' }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: 'var(--c-text-hint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                动作说明
+              </h3>
+              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: 'var(--c-text-primary)' }}>{descr}</p>
+            </div>
+          )}
+
+          {/* Instructions */}
+          {steps.length > 0 && (
+            <div style={{ padding: '16px 20px' }}>
+              <h3 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: 'var(--c-text-hint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                动作步骤
+              </h3>
+              <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {steps.map((step, i) => (
+                  <li key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <span style={{
+                      flexShrink: 0, width: 24, height: 24, borderRadius: '50%',
+                      background: 'var(--c-brand)', color: '#fff',
+                      fontSize: 11, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>{i + 1}</span>
+                    <span style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--c-text-primary)', paddingTop: 3 }}>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {/* Fallback if no description or instructions */}
+          {!descr && steps.length === 0 && (
+            <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--c-text-hint)', fontSize: 13 }}>
+              暂无详细说明
+            </div>
+          )}
+        </div>
+
+        {/* ── Notes ── */}
+        <div style={{ margin: '0 var(--sp-5)', background: 'var(--c-card-bg)', borderRadius: 'var(--r-lg)', border: '1px solid var(--c-border)', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--c-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)' }}>备注 & 心得</h3>
+              <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--c-text-hint)' }}>教练和学员都可以留言</p>
+            </div>
+            <span style={{ fontSize: 12, color: 'var(--c-text-hint)' }}>{notes.length} 条</span>
           </div>
 
-          {/* Add Note Form */}
-          <div style={{ padding: '20px', borderBottom: '1px solid #ddd', backgroundColor: '#fafafa' }}>
-            <form onSubmit={handleAddNote}>
-              <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', fontSize: '13px' }}>
-                Add Your Note
-              </label>
+          {/* Add note */}
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--c-border)', background: 'var(--c-fill-light)' }}>
+            <form onSubmit={handleAddNote} style={{ display: 'flex', gap: 8 }}>
               <textarea
                 value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Share tips, improvements, or observations..."
-                rows={3}
+                onChange={e => setNewNote(e.target.value)}
+                placeholder="分享你的心得、注意事项…"
+                rows={2}
                 style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  boxSizing: 'border-box',
-                  fontSize: '14px',
-                  marginBottom: '10px',
-                  fontFamily: 'sans-serif',
+                  flex: 1, padding: '8px 12px', borderRadius: 8,
+                  border: '1px solid var(--c-border)', fontSize: 13,
+                  background: 'var(--c-card-bg)', color: 'var(--c-text-primary)',
+                  resize: 'none', fontFamily: 'inherit',
                 }}
               />
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px' }}>
-                <select
-                  value={noteAuthorType}
-                  onChange={(e) => setNoteAuthorType(e.target.value as 'trainer' | 'client')}
-                  style={{
-                    padding: '8px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                  }}
-                >
-                  <option value="trainer">Trainer Note</option>
-                  <option value="client">Client Note</option>
-                </select>
-                <button
-                  type="submit"
-                  disabled={!newNote.trim() || isSubmittingNote}
-                  style={{
-                    padding: '8px 20px',
-                    backgroundColor: 'var(--c-brand)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: newNote.trim() && !isSubmittingNote ? 'pointer' : 'not-allowed',
-                    fontWeight: 'bold',
-                    opacity: newNote.trim() && !isSubmittingNote ? 1 : 0.5,
-                    fontSize: '13px',
-                  }}
-                >
-                  {isSubmittingNote ? 'Adding...' : 'Add Note'}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={!newNote.trim() || isSubmittingNote}
+                style={{
+                  padding: '8px 16px', borderRadius: 8, border: 'none',
+                  background: 'var(--c-brand)', color: '#fff',
+                  fontSize: 13, fontWeight: 600,
+                  cursor: newNote.trim() && !isSubmittingNote ? 'pointer' : 'not-allowed',
+                  opacity: newNote.trim() && !isSubmittingNote ? 1 : 0.4,
+                  alignSelf: 'flex-end',
+                }}
+              >
+                {isSubmittingNote ? '…' : '发送'}
+              </button>
             </form>
           </div>
 
-          {/* Notes List */}
+          {/* Notes list */}
           {notes.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-              No notes yet. Be the first to add feedback!
+            <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--c-text-hint)', fontSize: 13 }}>
+              还没有备注，来第一个留言吧
             </div>
           ) : (
             <div>
-              {notes.map((note, index) => (
-                <div
-                  key={note.id}
-                  style={{
-                    padding: '20px',
-                    borderBottom: index < notes.length - 1 ? '1px solid #eee' : 'none',
-                  }}
-                >
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'start',
-                    marginBottom: '10px',
-                  }}>
+              {notes.map((note, i) => (
+                <div key={note.id} style={{
+                  padding: '14px 20px',
+                  borderBottom: i < notes.length - 1 ? '1px solid var(--c-border)' : 'none',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      background: note.author_type === 'trainer' ? 'var(--c-lavender)' : 'var(--c-fill-mid)',
+                      color: '#fff', fontSize: 11, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {note.author_name?.[0]?.toUpperCase() || '?'}
+                    </span>
                     <div>
-                      <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px' }}>
-                        {note.author_name}
-                      </p>
-                      <p style={{
-                        margin: '2px 0 0 0',
-                        fontSize: '12px',
-                        color: '#999',
-                      }}>
-                        {note.author_type === 'trainer' ? '👨‍🏫 Trainer' : '👤 Client'} • {new Date(note.created_at).toLocaleDateString()}
-                      </p>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-text-primary)' }}>{note.author_name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--c-text-hint)', marginLeft: 6 }}>
+                        {note.author_type === 'trainer' ? '教练' : '学员'} · {new Date(note.created_at).toLocaleDateString('zh-CN')}
+                      </span>
                     </div>
                   </div>
-                  <p style={{
-                    margin: 0,
-                    lineHeight: '1.6',
-                    whiteSpace: 'pre-wrap',
-                    wordWrap: 'break-word',
-                  }}>
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--c-text-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                     {note.content}
                   </p>
                 </div>

@@ -17,19 +17,24 @@ export async function GET(
 
     const { id } = await params
 
+    // 先单独取动作本体，避免 join 失败导致整体报错
     const { data, error } = await supabaseAdmin
       .from('master_exercise')
-      .select(`
-        *,
-        images:exercise_image(*),
-        notes:exercise_note(*)
-      `)
+      .select('*')
       .eq('id', id)
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+    if (error || !data) {
+      return NextResponse.json({ error: error?.message || 'Exercise not found' }, { status: 404 })
+    }
 
-    return NextResponse.json(data)
+    // 图片和笔记单独查，失败也不影响主数据
+    const [{ data: images }, { data: notes }] = await Promise.all([
+      supabaseAdmin.from('exercise_image').select('*').eq('exercise_id', id),
+      supabaseAdmin.from('exercise_note').select('*').eq('exercise_id', id).order('created_at', { ascending: false }),
+    ])
+
+    return NextResponse.json({ ...data, images: images || [], notes: notes || [] })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

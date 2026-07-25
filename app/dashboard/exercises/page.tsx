@@ -19,6 +19,7 @@ interface Exercise {
   target_muscles_en?: string
   target_muscles_cn?: string
   featured_image_url?: string
+  gif_url?: string
   default_sets?: number
   default_reps?: number
   created_at: string
@@ -319,8 +320,8 @@ function ExerciseRows({ items, exName, exNameSub, exDiff, exMuscles, exSeries, o
             <Link href={`/dashboard/exercises/${ex.id}`} style={{ textDecoration: 'none', color: 'inherit', flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'var(--c-fill-light)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {ex.featured_image_url
-                    ? <img src={ex.featured_image_url} alt={ex.name_en} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {(ex.gif_url || ex.featured_image_url)
+                    ? <img src={ex.gif_url || ex.featured_image_url} alt={ex.name_en} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <span style={{ fontSize: '22px' }}>🏋️</span>}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>

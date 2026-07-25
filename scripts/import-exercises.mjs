@@ -272,11 +272,13 @@ async function main() {
     // 中文：尝试 zh 键，无则留 NULL 等人工补充
     const instrCn = (ex.instructions?.zh) ||
                     (ex.instruction_steps?.zh?.join(' ')) || null
-    const nameCn  = ex.name_cn || null
+    const nameCn  = ex.name_cn || ex.name  // 无中文名则暂用英文名占位
     const targetEn = ex.target || null
     const targetCn = targetEn ? (MUSCLE_CN[targetEn] || targetEn) : null
     const imgFile  = ex.image ? ex.image.replace('images/', '') : null
+    const gifFile  = ex.gif_url ? ex.gif_url.replace('videos/', '') : null
     const imageUrl = imgFile ? `${IMAGE_BASE}/${imgFile}` : null
+    const gifUrl   = gifFile ? `${GITHUB_RAW}/videos/${gifFile}` : null
     const equipEn  = ex.equipment || null
     const equipCn  = equipEn ? (EQUIP_CN[equipEn.toLowerCase()] || equipEn) : null
 
@@ -288,16 +290,16 @@ async function main() {
       `  equipment_en, equipment_cn,`,
       `  target_muscles_en, target_muscles_cn,`,
       `  instructions_en, instructions_cn,`,
-      `  featured_image_url,`,
-      `  is_active, created_at`,
+      `  featured_image_url, gif_url,`,
+      `  is_active, created_by, created_at`,
       `) VALUES (`,
       `  ${escSql(ex.name)}, ${escSql(nameCn)},`,
       `  ${escSql(type.en)}, ${escSql(type.cn)},`,
       `  ${escSql(equipEn)}, ${escSql(equipCn)},`,
       `  ${escSql(targetEn)}, ${escSql(targetCn)},`,
       `  ${escSql(instrEn)}, ${escSql(instrCn)},`,
-      `  ${escSql(imageUrl)},`,
-      `  true, NOW()`,
+      `  ${escSql(imageUrl)}, ${escSql(gifUrl)},`,
+      `  true, (SELECT id FROM auth.users ORDER BY created_at LIMIT 1), NOW()`,
       `) ON CONFLICT DO NOTHING;`,
       '',
     )

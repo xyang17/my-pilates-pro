@@ -57,57 +57,56 @@ async function main() {
     console.log(`✅ 创建 bucket "${BUCKET}"`)
   }
 
-  // 2. 拉取所有 featured_image_url 指向 GitHub 的动作
+  // 2. 拉取所有指向 GitHub 的动作（图片或 GIF）
   const { data: exercises, error } = await supabase
     .from('master_exercise')
-    .select('id, name_en, featured_image_url')
-    .like('featured_image_url', '%githubusercontent.com%')
+    .select('id, name_en, featured_image_url, gif_url')
+    .or('featured_image_url.like.%githubusercontent.com%,gif_url.like.%githubusercontent.com%')
     .order('name_en')
 
   if (error) { console.error('查询失败:', error.message); process.exit(1) }
-  console.log(`找到 ${exercises.length} 条需要迁移图片的动作\n`)
+  console.log(`找到 ${exercises.length} 条需要迁移的动作\n`)
 
   let ok = 0, fail = 0
 
   for (const ex of exercises) {
-    const oldUrl = ex.featured_image_url
-    // 文件名从 URL 末尾取
-    const filename = oldUrl.split('/').pop()
-    const storagePath = `exercises/${filename}`
+    const patch = {}
 
-    try {
-      // 下载
-      const { buffer, contentType } = await downloadBuffer(oldUrl)
-
-      // 上传到 Supabase Storage（已存在则跳过）
-      const { error: upErr } = await supabase.storage
-        .from(BUCKET)
-        .upload(storagePath, buffer, { contentType, upsert: false })
-
-      if (upErr && !upErr.message.includes('already exists')) {
-        throw new Error(upErr.message)
-      }
-
-      // 获取公开 URL
-      const { data: { publicUrl } } = supabase.storage
-        .from(BUCKET)
-        .getPublicUrl(storagePath)
-
-      // 更新数据库
-      await supabase
-        .from('master_exercise')
-        .update({ featured_image_url: publicUrl })
-        .eq('id', ex.id)
-
-      console.log(`✅ ${ex.name_en}`)
-      ok++
-    } catch (e) {
-      console.error(`❌ ${ex.name_en}: ${e.message}`)
-      fail++
+    // 迁移静态图片
+    if (ex.featured_image_url?.includes('githubusercontent.com')) {
+      try {
+        const filename = ex.featured_image_url.split('/').pop()
+        const storagePath = `exercises/${filename}`
+        const { buffer, contentType } = await downloadBuffer(ex.featured_image_url)
+        const { error: upErr } = await supabase.storage
+          .from(BUCKET).upload(storagePath, buffer, { contentType, upsert: false })
+        if (upErr && !upErr.message.includes('already exists')) throw new Error(upErr.message)
+        const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath)
+        patch.featured_image_url = publicUrl
+      } catch (e) { console.error(`❌ 图片 ${ex.name_en}: ${e.message}`); fail++ }
     }
 
-    // 避免请求太快被 GitHub 限速
-    await sleep(200)
+    // 迁移 GIF
+    if (ex.gif_url?.includes('githubusercontent.com')) {
+      try {
+        const filename = ex.gif_url.split('/').pop()
+        const storagePath = `exercises/gif/${filename}`
+        const { buffer, contentType } = await downloadBuffer(ex.gif_url)
+        const { error: upErr } = await supabase.storage
+          .from(BUCKET).upload(storagePath, buffer, { contentType, upsert: false })
+        if (upErr && !upErr.message.includes('already exists')) throw new Error(upErr.message)
+        const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath)
+        patch.gif_url = publicUrl
+      } catch (e) { console.error(`❌ GIF ${ex.name_en}: ${e.message}`); fail++ }
+    }
+
+    if (Object.keys(patch).length > 0) {
+      await supabase.from('master_exercise').update(patch).eq('id', ex.id)
+      console.log(`✅ ${ex.name_en} → ${Object.keys(patch).join(' + ')}`)
+      ok++
+    }
+
+    await sleep(300)
   }
 
   console.log(`\n完成：成功 ${ok} 条，失败 ${fail} 条`)
