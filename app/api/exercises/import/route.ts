@@ -57,21 +57,50 @@ export async function POST(req: NextRequest) {
       created_by: userId,
     }))
 
-    // Insert one by one to collect per-row errors
+    // 按 name_en 匹配：已存在就更新，不存在就新增
+    // 这样同一批动作补充新字段后重新导入，会覆盖旧记录而不是产生重复行
     let created = 0
+    let updated = 0
     const errors: { exercise: string; error: string }[] = []
 
     for (const row of rows) {
-      const { error } = await supabaseAdmin.from('master_exercise').insert([row])
-      if (error) {
-        errors.push({ exercise: row.name_en || row.name_cn || 'Unknown', error: error.message })
+      if (!row.name_en) {
+        errors.push({ exercise: row.name_cn || 'Unknown', error: 'name_en 不能为空' })
+        continue
+      }
+
+      const { data: existing } = await supabaseAdmin
+        .from('master_exercise')
+        .select('id')
+        .eq('name_en', row.name_en)
+        .limit(1)
+        .maybeSingle()
+
+      if (existing) {
+        // 更新时不覆盖 created_by（保留原创建者）
+        const { created_by, ...updateRow } = row
+        const { error } = await supabaseAdmin
+          .from('master_exercise')
+          .update(updateRow)
+          .eq('id', existing.id)
+        if (error) {
+          errors.push({ exercise: row.name_en || row.name_cn || 'Unknown', error: error.message })
+        } else {
+          updated++
+        }
       } else {
-        created++
+        const { error } = await supabaseAdmin.from('master_exercise').insert([row])
+        if (error) {
+          errors.push({ exercise: row.name_en || row.name_cn || 'Unknown', error: error.message })
+        } else {
+          created++
+        }
       }
     }
 
     return NextResponse.json({
       created,
+      updated,
       failed: errors.length,
       errors,
     }, { status: 201 })

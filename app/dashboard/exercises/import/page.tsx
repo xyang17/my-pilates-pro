@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx'
 
 interface ImportResult {
   created: number
+  updated: number
   failed: number
   errors: { exercise: string; error: string }[]
 }
@@ -180,7 +181,7 @@ export default function ImportExercisesPage() {
             <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', fontSize: '16px' }}>
               {result.failed === 0 ? '✅ 导入成功 Import Successful' : '⚠️ 部分导入 Partial Import'}
             </p>
-            <p style={{ margin: '0 0 4px 0', fontSize: '14px' }}>成功 Created: <strong>{result.created}</strong> 条</p>
+            <p style={{ margin: '0 0 4px 0', fontSize: '14px' }}>新增 Created: <strong>{result.created}</strong> 条{result.updated > 0 && <> · 更新 Updated: <strong>{result.updated}</strong> 条</>}</p>
             {result.failed > 0 && <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#E74C3C' }}>失败 Failed: <strong>{result.failed}</strong> 条</p>}
             {result.errors.map((e, i) => (
               <p key={i} style={{ margin: '4px 0', fontSize: '12px', color: '#E74C3C' }}>• {e.exercise}: {e.error}</p>
