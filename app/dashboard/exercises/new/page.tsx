@@ -18,6 +18,13 @@ export default function NewExercisePage() {
     type: '',
     difficulty: 'Intermediate',
     targetMuscles: '',
+    secondaryMuscles: '',
+    bodyPosition: '',
+    equipment: '',
+    equipmentSetup: '',
+    cues: '',
+    contraindications: '',
+    gifUrl: '',
     defaultSets: '',
     defaultReps: '',
     defaultWeight: '',
@@ -70,6 +77,13 @@ export default function NewExercisePage() {
           type: formData.type || null,
           difficulty: formData.difficulty,
           targetMuscles: formData.targetMuscles || null,
+          secondaryMuscles: formData.secondaryMuscles || null,
+          bodyPosition: formData.bodyPosition || null,
+          equipment: formData.equipment || null,
+          equipmentSetup: formData.equipmentSetup || null,
+          cues: formData.cues || null,
+          contraindications: formData.contraindications || null,
+          gifUrl: formData.gifUrl || null,
           defaultSets: formData.defaultSets ? parseInt(formData.defaultSets) : null,
           defaultReps: formData.defaultReps ? parseInt(formData.defaultReps) : null,
           defaultWeight: formData.defaultWeight ? parseFloat(formData.defaultWeight) : null,
@@ -288,6 +302,90 @@ export default function NewExercisePage() {
                 Comma-separated muscle groups
               </p>
             </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>
+                Secondary Muscles
+              </label>
+              <input
+                type="text"
+                name="secondaryMuscles"
+                value={formData.secondaryMuscles}
+                onChange={handleChange}
+                placeholder="e.g., Shoulders, Triceps"
+                style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontSize: '14px' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>
+                Body Position 体位
+              </label>
+              <input
+                type="text"
+                name="bodyPosition"
+                value={formData.bodyPosition}
+                onChange={handleChange}
+                placeholder="e.g., Supine, Prone, Standing"
+                style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontSize: '14px' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>
+                Equipment 器械
+              </label>
+              <input
+                type="text"
+                name="equipment"
+                value={formData.equipment}
+                onChange={handleChange}
+                placeholder="e.g., Reformer, Mat, Cadillac"
+                style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontSize: '14px' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>
+                Equipment Setup 器械配置
+              </label>
+              <input
+                type="text"
+                name="equipmentSetup"
+                value={formData.equipmentSetup}
+                onChange={handleChange}
+                placeholder="e.g., 2 red springs"
+                style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontSize: '14px' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+              Teaching Cues 教学提示语
+            </label>
+            <textarea
+              name="cues"
+              value={formData.cues}
+              onChange={handleChange}
+              placeholder="e.g., Imagine zipping up from pubic bone to ribs"
+              rows={3}
+              style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontSize: '14px', fontFamily: 'sans-serif' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#c62828' }}>
+              ⚠️ Contraindications 禁忌 / 慎用人群
+            </label>
+            <textarea
+              name="contraindications"
+              value={formData.contraindications}
+              onChange={handleChange}
+              placeholder="e.g., Avoid during pregnancy, herniated disc"
+              rows={2}
+              style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontSize: '14px', fontFamily: 'sans-serif' }}
+            />
           </div>
 
           <h2>Default Parameters</h2>
@@ -451,6 +549,23 @@ export default function NewExercisePage() {
             />
             <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>
               💡 This will be shown on the exercise card. You can add more images later!
+            </p>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+              GIF URL
+            </label>
+            <input
+              type="url"
+              name="gifUrl"
+              value={formData.gifUrl}
+              onChange={handleChange}
+              placeholder="https://example.com/animation.gif"
+              style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontSize: '14px' }}
+            />
+            <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>
+              💡 动图优先于静态图展示
             </p>
           </div>
 

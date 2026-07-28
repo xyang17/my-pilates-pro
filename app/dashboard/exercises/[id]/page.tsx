@@ -39,6 +39,16 @@ interface MasterExercise {
   target_muscles_cn?: string
   equipment_en?: string
   equipment_cn?: string
+  equipment_setup_en?: string
+  equipment_setup_cn?: string
+  body_position_en?: string
+  body_position_cn?: string
+  secondary_muscles_en?: string
+  secondary_muscles_cn?: string
+  cues_en?: string
+  cues_cn?: string
+  contraindications_en?: string
+  contraindications_cn?: string
   default_sets?: number
   default_reps?: number
   default_weight?: number
@@ -55,8 +65,9 @@ interface MasterExercise {
 function parseSteps(text: string): string[] {
   if (!text) return []
   // 先尝试按数字序号拆（"1. xxx 2. xxx"）
-  const numbered = text.match(/\d+\.\s[^0-9]+/g)
-  if (numbered && numbered.length > 1) return numbered.map(s => s.replace(/^\d+\.\s*/, '').trim())
+  // 用否定前瞻而不是排除数字字符类，避免句子中间出现的数字（如"重复5次"）把步骤截断
+  const numbered = text.match(/\d+\.\s(?:(?!\d+\.\s)[\s\S])*/g)
+  if (numbered && numbered.length > 1) return numbered.map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean)
   // 否则按句号/。拆
   return text.split(/[。\.]\s+/).map(s => s.trim()).filter(Boolean)
 }
@@ -168,11 +179,17 @@ export default function ExerciseDetailPage() {
   const nameAlt = lang === 'cn' ? exercise.name_en : (exercise.name_cn || '')
   const type    = lang === 'cn' ? exercise.type_cn    : exercise.type_en
   const equip   = lang === 'cn' ? exercise.equipment_cn : exercise.equipment_en
+  const equipSetup = lang === 'cn' ? exercise.equipment_setup_cn : exercise.equipment_setup_en
+  const position = lang === 'cn' ? exercise.body_position_cn : exercise.body_position_en
   const muscle  = lang === 'cn' ? exercise.target_muscles_cn : exercise.target_muscles_en
+  const muscle2 = lang === 'cn' ? exercise.secondary_muscles_cn : exercise.secondary_muscles_en
   const diff    = lang === 'cn' ? exercise.difficulty_cn : exercise.difficulty_en
   const descr   = lang === 'cn' ? exercise.description_cn  : exercise.description_en
   const instrRaw = lang === 'cn' ? exercise.instructions_cn : exercise.instructions_en
   const steps   = instrRaw ? parseSteps(instrRaw) : []
+  const cues    = lang === 'cn' ? exercise.cues_cn : exercise.cues_en
+  const cueList = cues ? parseSteps(cues) : []
+  const contraindications = lang === 'cn' ? exercise.contraindications_cn : exercise.contraindications_en
   const mediaUrl = exercise.gif_url || exercise.featured_image_url || exercise.images?.[0]?.image_url
 
   return (
@@ -255,9 +272,11 @@ export default function ExerciseDetailPage() {
 
           {/* Tags */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
-            {type   && <span style={TAG_STYLE}>🏷 {type}</span>}
-            {equip  && <span style={TAG_STYLE}>🏋️ {equip}</span>}
-            {muscle && <span style={TAG_STYLE}>💪 {muscle}</span>}
+            {type     && <span style={TAG_STYLE}>🏷 {type}</span>}
+            {position && <span style={TAG_STYLE}>🧍 {position}</span>}
+            {equip    && <span style={TAG_STYLE}>🏋️ {equip}{equipSetup ? `（${equipSetup}）` : ''}</span>}
+            {muscle   && <span style={TAG_STYLE}>💪 {muscle}</span>}
+            {muscle2  && <span style={TAG_STYLE}>➕ {muscle2}</span>}
             {diff   && (
               <span style={{
                 ...TAG_STYLE,
@@ -335,6 +354,22 @@ export default function ExerciseDetailPage() {
             </div>
           )}
 
+          {/* Teaching cues */}
+          {cueList.length > 0 && (
+            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--c-border)', background: 'var(--c-fill-light)' }}>
+              <h3 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: 'var(--c-text-hint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                💬 教学提示语
+              </h3>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {cueList.map((cue, i) => (
+                  <li key={i} style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--c-text-primary)', fontStyle: 'italic' }}>
+                    "{cue}"
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Fallback if no description or instructions */}
           {!descr && steps.length === 0 && (
             <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--c-text-hint)', fontSize: 13 }}>
@@ -342,6 +377,22 @@ export default function ExerciseDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Contraindications — 单独一张警示卡，视觉上要突出 */}
+        {contraindications && (
+          <div style={{
+            margin: '0 var(--sp-5) 16px',
+            background: '#fef2f2', border: '1px solid #fecaca',
+            borderRadius: 'var(--r-lg)', padding: '14px 18px',
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+          }}>
+            <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}>⚠️</span>
+            <div>
+              <h3 style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: '#dc2626' }}>禁忌 / 慎用人群</h3>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: '#991b1b' }}>{contraindications}</p>
+            </div>
+          </div>
+        )}
 
         {/* ── Notes ── */}
         <div style={{ margin: '0 var(--sp-5)', background: 'var(--c-card-bg)', borderRadius: 'var(--r-lg)', border: '1px solid var(--c-border)', overflow: 'hidden' }}>

@@ -19,7 +19,20 @@ interface Exercise {
   difficulty_cn?: string
   target_muscles_en?: string
   target_muscles_cn?: string
+  secondary_muscles_en?: string
+  secondary_muscles_cn?: string
+  body_position_en?: string
+  body_position_cn?: string
+  equipment_en?: string
+  equipment_cn?: string
+  equipment_setup_en?: string
+  equipment_setup_cn?: string
+  cues_en?: string
+  cues_cn?: string
+  contraindications_en?: string
+  contraindications_cn?: string
   featured_image_url?: string
+  gif_url?: string
   default_sets?: number
   default_reps?: number
   default_weight?: number
@@ -54,7 +67,20 @@ export default function EditExercisePage() {
     difficultyCN: '',
     targetMusclesEN: '',
     targetMusclesCN: '',
+    secondaryMusclesEN: '',
+    secondaryMusclesCN: '',
+    bodyPositionEN: '',
+    bodyPositionCN: '',
+    equipmentEN: '',
+    equipmentCN: '',
+    equipmentSetupEN: '',
+    equipmentSetupCN: '',
+    cuesEN: '',
+    cuesCN: '',
+    contraindicationsEN: '',
+    contraindicationsCN: '',
     featuredImageUrl: '',
+    gifUrl: '',
     defaultSets: '',
     defaultReps: '',
     defaultWeight: '',
@@ -108,7 +134,20 @@ export default function EditExercisePage() {
         difficultyCN: data.difficulty_cn || '',
         targetMusclesEN: data.target_muscles_en || '',
         targetMusclesCN: data.target_muscles_cn || '',
+        secondaryMusclesEN: data.secondary_muscles_en || '',
+        secondaryMusclesCN: data.secondary_muscles_cn || '',
+        bodyPositionEN: data.body_position_en || '',
+        bodyPositionCN: data.body_position_cn || '',
+        equipmentEN: data.equipment_en || '',
+        equipmentCN: data.equipment_cn || '',
+        equipmentSetupEN: data.equipment_setup_en || '',
+        equipmentSetupCN: data.equipment_setup_cn || '',
+        cuesEN: data.cues_en || '',
+        cuesCN: data.cues_cn || '',
+        contraindicationsEN: data.contraindications_en || '',
+        contraindicationsCN: data.contraindications_cn || '',
         featuredImageUrl: data.featured_image_url || '',
+        gifUrl: data.gif_url || '',
         defaultSets: data.default_sets || '',
         defaultReps: data.default_reps || '',
         defaultWeight: data.default_weight || '',
@@ -490,6 +529,128 @@ export default function EditExercisePage() {
             </div>
           </div>
 
+          {/* Secondary Muscles */}
+          <div style={{ marginBottom: '30px' }}>
+            <h2 style={{ margin: '0 0 20px 0', color: '#333' }}>Secondary Muscles 次要发力肌群</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇬🇧 English</label>
+                <input type="text" value={formData.secondaryMusclesEN}
+                  onChange={(e) => handleInputChange('secondaryMusclesEN', e.target.value)}
+                  placeholder="e.g., Shoulders, Triceps"
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇨🇳 Chinese</label>
+                <input type="text" value={formData.secondaryMusclesCN}
+                  onChange={(e) => handleInputChange('secondaryMusclesCN', e.target.value)}
+                  placeholder="e.g., 肩部, 肱三头肌"
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Body Position & Equipment */}
+          <div style={{ marginBottom: '30px' }}>
+            <h2 style={{ margin: '0 0 20px 0', color: '#333' }}>Body Position & Equipment 体位与器械</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇬🇧 Body Position (English)</label>
+                <input type="text" value={formData.bodyPositionEN}
+                  onChange={(e) => handleInputChange('bodyPositionEN', e.target.value)}
+                  placeholder="e.g., Supine, Prone, Side-lying, Standing"
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇨🇳 体位（中文）</label>
+                <input type="text" value={formData.bodyPositionCN}
+                  onChange={(e) => handleInputChange('bodyPositionCN', e.target.value)}
+                  placeholder="例如：仰卧、俯卧、侧卧、站立"
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇬🇧 Equipment (English)</label>
+                <input type="text" value={formData.equipmentEN}
+                  onChange={(e) => handleInputChange('equipmentEN', e.target.value)}
+                  placeholder="e.g., Reformer, Mat, Cadillac"
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇨🇳 器械（中文）</label>
+                <input type="text" value={formData.equipmentCN}
+                  onChange={(e) => handleInputChange('equipmentCN', e.target.value)}
+                  placeholder="例如：改良机、垫子、凯迪拉克"
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇬🇧 Equipment Setup (English)</label>
+                <input type="text" value={formData.equipmentSetupEN}
+                  onChange={(e) => handleInputChange('equipmentSetupEN', e.target.value)}
+                  placeholder="e.g., 2 red springs, Long box + strap"
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} />
+                <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>弹簧/阻力档位配置，Reformer/Cadillac 类动作常用</p>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇨🇳 器械配置（中文）</label>
+                <input type="text" value={formData.equipmentSetupCN}
+                  onChange={(e) => handleInputChange('equipmentSetupCN', e.target.value)}
+                  placeholder="例如：2根红色弹簧、长箱+绑带"
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Teaching Cues */}
+          <div style={{ marginBottom: '30px' }}>
+            <h2 style={{ margin: '0 0 20px 0', color: '#333' }}>Teaching Cues 教学提示语</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇬🇧 English</label>
+                <textarea value={formData.cuesEN}
+                  onChange={(e) => handleInputChange('cuesEN', e.target.value)}
+                  placeholder="e.g., Imagine zipping up from pubic bone to ribs"
+                  rows={3}
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontFamily: 'sans-serif' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇨🇳 Chinese</label>
+                <textarea value={formData.cuesCN}
+                  onChange={(e) => handleInputChange('cuesCN', e.target.value)}
+                  placeholder="例如：想象从耻骨向肋骨拉拉链"
+                  rows={3}
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontFamily: 'sans-serif' }} />
+              </div>
+            </div>
+            <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>口令式教学提示，可写多条，用句号或数字序号分隔</p>
+          </div>
+
+          {/* Contraindications */}
+          <div style={{ marginBottom: '30px' }}>
+            <h2 style={{ margin: '0 0 20px 0', color: '#c62828' }}>⚠️ Contraindications 禁忌 / 慎用人群</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇬🇧 English</label>
+                <textarea value={formData.contraindicationsEN}
+                  onChange={(e) => handleInputChange('contraindicationsEN', e.target.value)}
+                  placeholder="e.g., Avoid during pregnancy, herniated disc"
+                  rows={2}
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontFamily: 'sans-serif' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>🇨🇳 Chinese</label>
+                <textarea value={formData.contraindicationsCN}
+                  onChange={(e) => handleInputChange('contraindicationsCN', e.target.value)}
+                  placeholder="例如：孕期慎做、腰椎间盘突出禁做"
+                  rows={2}
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontFamily: 'sans-serif' }} />
+              </div>
+            </div>
+          </div>
+
           {/* Default Parameters */}
           <div style={{ marginBottom: '30px' }}>
             <h2 style={{ margin: '0 0 20px 0', color: '#333' }}>Default Parameters</h2>
@@ -612,6 +773,26 @@ export default function EditExercisePage() {
                   <option value="seconds">seconds</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* Media */}
+          <div style={{ marginBottom: '30px' }}>
+            <h2 style={{ margin: '0 0 20px 0', color: '#333' }}>Media 图片 / GIF</h2>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>Featured Image URL</label>
+              <input type="url" value={formData.featuredImageUrl}
+                onChange={(e) => handleInputChange('featuredImageUrl', e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>GIF URL</label>
+              <input type="url" value={formData.gifUrl}
+                onChange={(e) => handleInputChange('gifUrl', e.target.value)}
+                placeholder="https://example.com/animation.gif"
+                style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} />
+              <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>动图优先于静态图展示</p>
             </div>
           </div>
 

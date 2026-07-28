@@ -12,6 +12,17 @@ interface ImportResult {
   errors: { exercise: string; error: string }[]
 }
 
+interface HistoryExercise {
+  id: string
+  name_en: string
+  name_cn: string
+  type_en?: string
+  type_cn?: string
+  equipment_en?: string
+  equipment_cn?: string
+  created_at: string
+}
+
 export default function ImportExercisesPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -24,9 +35,33 @@ export default function ImportExercisesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
+  // 历史上传的动作列表
+  const [history, setHistory] = useState<HistoryExercise[]>([])
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [historyVisible, setHistoryVisible] = useState(20)
+
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login')
   }, [user, loading])
+
+  useEffect(() => {
+    if (user) fetchHistory()
+  }, [user])
+
+  const fetchHistory = async () => {
+    setHistoryLoading(true)
+    try {
+      const res = await fetch('/api/exercises', { headers: { 'x-user-id': user?.id || '' } })
+      if (!res.ok) return
+      const data: HistoryExercise[] = await res.json()
+      data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      setHistory(data)
+    } catch {
+      // 静默失败，不影响上传功能
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
 
   const parseFile = (f: File) => {
     const reader = new FileReader()
@@ -87,6 +122,7 @@ export default function ImportExercisesPage() {
           setResult(data)
           setFile(null)
           setPreview([])
+          fetchHistory()
         } catch (err: any) {
           setError(err.message)
         } finally {
@@ -103,15 +139,25 @@ export default function ImportExercisesPage() {
   const downloadTemplate = () => {
     const headers = [
       'name_en', 'name_cn', 'type_en', 'type_cn', 'difficulty_en', 'difficulty_cn',
-      'target_muscles_en', 'target_muscles_cn', 'description_en', 'description_cn',
-      'instructions_en', 'instructions_cn', 'default_sets', 'default_reps',
+      'target_muscles_en', 'target_muscles_cn', 'secondary_muscles_en', 'secondary_muscles_cn',
+      'body_position_en', 'body_position_cn', 'equipment_en', 'equipment_cn',
+      'equipment_setup_en', 'equipment_setup_cn',
+      'description_en', 'description_cn', 'instructions_en', 'instructions_cn',
+      'cues_en', 'cues_cn', 'contraindications_en', 'contraindications_cn',
+      'default_sets', 'default_reps',
       'default_weight', 'default_weight_unit', 'default_duration', 'default_duration_unit',
-      'featured_image_url',
+      'featured_image_url', 'gif_url',
     ]
     const example = [
       'Roll Up', '脊椎伸展', 'Pilates Mat', '垫上普拉提', 'Beginner', '初级',
-      'Core, Spine', '核心, 脊椎', 'A classic mat exercise', '经典垫上动作',
-      '1. Lie flat 2. Roll up slowly', '1. 平躺 2. 缓慢卷起', 3, 10, '', 'kg', 30, 'seconds', '',
+      'Core, Spine', '核心, 脊椎', 'Shoulders, Hip flexors', '肩部, 髂腰肌',
+      'Supine', '仰卧', 'Mat', '垫子',
+      '', '',
+      'A classic mat exercise', '经典垫上动作',
+      '1. Lie flat 2. Roll up slowly', '1. 平躺 2. 缓慢卷起',
+      'Imagine zipping up from pubic bone to ribs', '想象从耻骨向肋骨拉拉链',
+      'Avoid during pregnancy or with herniated disc', '孕期慎做，腰椎间盘突出禁做',
+      3, 10, '', 'kg', 30, 'seconds', '', '',
     ]
     const ws = XLSX.utils.aoa_to_sheet([headers, example])
     const wb = XLSX.utils.book_new()
@@ -139,9 +185,17 @@ export default function ImportExercisesPage() {
             {result.errors.map((e, i) => (
               <p key={i} style={{ margin: '4px 0', fontSize: '12px', color: '#E74C3C' }}>• {e.exercise}: {e.error}</p>
             ))}
-            <Link href="/dashboard/exercises" style={{ display: 'inline-block', marginTop: '12px', color: 'var(--c-brand)', fontWeight: 'bold', fontSize: '14px', textDecoration: 'none' }}>
-              → 查看动作库 View Library
-            </Link>
+            <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
+              <Link href="/dashboard/exercises" style={{ color: 'var(--c-brand)', fontWeight: 'bold', fontSize: '14px', textDecoration: 'none' }}>
+                → 查看动作库 View Library
+              </Link>
+              <button
+                onClick={() => setResult(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--c-brand)', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', padding: 0 }}
+              >
+                → 继续导入 Import More
+              </button>
+            </div>
           </div>
         )}
 
@@ -232,6 +286,60 @@ export default function ImportExercisesPage() {
             </div>
           </div>
         )}
+
+        {/* 历史上传的动作列表 */}
+        <div style={{ background: 'var(--c-card-bg)', borderRadius: '10px', padding: '20px', marginTop: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h2 style={{ margin: 0, fontSize: '15px' }}>历史上传的动作</h2>
+            {!historyLoading && <span style={{ fontSize: '12px', color: '#999' }}>共 {history.length} 条</span>}
+          </div>
+
+          {historyLoading ? (
+            <p style={{ fontSize: '13px', color: '#999', margin: 0 }}>加载中...</p>
+          ) : history.length === 0 ? (
+            <p style={{ fontSize: '13px', color: '#999', margin: 0 }}>还没有上传过动作</p>
+          ) : (
+            <>
+              <div style={{ border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden' }}>
+                {history.slice(0, historyVisible).map((ex, i) => (
+                  <Link
+                    key={ex.id}
+                    href={`/dashboard/exercises/${ex.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '10px 14px', textDecoration: 'none', color: 'inherit',
+                      borderBottom: i < Math.min(history.length, historyVisible) - 1 ? '1px solid #f2f2f2' : 'none',
+                    }}
+                  >
+                    <span style={{ fontSize: '12px', color: '#bbb', width: '24px', flexShrink: 0 }}>{i + 1}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: '13px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {ex.name_cn || ex.name_en}
+                      </p>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#999' }}>
+                        {[ex.type_cn || ex.type_en, ex.equipment_cn || ex.equipment_en].filter(Boolean).join(' · ') || '—'}
+                      </p>
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#bbb', flexShrink: 0 }}>
+                      {new Date(ex.created_at).toLocaleDateString('zh-CN')}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+
+              {historyVisible < history.length && (
+                <button
+                  onClick={() => setHistoryVisible(v => v + 20)}
+                  style={{ width: '100%', marginTop: '12px', padding: '10px', background: 'var(--c-fill-light)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--c-brand)', fontWeight: 'bold' }}
+                >
+                  显示更多（还有 {history.length - historyVisible} 条）
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </main>
     </div>
   )
