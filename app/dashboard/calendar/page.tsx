@@ -260,7 +260,7 @@ export default function CalendarPage() {
             {(() => {
               const monthClasses = classes
                 .filter(c => c.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`))
-                .sort((a, b) => (a.date + (a.start_time || '')).localeCompare(b.date + (b.start_time || '')))
+                .sort((a, b) => (b.date + (b.start_time || '')).localeCompare(a.date + (a.start_time || '')))
               if (monthClasses.length === 0 && !isLoading) return (
                 <p style={{ color: 'var(--c-text-hint)', textAlign: 'center', padding: 'var(--sp-6) 0', fontSize: 'var(--text-base)' }}>{t('本月暂无课程', 'No classes this month')}</p>
               )
