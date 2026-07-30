@@ -29,6 +29,7 @@ import {
   User,
   LogOut,
   Home,
+  BarChart3,
 } from 'lucide-react'
 
 interface NavGroup {
@@ -58,6 +59,7 @@ const trainerNav: NavGroup[] = [
       { label: '我的计划', href: '/dashboard/plans',      icon: ClipboardList },
       { label: '训练方案', href: '/dashboard/programs',   icon: Trophy },
       { label: '课后作业', href: '/dashboard/workouts',   icon: ClipboardList },
+      { label: '统计',    href: '/dashboard/stats',      icon: BarChart3 },
     ],
   },
 ]

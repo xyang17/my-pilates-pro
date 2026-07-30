@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabaseAdmin
       .from('user')
-      .select('id, name, bio, photo_url, certificate, role')
+      .select('id, name, bio, photo_url, role, can_view_store_stats')
       .in('role', ['ADMIN', 'TRAINER'])
       .order('name')
 
