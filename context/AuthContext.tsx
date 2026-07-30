@@ -48,12 +48,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         setUser(session?.user ?? null)
         if (session?.user) {
-          const { data } = await supabase
-            .from('user')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
-          setUserRole(data?.role || 'CLIENT')
+          try {
+            const { data } = await supabase
+              .from('user')
+              .select('role')
+              .eq('id', session.user.id)
+              .single()
+            setUserRole(data?.role || 'CLIENT')
+          } catch (err) {
+            console.error('Failed to fetch user role on auth state change:', err)
+            setUserRole('CLIENT')
+          }
+        } else {
+          setUserRole(null)
         }
       }
     )

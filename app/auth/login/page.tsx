@@ -20,7 +20,16 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      // 加一个超时兜底：Supabase 客户端在某些情况下（比如多个标签页同时持有登录锁）
+      // 请求会一直不 resolve，导致按钮永远转圈却没有任何提示。
+      // 这里给 15 秒上限，超时就报错让用户重试，而不是无限等待。
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('登录超时，请刷新页面后重试（如果开了多个标签页，建议先关掉其他标签页）')), 15000)
+      )
+      const { error } = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        timeout,
+      ])
       if (error) { setError(error.message); return }
       router.push('/dashboard')
     } catch (err: any) {
