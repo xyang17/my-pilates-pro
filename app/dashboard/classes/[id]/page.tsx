@@ -140,7 +140,7 @@ export default function ClassDetailPage() {
   const [recentExIds, setRecentExIds] = useState<string[]>([])
   // Class copy modal
   const [showCopyModal, setShowCopyModal] = useState(false)
-  const [copyForm, setCopyForm] = useState({ name: '', date: '', start_time: '', assigned_to: '' })
+  const [copyForm, setCopyForm] = useState({ name: '', date: '', start_time: '', assigned_to: '', price: '', duration: '' })
   const [copying, setCopying] = useState(false)
   const [copyExercises, setCopyExercises] = useState<ClassExercise[]>([])
   // Drag-to-reorder
@@ -550,6 +550,8 @@ export default function ClassDetailPage() {
       date: '',
       start_time: classData.start_time?.slice(0, 5) || '',
       assigned_to: classData.assigned_to || '',
+      price: classData.price != null ? String(classData.price) : '',
+      duration: classData.duration != null ? String(classData.duration) : '',
     })
     // Re-fetch exercises fresh from DB so copy always reflects latest saved state
     try {
@@ -580,13 +582,13 @@ export default function ClassDetailPage() {
           name: copyForm.name || classData.name,
           date: copyForm.date,
           start_time: copyForm.start_time || null,
-          duration: classData.duration,
+          duration: copyForm.duration !== '' ? parseInt(copyForm.duration, 10) : classData.duration,
           discipline: classData.discipline || classData.type,
           class_type: classData.class_type,
           level: classData.level || 'beginner',
           description: classData.description || null,
           max_capacity: classData.max_capacity || null,
-          price: classData.price || null,
+          price: copyForm.price !== '' ? parseFloat(copyForm.price) : (classData.price || null),
           color: classData.color || null,
           trainer_id: classData.trainer_id || null,
           assigned_to: copyForm.assigned_to || null,
@@ -1961,6 +1963,33 @@ export default function ClassDetailPage() {
                   style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
                 />
               </label>
+
+              {/* Price + Duration */}
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                <label style={{ fontSize: '13px', color: '#666', display: 'block', flex: 1 }}>
+                  {t('价格', 'Price')}
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={copyForm.price}
+                    onChange={e => setCopyForm(p => ({ ...p, price: e.target.value }))}
+                    placeholder={t('默认与原课程相同', 'Same as original')}
+                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                </label>
+                <label style={{ fontSize: '13px', color: '#666', display: 'block', flex: 1 }}>
+                  {t('时长（分钟）', 'Duration (min)')}
+                  <input
+                    type="number"
+                    min="0"
+                    value={copyForm.duration}
+                    onChange={e => setCopyForm(p => ({ ...p, duration: e.target.value }))}
+                    placeholder={t('默认与原课程相同', 'Same as original')}
+                    style={{ display: 'block', width: '100%', marginTop: '4px', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                </label>
+              </div>
 
               {/* Student (private class only) */}
               {classData.class_type === 'private' && (
