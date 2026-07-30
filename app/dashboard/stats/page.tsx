@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 
-type PeriodType = 'week' | 'month' | 'quarter' | 'year'
+type PeriodType = 'week' | 'month' | 'quarter' | 'year' | 'custom'
 type Scope = 'own' | 'store'
 
 interface TypeStat { count: number; revenue: number }
@@ -20,12 +20,14 @@ interface Summary {
 }
 interface TrendPoint { label: string; classes: number; revenue: number }
 interface TrainerStat extends Summary { trainer_id: string; name: string }
+interface ClientStat { client_id: string; name: string; classes: number; revenue: number }
 interface StatsResponse {
   range: { start: string; end: string; label: string }
   scope: Scope
   summary: Summary
   trend: TrendPoint[]
   byTrainer: TrainerStat[]
+  byClient: ClientStat[]
 }
 interface TrainerRow {
   id: string
@@ -39,9 +41,20 @@ const PERIOD_TABS: { key: PeriodType; zh: string; en: string }[] = [
   { key: 'month', zh: '月', en: 'Month' },
   { key: 'quarter', zh: '季', en: 'Quarter' },
   { key: 'year', zh: '年', en: 'Year' },
+  { key: 'custom', zh: '自定义', en: 'Custom' },
 ]
 
 const fmtMoney = (n: number) => `¥${Math.round(n || 0).toLocaleString()}`
+
+const todayStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const daysAgoStr = (n: number) => {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 export default function StatsPage() {
   const { user, userRole, loading: authLoading } = useAuth()
@@ -50,6 +63,8 @@ export default function StatsPage() {
 
   const [periodType, setPeriodType] = useState<PeriodType>('month')
   const [offset, setOffset] = useState(0)
+  const [customStart, setCustomStart] = useState(daysAgoStr(29))
+  const [customEnd, setCustomEnd] = useState(todayStr())
   const [scope, setScope] = useState<Scope>('own')
   const [canViewStore, setCanViewStore] = useState(false)
   const [data, setData] = useState<StatsResponse | null>(null)
@@ -81,9 +96,12 @@ export default function StatsPage() {
 
   const fetchStats = useCallback(async () => {
     if (!user || !userRole || userRole === 'CLIENT') return
+    if (periodType === 'custom' && (!customStart || !customEnd || customStart > customEnd)) return
     setLoading(true)
     try {
-      const params = new URLSearchParams({ type: periodType, offset: String(offset), scope })
+      const params = periodType === 'custom'
+        ? new URLSearchParams({ type: 'custom', start: customStart, end: customEnd, scope })
+        : new URLSearchParams({ type: periodType, offset: String(offset), scope })
       const res = await fetch(`/api/stats?${params}`, {
         headers: { 'x-user-id': user.id, 'x-user-role': userRole },
       })
@@ -95,7 +113,7 @@ export default function StatsPage() {
     } finally {
       setLoading(false)
     }
-  }, [user, userRole, periodType, offset, scope])
+  }, [user, userRole, periodType, offset, scope, customStart, customEnd])
 
   useEffect(() => { fetchStats() }, [fetchStats])
 
@@ -127,6 +145,7 @@ export default function StatsPage() {
   const summary = data?.summary
   const trend = data?.trend || []
   const byTrainer = data?.byTrainer || []
+  const byClient = data?.byClient || []
   const managedTrainers = trainerList.filter(tr => tr.role === 'TRAINER')
 
   return (
@@ -150,7 +169,7 @@ export default function StatsPage() {
         {/* 周期切换 + 我的/全店 切换 */}
         <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 'var(--sp-4)', marginBottom: 'var(--sp-4)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {PERIOD_TABS.map(p => (
                 <button key={p.key} onClick={() => changePeriodType(p.key)} style={{
                   padding: '6px 14px', borderRadius: 20, border: 'none', fontSize: 12, cursor: 'pointer',
@@ -176,20 +195,41 @@ export default function StatsPage() {
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 'var(--sp-4)' }}>
-            <button onClick={() => setOffset(o => o - 1)} style={{
-              background: 'var(--c-fill-light)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-sm)',
-              width: 30, height: 30, cursor: 'pointer', fontSize: 16, color: 'var(--c-text-secondary)',
-            }}>‹</button>
-            <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--c-text-primary)', minWidth: 160, textAlign: 'center' }}>
-              {data?.range.label || '…'}
-            </span>
-            <button onClick={() => setOffset(o => o + 1)} disabled={offset >= 0} style={{
-              background: 'var(--c-fill-light)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-sm)',
-              width: 30, height: 30, cursor: offset >= 0 ? 'not-allowed' : 'pointer', fontSize: 16,
-              color: offset >= 0 ? 'var(--c-border)' : 'var(--c-text-secondary)',
-            }}>›</button>
-          </div>
+          {periodType === 'custom' ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 'var(--sp-4)', flexWrap: 'wrap' }}>
+              <input
+                type="date"
+                value={customStart}
+                max={customEnd}
+                onChange={e => setCustomStart(e.target.value)}
+                style={{ padding: '7px 10px', border: '1px solid var(--c-border)', borderRadius: 'var(--r-sm)', fontSize: 13 }}
+              />
+              <span style={{ color: 'var(--c-text-hint)', fontSize: 13 }}>{t('至', 'to')}</span>
+              <input
+                type="date"
+                value={customEnd}
+                min={customStart}
+                max={todayStr()}
+                onChange={e => setCustomEnd(e.target.value)}
+                style={{ padding: '7px 10px', border: '1px solid var(--c-border)', borderRadius: 'var(--r-sm)', fontSize: 13 }}
+              />
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 'var(--sp-4)' }}>
+              <button onClick={() => setOffset(o => o - 1)} style={{
+                background: 'var(--c-fill-light)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-sm)',
+                width: 30, height: 30, cursor: 'pointer', fontSize: 16, color: 'var(--c-text-secondary)',
+              }}>‹</button>
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--c-text-primary)', minWidth: 160, textAlign: 'center' }}>
+                {data?.range.label || '…'}
+              </span>
+              <button onClick={() => setOffset(o => o + 1)} disabled={offset >= 0} style={{
+                background: 'var(--c-fill-light)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-sm)',
+                width: 30, height: 30, cursor: offset >= 0 ? 'not-allowed' : 'pointer', fontSize: 16,
+                color: offset >= 0 ? 'var(--c-border)' : 'var(--c-text-secondary)',
+              }}>›</button>
+            </div>
+          )}
           {loading && <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--c-text-hint)', margin: '6px 0 0' }}>{t('加载中…', 'Loading…')}</p>}
         </div>
 
@@ -242,6 +282,35 @@ export default function StatsPage() {
             ))}
           </div>
         )}
+
+        {/* 客户对比：上课节数 + 收入贡献排名 */}
+        <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 'var(--sp-4)', marginBottom: 'var(--sp-4)' }}>
+          <h3 style={{ margin: '0 0 4px', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--c-text-primary)' }}>{t('客户对比', 'By Client')}</h3>
+          <p style={{ margin: '0 0 10px', fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)' }}>
+            {t('按收入贡献排名；团课收入按当次报名人数平摊', 'Ranked by revenue contribution; group class revenue is split evenly among enrolled students')}
+          </p>
+          {byClient.length === 0 ? (
+            <p style={{ textAlign: 'center', color: 'var(--c-text-hint)', fontSize: 'var(--text-sm)', padding: '16px 0', margin: 0 }}>
+              {t('本周期暂无数据', 'No data this period')}
+            </p>
+          ) : byClient.map((c, i) => (
+            <div key={c.client_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--c-border)' }}>
+              <span style={{
+                width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                background: i < 3 ? 'var(--c-brand)' : 'var(--c-fill-light)',
+                color: i < 3 ? '#fff' : 'var(--c-text-hint)',
+                fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>{i + 1}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--c-brand)' }}>{fmtMoney(c.revenue)}</p>
+                <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)' }}>{t(`${c.classes} 节`, `${c.classes} classes`)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
 
         {/* ADMIN 权限管理面板 */}
         {userRole === 'ADMIN' && (
