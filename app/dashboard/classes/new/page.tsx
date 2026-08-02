@@ -289,12 +289,12 @@ export default function NewClassPage() {
     setIsLoading(true)
     setError('')
 
-    // Auto-generate name for private class if not filled
+    // Auto-generate name if not filled
     let submitData = { ...formData }
-    if (isPrivate && !submitData.name.trim()) {
-      if (isSubstitute || !submitData.assigned_to) {
+    if (!submitData.name.trim()) {
+      if (isSubstitute || (isPrivate && !submitData.assigned_to)) {
         submitData.name = `代课 · ${submitData.date}`
-      } else {
+      } else if (isPrivate) {
         const client = clients.find(c => c.id === submitData.assigned_to)
         const clientLabel = client?.name || client?.email || '学员'
         submitData.name = `${clientLabel} · ${submitData.date}`
@@ -373,69 +373,72 @@ export default function NewClassPage() {
             </div>
           </section>
 
-          {/* ── PRIVATE: Student (required) ── */}
-          {isPrivate && (
-            <section style={s.section}>
-              <h2 style={s.sectionTitle}>课程客户 Class Client *</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsSubstitute(false)}
-                  style={{
-                    padding: '10px', cursor: 'pointer', fontSize: '13px', borderRadius: '8px',
-                    border: `2px solid ${!isSubstitute ? 'var(--c-brand)' : '#ddd'}`,
-                    backgroundColor: !isSubstitute ? '#f3eef9' : 'white',
-                    color: !isSubstitute ? 'var(--c-brand)' : '#555',
-                    fontWeight: !isSubstitute ? 'bold' : 'normal',
-                  }}
-                >
-                  选择学员 <span style={{ fontWeight: 'normal', color: '#999' }}>Existing Client</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsSubstitute(true); setFormData(prev => ({ ...prev, assigned_to: '' })) }}
-                  style={{
-                    padding: '10px', cursor: 'pointer', fontSize: '13px', borderRadius: '8px',
-                    border: `2px solid ${isSubstitute ? 'var(--c-brand)' : '#ddd'}`,
-                    backgroundColor: isSubstitute ? '#f3eef9' : 'white',
-                    color: isSubstitute ? 'var(--c-brand)' : '#555',
-                    fontWeight: isSubstitute ? 'bold' : 'normal',
-                  }}
-                >
-                  🔄 代课 <span style={{ fontWeight: 'normal', color: '#999' }}>Substitute / No Client</span>
-                </button>
-              </div>
+          {/* ── Class Client / Substitute (both private & group) ── */}
+          <section style={s.section}>
+            <h2 style={s.sectionTitle}>
+              课程客户 Class Client {isPrivate && !isSubstitute ? '*' : ''}
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: isSubstitute || isPrivate ? '12px' : 0 }}>
+              <button
+                type="button"
+                onClick={() => setIsSubstitute(false)}
+                style={{
+                  padding: '10px', cursor: 'pointer', fontSize: '13px', borderRadius: '8px',
+                  border: `2px solid ${!isSubstitute ? 'var(--c-brand)' : '#ddd'}`,
+                  backgroundColor: !isSubstitute ? '#f3eef9' : 'white',
+                  color: !isSubstitute ? 'var(--c-brand)' : '#555',
+                  fontWeight: !isSubstitute ? 'bold' : 'normal',
+                }}
+              >
+                {isPrivate ? '选择学员' : '正常团课'}{' '}
+                <span style={{ fontWeight: 'normal', color: '#999' }}>
+                  {isPrivate ? 'Existing Client' : 'Regular'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsSubstitute(true); setFormData(prev => ({ ...prev, assigned_to: '' })) }}
+                style={{
+                  padding: '10px', cursor: 'pointer', fontSize: '13px', borderRadius: '8px',
+                  border: `2px solid ${isSubstitute ? 'var(--c-brand)' : '#ddd'}`,
+                  backgroundColor: isSubstitute ? '#f3eef9' : 'white',
+                  color: isSubstitute ? 'var(--c-brand)' : '#555',
+                  fontWeight: isSubstitute ? 'bold' : 'normal',
+                }}
+              >
+                🔄 代课 <span style={{ fontWeight: 'normal', color: '#999' }}>Substitute / No Client</span>
+              </button>
+            </div>
 
-              {isSubstitute ? (
-                <div>
-                  <label style={s.label}>
-                    <BiLabel cn="备注" en="Note" note="选填，方便自己回顾" />
-                  </label>
-                  <textarea
-                    name="notes" value={formData.notes}
-                    onChange={handleChange} rows={2}
-                    placeholder="例：帮XX教练代私教课 / 临时加的体验课…"
-                    style={{ ...s.input, fontFamily: 'sans-serif', resize: 'vertical' }}
-                  />
-                  <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#999' }}>
-                    不需要客户账号，仅用于记录课时，会正常计入本月收入统计。
-                  </p>
-                </div>
-              ) : (
-                <select
-                  value={formData.assigned_to}
-                  onChange={e => setFormData(prev => ({ ...prev, assigned_to: e.target.value }))}
-                  required
-                  style={s.input}
-                >
-                  <option value="">-- 选择学员 Select student --</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>{c.name || c.email}</option>
-                  ))}
-                </select>
-              )}
-            </section>
-          )}
+            {isSubstitute ? (
+              <div>
+                <label style={s.label}>
+                  <BiLabel cn="备注" en="Note" note="选填，方便自己回顾" />
+                </label>
+                <textarea
+                  name="notes" value={formData.notes}
+                  onChange={handleChange} rows={2}
+                  placeholder={isPrivate ? '例：帮XX教练代私教课 / 临时加的体验课…' : '例：帮XX教练代周三晚团课…'}
+                  style={{ ...s.input, fontFamily: 'sans-serif', resize: 'vertical' }}
+                />
+                <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#999' }}>
+                  不需要客户账号，仅用于记录课时，会正常计入本月收入统计。
+                </p>
+              </div>
+            ) : isPrivate ? (
+              <select
+                value={formData.assigned_to}
+                onChange={e => setFormData(prev => ({ ...prev, assigned_to: e.target.value }))}
+                required
+                style={s.input}
+              >
+                <option value="">-- 选择学员 Select student --</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name || c.email}</option>
+                ))}
+              </select>
+            ) : null}
+          </section>
 
           {/* ── GROUP: Class info (required) ── */}
           {!isPrivate && (
@@ -443,11 +446,14 @@ export default function NewClassPage() {
               <h2 style={s.sectionTitle}>课程信息 Class Info</h2>
 
               <div style={s.field}>
-                <label style={s.label}><BiLabel cn="课程名称" en="Class Name" /> *</label>
+                <label style={s.label}>
+                  <BiLabel cn="课程名称" en="Class Name" note={isSubstitute ? '不填则自动生成' : undefined} />
+                  {!isSubstitute && ' *'}
+                </label>
                 <input
                   type="text" name="name" value={formData.name}
-                  onChange={handleChange} required={!isPrivate}
-                  placeholder="e.g., 周三普拉提床基础课"
+                  onChange={handleChange} required={!isPrivate && !isSubstitute}
+                  placeholder={isSubstitute ? '留空则自动生成为「代课 · 日期」' : 'e.g., 周三普拉提床基础课'}
                   style={s.input}
                 />
               </div>

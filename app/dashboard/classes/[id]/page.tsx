@@ -160,6 +160,8 @@ export default function ClassDetailPage() {
   const [enrollmentSearch, setEnrollmentSearch] = useState('')
   // AI features
   const [aiSuggestingTheme, setAiSuggestingTheme] = useState(false)
+  // Quick mark-complete (no review needed)
+  const [markingComplete, setMarkingComplete] = useState(false)
 
   const { lang, t } = useLang()
   const { showToast } = useToast()
@@ -696,6 +698,35 @@ export default function ClassDetailPage() {
     }
   }
 
+  // 直接标记完成，不用走复盘页。代课/无动作计划的课直接点一下就能计入统计。
+  const handleMarkComplete = async () => {
+    if (!classData || markingComplete) return
+    const done = classData.status === 'completed'
+    if (!done && !confirm(t('确认把这节课标记为已完成？（会计入收入统计）', 'Mark this class as completed? It will count toward revenue stats.'))) return
+    setMarkingComplete(true)
+    try {
+      const res = await fetch(`/api/classes/${classId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        body: JSON.stringify(
+          done
+            ? { status: 'planned', completed_at: null }
+            : { status: 'completed', completed_at: new Date().toISOString() }
+        ),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || '操作失败')
+      }
+      await fetchClassData()
+      showToast(done ? t('已恢复为未开始', 'Reverted to not started') : t('已标记完成 ✓', 'Marked complete ✓'))
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setMarkingComplete(false)
+    }
+  }
+
   const handleRemoveExercise = async (instanceId: string) => {
     if (!confirm('确认移除这个动作？')) return
     try {
@@ -924,21 +955,40 @@ export default function ClassDetailPage() {
         {/* Action button based on status and role */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', flexShrink: 0 }}>
           {canReview && classData.status !== 'completed' && (
-            <Link href={`/dashboard/classes/${classId}/review`} style={{
-              padding: '7px 14px', background: 'var(--c-brand)', color: '#fff',
-              textDecoration: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--text-sm)', fontWeight: 500,
-            }}>
-              复盘 →
-            </Link>
+            <>
+              <button onClick={handleMarkComplete} disabled={markingComplete} style={{
+                padding: '7px 14px', background: '#4CAF50', color: '#fff',
+                border: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--text-sm)', fontWeight: 500,
+                cursor: markingComplete ? 'not-allowed' : 'pointer', opacity: markingComplete ? 0.6 : 1,
+              }}>
+                {markingComplete ? '…' : '✓ 完成'}
+              </button>
+              <Link href={`/dashboard/classes/${classId}/review`} style={{
+                padding: '7px 14px', background: 'var(--c-fill-light)', color: 'var(--c-text-primary)',
+                textDecoration: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--text-sm)',
+                border: '1px solid var(--c-border)',
+              }}>
+                复盘 →
+              </Link>
+            </>
           )}
           {canReview && classData.status === 'completed' && (
-            <Link href={`/dashboard/classes/${classId}/review`} style={{
-              padding: '7px 14px', background: 'var(--c-fill-light)', color: 'var(--c-text-primary)',
-              textDecoration: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--text-sm)',
-              border: '1px solid var(--c-border)',
-            }}>
-              查看复盘
-            </Link>
+            <>
+              <button onClick={handleMarkComplete} disabled={markingComplete} title={t('撤销完成', 'Undo complete')} style={{
+                padding: '7px 12px', background: 'var(--c-fill-light)', color: 'var(--c-text-secondary)',
+                border: '1px solid var(--c-border)', borderRadius: 'var(--r-sm)', fontSize: 'var(--text-sm)',
+                cursor: markingComplete ? 'not-allowed' : 'pointer', opacity: markingComplete ? 0.6 : 1,
+              }}>
+                {markingComplete ? '…' : '↩ 撤销完成'}
+              </button>
+              <Link href={`/dashboard/classes/${classId}/review`} style={{
+                padding: '7px 14px', background: 'var(--c-fill-light)', color: 'var(--c-text-primary)',
+                textDecoration: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--text-sm)',
+                border: '1px solid var(--c-border)',
+              }}>
+                查看复盘
+              </Link>
+            </>
           )}
           {canAddStudentNote && (
             <Link href={`/dashboard/classes/${classId}/student-notes`} style={{
