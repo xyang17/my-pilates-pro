@@ -893,7 +893,7 @@ export default function ClassDetailPage() {
     )
   }
 
-  const canReview = isTrainer && classData.class_type === 'private'
+  const canReview = isTrainer
   const canAddStudentNote = !isTrainer && classData.class_type === 'group'
 
   return (
@@ -1024,12 +1024,12 @@ export default function ClassDetailPage() {
                     <option value="advanced">高级</option>
                   </select>
                 </div>
-                {classData.class_type === 'private' && clientList.length > 0 && (
+                {classData.class_type === 'private' && (
                   <div>
                     <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>学员</label>
                     <select value={infoForm.assigned_to} onChange={e => setInfoForm(p => ({ ...p, assigned_to: e.target.value }))}
                       style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}>
-                      <option value="">未分配</option>
+                      <option value="">未分配（代课 / 无客户账号，可在下方备注写清楚）</option>
                       {clientList.map(c => <option key={c.id} value={c.id}>{c.name || c.email}</option>)}
                     </select>
                   </div>

@@ -226,6 +226,7 @@ export default function NewClassPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [isSubstitute, setIsSubstitute] = useState(false)
 
   const isPrivate = formData.class_type === 'private'
 
@@ -291,10 +292,15 @@ export default function NewClassPage() {
     // Auto-generate name for private class if not filled
     let submitData = { ...formData }
     if (isPrivate && !submitData.name.trim()) {
-      const client = clients.find(c => c.id === submitData.assigned_to)
-      const clientLabel = client?.name || client?.email || '学员'
-      submitData.name = `${clientLabel} · ${submitData.date}`
+      if (isSubstitute || !submitData.assigned_to) {
+        submitData.name = `代课 · ${submitData.date}`
+      } else {
+        const client = clients.find(c => c.id === submitData.assigned_to)
+        const clientLabel = client?.name || client?.email || '学员'
+        submitData.name = `${clientLabel} · ${submitData.date}`
+      }
     }
+    if (isSubstitute) submitData.assigned_to = ''
 
     try {
       const photos = photoUrls.filter((u) => u.trim())
@@ -370,18 +376,64 @@ export default function NewClassPage() {
           {/* ── PRIVATE: Student (required) ── */}
           {isPrivate && (
             <section style={s.section}>
-              <h2 style={s.sectionTitle}>选择学员 Student *</h2>
-              <select
-                value={formData.assigned_to}
-                onChange={e => setFormData(prev => ({ ...prev, assigned_to: e.target.value }))}
-                required
-                style={s.input}
-              >
-                <option value="">-- 选择学员 Select student --</option>
-                {clients.map(c => (
-                  <option key={c.id} value={c.id}>{c.name || c.email}</option>
-                ))}
-              </select>
+              <h2 style={s.sectionTitle}>课程客户 Class Client *</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsSubstitute(false)}
+                  style={{
+                    padding: '10px', cursor: 'pointer', fontSize: '13px', borderRadius: '8px',
+                    border: `2px solid ${!isSubstitute ? 'var(--c-brand)' : '#ddd'}`,
+                    backgroundColor: !isSubstitute ? '#f3eef9' : 'white',
+                    color: !isSubstitute ? 'var(--c-brand)' : '#555',
+                    fontWeight: !isSubstitute ? 'bold' : 'normal',
+                  }}
+                >
+                  选择学员 <span style={{ fontWeight: 'normal', color: '#999' }}>Existing Client</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsSubstitute(true); setFormData(prev => ({ ...prev, assigned_to: '' })) }}
+                  style={{
+                    padding: '10px', cursor: 'pointer', fontSize: '13px', borderRadius: '8px',
+                    border: `2px solid ${isSubstitute ? 'var(--c-brand)' : '#ddd'}`,
+                    backgroundColor: isSubstitute ? '#f3eef9' : 'white',
+                    color: isSubstitute ? 'var(--c-brand)' : '#555',
+                    fontWeight: isSubstitute ? 'bold' : 'normal',
+                  }}
+                >
+                  🔄 代课 <span style={{ fontWeight: 'normal', color: '#999' }}>Substitute / No Client</span>
+                </button>
+              </div>
+
+              {isSubstitute ? (
+                <div>
+                  <label style={s.label}>
+                    <BiLabel cn="备注" en="Note" note="选填，方便自己回顾" />
+                  </label>
+                  <textarea
+                    name="notes" value={formData.notes}
+                    onChange={handleChange} rows={2}
+                    placeholder="例：帮XX教练代私教课 / 临时加的体验课…"
+                    style={{ ...s.input, fontFamily: 'sans-serif', resize: 'vertical' }}
+                  />
+                  <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#999' }}>
+                    不需要客户账号，仅用于记录课时，会正常计入本月收入统计。
+                  </p>
+                </div>
+              ) : (
+                <select
+                  value={formData.assigned_to}
+                  onChange={e => setFormData(prev => ({ ...prev, assigned_to: e.target.value }))}
+                  required
+                  style={s.input}
+                >
+                  <option value="">-- 选择学员 Select student --</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name || c.email}</option>
+                  ))}
+                </select>
+              )}
             </section>
           )}
 

@@ -69,6 +69,7 @@ export async function PUT(
     if (body.color           !== undefined) updates.color           = body.color
     if (body.cover_image_url !== undefined) updates.cover_image_url = body.cover_image_url
     if (body.trainer_id      !== undefined) updates.trainer_id      = body.trainer_id
+    if (body.assigned_to     !== undefined) updates.assigned_to     = body.assigned_to
     if (body.status          !== undefined) updates.status          = body.status
     if (body.notes           !== undefined) updates.notes           = body.notes
     if (body.feedback        !== undefined) updates.feedback        = body.feedback
