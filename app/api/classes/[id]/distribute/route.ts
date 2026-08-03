@@ -7,8 +7,8 @@ const supabaseAdmin = createClient(
 )
 
 // POST /api/classes/[id]/distribute
-// Trainer distributes a group class plan to multiple clients.
-// Creates one homework record per client, copying class exercises as planned values.
+// 教练把团课发给学员：默认只是把学员报名进这节课，让他们在「我的课程」里看到课程内容。
+// 只有显式传 create_homework=true 时，才额外复制一份动作作为「课后作业」。
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -23,7 +23,7 @@ export async function POST(
 
     const { id: classId } = await params
     const body = await req.json()
-    const { client_ids, due_date } = body
+    const { client_ids, due_date, create_homework = false } = body
 
     if (!Array.isArray(client_ids) || client_ids.length === 0) {
       return NextResponse.json({ error: 'client_ids required' }, { status: 400 })
@@ -44,8 +44,9 @@ export async function POST(
       .eq('class_id', classId)
       .order('order', { ascending: true })
     if (exErr) return NextResponse.json({ error: exErr.message }, { status: 400 })
-    if (!exercises || exercises.length === 0) {
-      return NextResponse.json({ error: '课程没有动作，无法分发' }, { status: 400 })
+    // 只有布置作业时才要求课程里有动作；单纯发课程内容不需要
+    if (create_homework && (!exercises || exercises.length === 0)) {
+      return NextResponse.json({ error: '课程没有动作，无法布置作业' }, { status: 400 })
     }
 
     // 同时把学员报名进这节课，这样学员端「我的课程」里能直接看到课程本身，
@@ -62,6 +63,16 @@ export async function POST(
       await supabaseAdmin
         .from('class_enrollment')
         .insert(toEnroll.map((cid: string) => ({ class_id: classId, student_id: cid })))
+    }
+
+    if (!create_homework) {
+      return NextResponse.json({
+        enrolled: toEnroll.length,
+        already_enrolled: enrolledSet.size,
+        created: 0,
+        skipped: 0,
+        results: [],
+      }, { status: 201 })
     }
 
     // For each client, create homework + exercises (skip if already distributed)
@@ -122,7 +133,13 @@ export async function POST(
     const created = results.filter(r => !r.skipped).length
     const skipped = results.filter(r => r.skipped).length
 
-    return NextResponse.json({ created, skipped, results }, { status: 201 })
+    return NextResponse.json({
+      enrolled: toEnroll.length,
+      already_enrolled: enrolledSet.size,
+      created,
+      skipped,
+      results,
+    }, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
