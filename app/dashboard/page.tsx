@@ -6,18 +6,33 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Calendar, ChevronRight, Clock, Users, ClipboardCheck, Plus } from 'lucide-react'
 
+interface ClassItem {
+  id: string
+  name: string
+  date: string
+  start_time?: string | null
+  duration: number
+  type: string
+  discipline?: string
+  class_type: string
+  status: string
+  post_summary: string | null
+  client_names?: string[]
+}
+
+interface HomeworkItem {
+  id: string
+  title: string
+  due_date: string | null
+  status: string
+  class_id: string | null
+}
+
 interface DashboardData {
-  today_classes: {
-    id: string
-    name: string
-    date: string
-    duration: number
-    type: string
-    class_type: string
-    status: string
-    post_summary: string | null
-    client_names: string[]
-  }[]
+  today_classes: ClassItem[]
+  upcoming_classes: ClassItem[]
+  homework: HomeworkItem[]
+  homework_count: number
   month_count: number
   pending_review: number
   client_count: number
@@ -26,10 +41,16 @@ interface DashboardData {
 
 const WEEKDAY_ZH = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 const STATUS_LABEL: Record<string, { text: string; bg: string; color: string }> = {
+  planned:     { text: '待上课', bg: '#EDE6F4', color: '#9880B8' },
   scheduled:   { text: '待上课', bg: '#EDE6F4', color: '#9880B8' },
   in_progress: { text: '进行中', bg: '#FFF8E1', color: '#F57F17' },
   completed:   { text: '已完成', bg: '#E8F5E9', color: '#2E7D32' },
   cancelled:   { text: '已取消', bg: '#F5EDED', color: '#C4A4A4' },
+}
+
+const fmtDate = (d: string) => {
+  const dt = new Date(d + 'T12:00:00')
+  return `${dt.getMonth() + 1}月${dt.getDate()}日`
 }
 
 export default function DashboardPage() {
@@ -154,8 +175,8 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {data.today_classes.map(cls => {
                 const st = STATUS_LABEL[cls.status] || STATUS_LABEL.scheduled
-                const time = new Date(cls.date).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-                const needsReview = cls.status === 'completed' && !cls.post_summary
+                const time = cls.start_time ? cls.start_time.slice(0, 5) : '待定'
+                const needsReview = isTrainer && cls.status === 'completed' && !cls.post_summary
                 return (
                   <Link key={cls.id} href={`/dashboard/classes/${cls.id}`} style={{ textDecoration: 'none' }}>
                     <div style={{
@@ -184,10 +205,11 @@ export default function DashboardPage() {
                           {cls.duration && (
                             <span style={{ fontSize: 12, color: 'var(--c-text-hint)' }}>{cls.duration} 分钟</span>
                           )}
-                          {cls.client_names?.length > 0 && (
+                          {(cls.client_names ?? []).length > 0 && (
                             <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--c-text-hint)' }}>
                               <Users size={11} />
-                              {cls.client_names.slice(0, 2).join('、')}{cls.client_names.length > 2 ? ` 等${cls.client_names.length}人` : ''}
+                              {(cls.client_names ?? []).slice(0, 2).join('、')}
+                              {(cls.client_names ?? []).length > 2 ? ` 等${(cls.client_names ?? []).length}人` : ''}
                             </span>
                           )}
                         </div>
@@ -200,6 +222,81 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
+
+        {/* Upcoming classes — client only */}
+        {!isTrainer && !!data?.upcoming_classes?.length && (
+          <section style={{ marginBottom: 24 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', margin: '0 0 12px' }}>
+              即将上课
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {data.upcoming_classes.map(cls => (
+                <Link key={cls.id} href={`/dashboard/classes/${cls.id}`} style={{ textDecoration: 'none' }}>
+                  <div style={{
+                    background: 'var(--c-card-bg)', border: '1px solid var(--c-border)',
+                    borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', margin: '0 0 4px' }}>{cls.name}</p>
+                      <p style={{ fontSize: 12, color: 'var(--c-text-hint)', margin: 0 }}>
+                        {fmtDate(cls.date)}
+                        {cls.start_time ? ` · ${cls.start_time.slice(0, 5)}` : ''}
+                        {cls.duration ? ` · ${cls.duration} 分钟` : ''}
+                      </p>
+                    </div>
+                    <ChevronRight size={16} color="var(--c-text-hint)" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Homework — client only */}
+        {!isTrainer && (
+          <section style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', margin: 0 }}>
+                待完成作业{data?.homework_count ? ` (${data.homework_count})` : ''}
+              </h2>
+              <Link href="/dashboard/workouts" style={{ fontSize: 13, color: 'var(--c-brand)', textDecoration: 'none', fontWeight: 500 }}>
+                全部
+              </Link>
+            </div>
+
+            {!data?.homework?.length ? (
+              <div style={{ background: 'var(--c-card-bg)', borderRadius: 12, padding: '28px 20px', textAlign: 'center' }}>
+                <ClipboardCheck size={26} color="var(--c-text-hint)" style={{ margin: '0 auto 10px', display: 'block' }} />
+                <p style={{ fontSize: 14, color: 'var(--c-text-hint)', margin: 0 }}>暂时没有待完成的作业</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {data.homework.slice(0, 5).map(hw => {
+                  const overdue = !!hw.due_date && hw.due_date < (data?.date || '')
+                  return (
+                    <Link key={hw.id} href="/dashboard/workouts" style={{ textDecoration: 'none' }}>
+                      <div style={{
+                        background: 'var(--c-card-bg)',
+                        border: `1px solid ${overdue ? '#E0B4B4' : 'var(--c-border)'}`,
+                        borderRadius: 12, padding: '14px 16px',
+                        display: 'flex', alignItems: 'center', gap: 12,
+                      }}>
+                        <span style={{ fontSize: 20 }}>📋</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', margin: '0 0 4px' }}>{hw.title}</p>
+                          <p style={{ fontSize: 12, color: overdue ? '#C4A4A4' : 'var(--c-text-hint)', margin: 0 }}>
+                            {hw.due_date ? `截止 ${fmtDate(hw.due_date)}${overdue ? '（已逾期）' : ''}` : '无截止日期'}
+                          </p>
+                        </div>
+                        <ChevronRight size={16} color="var(--c-text-hint)" />
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Quick links — trainer only */}
         {isTrainer && (

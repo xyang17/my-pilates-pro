@@ -24,7 +24,16 @@ export async function GET(req: NextRequest) {
     } else if (userRole === 'TRAINER') {
       query = query.eq('created_by', userId)
     } else {
-      query = query.or(`created_by.eq.${userId},assigned_to.eq.${userId}`)
+      // 学员：自己创建的、被指派的私教课，以及已报名的团课都要能看到
+      const { data: enrolled } = await supabaseAdmin
+        .from('class_enrollment')
+        .select('class_id')
+        .eq('student_id', userId)
+
+      const enrolledIds = (enrolled || []).map(e => e.class_id).filter(Boolean)
+      const filters = [`created_by.eq.${userId}`, `assigned_to.eq.${userId}`]
+      if (enrolledIds.length > 0) filters.push(`id.in.(${enrolledIds.join(',')})`)
+      query = query.or(filters.join(','))
     }
 
     const { data, error } = await query

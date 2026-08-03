@@ -48,6 +48,22 @@ export async function POST(
       return NextResponse.json({ error: '课程没有动作，无法分发' }, { status: 400 })
     }
 
+    // 同时把学员报名进这节课，这样学员端「我的课程」里能直接看到课程本身，
+    // 而不是只在「课后作业」里看到一份作业。
+    const { data: alreadyEnrolled } = await supabaseAdmin
+      .from('class_enrollment')
+      .select('student_id')
+      .eq('class_id', classId)
+      .in('student_id', client_ids)
+
+    const enrolledSet = new Set((alreadyEnrolled || []).map((e: any) => e.student_id))
+    const toEnroll = client_ids.filter((cid: string) => !enrolledSet.has(cid))
+    if (toEnroll.length > 0) {
+      await supabaseAdmin
+        .from('class_enrollment')
+        .insert(toEnroll.map((cid: string) => ({ class_id: classId, student_id: cid })))
+    }
+
     // For each client, create homework + exercises (skip if already distributed)
     const results: { client_id: string; homework_id: string; skipped?: boolean }[] = []
 
