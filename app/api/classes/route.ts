@@ -13,33 +13,47 @@ export async function GET(req: NextRequest) {
     const userRole = req.headers.get('x-user-role')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    let query = supabaseAdmin
-      .from('class')
-      .select('*')
-      .order('date', { ascending: false })
-
     // ADMIN sees all classes; TRAINERs see classes they created; clients see their own
-    if (userRole === 'ADMIN') {
-      // no filter — see all
-    } else if (userRole === 'TRAINER') {
-      query = query.eq('created_by', userId)
-    } else {
-      // 学员：自己创建的、被指派的私教课，以及已报名的团课都要能看到
-      const { data: enrolled } = await supabaseAdmin
-        .from('class_enrollment')
-        .select('class_id')
-        .eq('student_id', userId)
+    if (userRole === 'ADMIN' || userRole === 'TRAINER') {
+      let query = supabaseAdmin
+        .from('class')
+        .select('*')
+        .order('date', { ascending: false })
 
-      const enrolledIds = (enrolled || []).map(e => e.class_id).filter(Boolean)
-      const filters = [`created_by.eq.${userId}`, `assigned_to.eq.${userId}`]
-      if (enrolledIds.length > 0) filters.push(`id.in.(${enrolledIds.join(',')})`)
-      query = query.or(filters.join(','))
+      if (userRole === 'TRAINER') query = query.eq('created_by', userId)
+
+      const { data, error } = await query
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+      return NextResponse.json(data)
     }
 
-    const { data, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    // 学员：被指派的私教课 + 自己创建的 + 已报名的团课。
+    // 分开查再合并，避免 PostgREST 的 or(...in...) 语法出问题。
+    const { data: enrolled } = await supabaseAdmin
+      .from('class_enrollment')
+      .select('class_id')
+      .eq('student_id', userId)
 
-    return NextResponse.json(data)
+    const enrolledIds = [...new Set((enrolled || []).map(e => e.class_id).filter(Boolean))]
+
+    const [ownRes, enrolledRes] = await Promise.all([
+      supabaseAdmin
+        .from('class')
+        .select('*')
+        .or(`created_by.eq.${userId},assigned_to.eq.${userId}`),
+      enrolledIds.length > 0
+        ? supabaseAdmin.from('class').select('*').in('id', enrolledIds)
+        : Promise.resolve({ data: [], error: null }),
+    ])
+
+    if (ownRes.error) return NextResponse.json({ error: ownRes.error.message }, { status: 400 })
+    if (enrolledRes.error) return NextResponse.json({ error: enrolledRes.error.message }, { status: 400 })
+
+    const byId = new Map<string, any>()
+    ;[...(ownRes.data || []), ...(enrolledRes.data || [])].forEach(c => byId.set(c.id, c))
+    const merged = [...byId.values()].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+
+    return NextResponse.json(merged)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

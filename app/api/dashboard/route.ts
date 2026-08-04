@@ -29,25 +29,32 @@ export async function GET(req: NextRequest) {
         .select('class_id')
         .eq('student_id', userId)
 
-      const enrolledIds = (enrolled || []).map(e => e.class_id).filter(Boolean)
-      const filters = [`assigned_to.eq.${userId}`, `created_by.eq.${userId}`]
-      if (enrolledIds.length > 0) filters.push(`id.in.(${enrolledIds.join(',')})`)
+      const enrolledIds = [...new Set((enrolled || []).map(e => e.class_id).filter(Boolean))]
 
-      const { data: todayClasses } = await supabaseAdmin
-        .from('class')
-        .select(CLASS_FIELDS)
-        .eq('date', dateStr)
-        .or(filters.join(','))
-        .order('start_time', { ascending: true })
+      // 分开查再合并，避免 PostgREST 的 or(...in...) 语法出问题
+      const [ownRes, enrolledRes] = await Promise.all([
+        supabaseAdmin
+          .from('class')
+          .select(CLASS_FIELDS)
+          .or(`created_by.eq.${userId},assigned_to.eq.${userId}`),
+        enrolledIds.length > 0
+          ? supabaseAdmin.from('class').select(CLASS_FIELDS).in('id', enrolledIds)
+          : Promise.resolve({ data: [] as any[], error: null }),
+      ])
+
+      const byId = new Map<string, any>()
+      ;[...(ownRes.data || []), ...(enrolledRes.data || [])].forEach(c => byId.set(c.id, c))
+      const myClasses = [...byId.values()]
+
+      const todayClasses = myClasses
+        .filter(c => c.date === dateStr)
+        .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
 
       // 接下来的课（不含今天），给首页做个「即将上课」提示
-      const { data: upcoming } = await supabaseAdmin
-        .from('class')
-        .select(CLASS_FIELDS)
-        .gt('date', dateStr)
-        .or(filters.join(','))
-        .order('date', { ascending: true })
-        .limit(3)
+      const upcoming = myClasses
+        .filter(c => c.date > dateStr)
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+        .slice(0, 3)
 
       // 待完成的作业
       const { data: homework } = await supabaseAdmin
