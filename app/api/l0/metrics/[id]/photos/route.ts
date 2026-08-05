@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/l0-server'
+import { canWriteClientData, getMetricOwner, supabaseAdmin } from '@/lib/l0-server'
 
 const BUCKET = 'assessment-photos'
 
@@ -10,7 +10,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const userId = req.headers.get('x-user-id')
     const userRole = req.headers.get('x-user-role')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (userRole === 'CLIENT') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const owner = await getMetricOwner(id)
+    if (!owner) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!canWriteClientData(userId, userRole, owner)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const formData = await req.formData()
     const file = formData.get('file') as File | null
@@ -63,7 +68,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const userId = req.headers.get('x-user-id')
     const userRole = req.headers.get('x-user-role')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (userRole === 'CLIENT') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const owner = await getMetricOwner(id)
+    if (!owner) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!canWriteClientData(userId, userRole, owner)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const { url } = await req.json()
     if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 })

@@ -1,10 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { canWriteClientData, supabaseAdmin } from '@/lib/l0-server'
 
 // B22 运动禁忌。框架定位：动作库的硬过滤条件，而非仅作展示。
 const WRITABLE = [
@@ -22,7 +17,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const targetUser = body.user_id
     if (!targetUser) return NextResponse.json({ error: 'user_id required' }, { status: 400 })
-    if (userRole === 'CLIENT' && userId !== targetUser) {
+    if (!canWriteClientData(userId, userRole, targetUser)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     if (!body.body_region) return NextResponse.json({ error: 'body_region required' }, { status: 400 })
@@ -53,7 +48,7 @@ export async function PATCH(req: NextRequest) {
     const { data: row } = await supabaseAdmin
       .from('client_contraindication').select('user_id').eq('id', body.id).single()
     if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    if (userRole === 'CLIENT' && userId !== row.user_id) {
+    if (!canWriteClientData(userId, userRole, row.user_id)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -76,10 +71,16 @@ export async function DELETE(req: NextRequest) {
     const userId = req.headers.get('x-user-id')
     const userRole = req.headers.get('x-user-role')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (userRole === 'CLIENT') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const id = new URL(req.url).searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    const { data: row } = await supabaseAdmin
+      .from('client_contraindication').select('user_id').eq('id', id).maybeSingle()
+    if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!canWriteClientData(userId, userRole, row.user_id)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const { error } = await supabaseAdmin.from('client_contraindication').delete().eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

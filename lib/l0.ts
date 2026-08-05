@@ -12,6 +12,13 @@ import type {
   L0FieldMeta, Sex, UnitPreference,
 } from '@/types/l0'
 
+// ─── 报告署名 ────────────────────────────────────────────────
+// 会员可见的报告抬头与页脚。将来有 logo 时把 logoUrl 填上即可。
+export const REPORT_BRAND = {
+  name: 'MyFitnessPro',
+  logoUrl: null as string | null,
+}
+
 // ─── 录入字段配置 ────────────────────────────────────────────
 
 export interface L0FieldConfig {
@@ -313,123 +320,104 @@ export function diffMeasurements(
 // ─── 参考区间提示（事实陈述，非诊断）────────────────────────
 
 export interface ReferenceNote {
-  level: 'info' | 'attention'
-  /**
-   * 参考区间的来源强度，决定措辞尺度：
-   *   consensus —— WHO / AWGS / 中国标准 / NICE 等官方共识切点，可正常引用切点值
-   *   industry  —— 体适能行业经验区间（多为 BIA 设备的常规输出）。
-   *                只描述「数值位于哪一档」，不使用优秀 / 偏高 / 超标这类评价词，
-   *                也不推断任何健康结论。
-   */
-  source: 'consensus' | 'industry'
+  /** good = 可以肯定的；watch = 值得留意的 */
+  tone: 'good' | 'watch'
+  /** 一句话结论，白话，给会员看的 */
   text: string
+  /** 数值与依据，小字附在后面 */
+  detail: string
 }
 
 /**
- * 生成参考区间提示。
+ * 生成本次测量的小结，分「做得好的」与「可以留意的」两栏。
  *
- * 合规约束（Sheet 07 第 15 项）：一律「你的数值是 X，参考区间是 Y」句式，
- * 不输出「你有 XX 症」「XX 功能异常」这类判断。
- *
- * source='industry' 的条目额外收紧：这类区间在不同机构之间差异较大，
- * 且 BIA 本身有可观的测量误差，因此只作位置描述与趋势对照，不作评级。
+ * 这段文字是直接给会员看的，写作要求：
+ *   1. 先说人话（结论），数值和依据放 detail 里当小字；
+ *   2. 不用专业黑话，不堆术语；
+ *   3. 只陈述事实与参考线对照，不下诊断（Sheet 07 第 15 项）；
+ *   4. 宁可少说 —— 处在中间档、没什么可说的项就不出现，不凑数。
  */
 export function referenceNotes(m: Partial<L0BodyMetricFull>, sex: Sex | null): ReferenceNote[] {
   const out: ReferenceNote[] = []
   const isBinary = sex === 'MALE' || sex === 'FEMALE'
   const sexLabel = sex === 'MALE' ? '男' : '女'
 
-  // ── 官方共识切点 ──────────────────────────────────────────
-
-  // B18 腰高比 —— 单一切点 0.5 适用所有成人（NICE 2022）
+  // 腰高比 —— 最直观的一项，放第一条
   if (m.whtr != null) {
     out.push(m.whtr < 0.5
-      ? { level: 'info', source: 'consensus', text: `腰高比 ${m.whtr}，低于 0.5 的通用参考线。` }
-      : { level: 'attention', source: 'consensus', text: `腰高比 ${m.whtr}，通用参考线为 0.5（腰围小于身高一半）。如需进一步解读，建议咨询专业人士。` })
+      ? { tone: 'good', text: '腰围不到身高的一半', detail: `腰高比 ${m.whtr}，健康参考线是 0.5。这是最简单好记的一个指标。` }
+      : { tone: 'watch', text: '腰围超过了身高的一半', detail: `腰高比 ${m.whtr}，健康参考线是 0.5。如果想进一步了解，建议咨询专业人士。` })
   }
 
-  // B05 BMI —— 中国标准
-  if (m.bmi != null) {
-    const band = m.bmi < 18.5 ? '偏瘦区间' : m.bmi < 24 ? '正常区间' : m.bmi < 28 ? '超重区间' : '肥胖区间'
-    out.push({
-      level: 'info', source: 'consensus',
-      text: `BMI ${m.bmi}，按中国标准（正常 18.5–23.9）落在${band}。BMI 不区分脂肪与肌肉，须与体脂率联合解读。`,
-    })
-  }
-
-  // B10 SMI —— AWGS 2019 亚洲切点
+  // 肌肉量
   if (m.smi != null && isBinary) {
     const cut = sex === 'MALE' ? 7.0 : 5.7
     out.push(m.smi >= cut
-      ? { level: 'info', source: 'consensus', text: `四肢骨骼肌指数 ${m.smi} kg/m²，高于 AWGS 2019 亚洲成人参考值（${sexLabel}性 ${cut}）。` }
-      : { level: 'attention', source: 'consensus', text: `四肢骨骼肌指数 ${m.smi} kg/m²，低于 AWGS 2019 亚洲成人参考值（${sexLabel}性 ${cut}）。建议咨询专业人士。` })
+      ? { tone: 'good', text: '肌肉量充足', detail: `四肢肌肉指数 ${m.smi}，亚洲成人的参考线是${sexLabel}性 ${cut}。` }
+      : { tone: 'watch', text: '肌肉量低于亚洲成人参考线', detail: `四肢肌肉指数 ${m.smi}，参考线是${sexLabel}性 ${cut}。建议咨询专业人士。` })
   }
 
-  // B15 腰围 —— 中国肥胖工作组
-  if (m.waist_cm != null && isBinary) {
-    const cut = sex === 'MALE' ? 90 : 85
-    if (m.waist_cm >= cut) {
+  // BMI
+  if (m.bmi != null) {
+    if (m.bmi >= 18.5 && m.bmi < 24) {
+      out.push({ tone: 'good', text: '体重在正常范围', detail: `BMI ${m.bmi}，正常范围是 18.5–23.9。` })
+    } else if (m.bmi < 18.5) {
+      out.push({ tone: 'watch', text: '体重偏轻', detail: `BMI ${m.bmi}，正常范围是 18.5–23.9。` })
+    } else {
       out.push({
-        level: 'attention', source: 'consensus',
-        text: `腰围 ${m.waist_cm} cm，达到中国标准的腹型肥胖参考线（${sexLabel}性 ${cut} cm）。建议咨询专业人士。`,
+        tone: 'watch', text: '体重高于正常范围',
+        detail: `BMI ${m.bmi}，正常范围是 18.5–23.9。BMI 分不清脂肪和肌肉，肌肉多的人也会偏高，要结合体脂率一起看。`,
       })
     }
   }
 
-  // ── 行业经验区间（BIA 设备常规输出）──────────────────────
-  // 措辞规则：只说数值落在第几档，不用评价词，不推断健康结论。
-
-  // B06 体脂率
+  // 体脂率
   if (m.body_fat_pct != null && isBinary) {
-    // 由低到高共 4 档，男 <15 / <20 / <25 / ≥25，女 <23 / <28 / <33 / ≥33
     const cuts = sex === 'MALE' ? [15, 20, 25] : [23, 28, 33]
-    const idx = cuts.findIndex(c => m.body_fat_pct! < c)
-    const band = idx === -1 ? 4 : idx + 1
-    out.push({
-      level: 'info', source: 'industry',
-      text: `体脂率 ${m.body_fat_pct}%。体适能领域常用的${sexLabel}性参考区间分 4 档（由低到高），该数值位于第 ${band} 档。`
-        + `BIA 受水合状态影响可达 ±3%，宜作长期趋势对照，不宜据单次数值下结论。`,
-    })
+    const band = cuts.findIndex(c => m.body_fat_pct! < c)
+    const hint = `体脂率 ${m.body_fat_pct}%。这类数值单次测会有 ±3% 左右的波动，看几次的趋势比看单次准。`
+    if (band === 0 || band === 1) out.push({ tone: 'good', text: '体脂率不高', detail: hint })
+    else if (band === -1) out.push({ tone: 'watch', text: '体脂率偏高', detail: hint })
+    // 中间档不刻意点评
   }
 
-  // B11 FFMI —— 不分档，只描述用途
-  if (m.ffmi != null) {
-    out.push({
-      level: 'info', source: 'industry',
-      text: `FFMI ${m.ffmi} kg/m²，反映去脂体重相对身高的比例，不受体脂干扰。`
-        + `它没有公认的健康切点，主要用途是与本人的历史数据比较，观察增肌进展。`,
-    })
+  // 腰围
+  if (m.waist_cm != null && isBinary) {
+    const cut = sex === 'MALE' ? 90 : 85
+    if (m.waist_cm >= cut) {
+      out.push({
+        tone: 'watch', text: '腰围达到需要留意的水平',
+        detail: `腰围 ${m.waist_cm} cm，${sexLabel}性的参考线是 ${cut} cm。建议咨询专业人士。`,
+      })
+    }
   }
 
-  // B12 内脏脂肪
+  // 内脏脂肪
   if (m.visceral_fat_area != null) {
-    out.push({
-      level: m.visceral_fat_area >= 100 ? 'attention' : 'info', source: 'industry',
-      text: `内脏脂肪面积 ${m.visceral_fat_area} cm²。相关文献中常以 100 cm² 作为参考线。`
-        + (m.visceral_fat_area >= 100 ? '如需进一步解读，建议咨询专业人士。' : ''),
-    })
+    out.push(m.visceral_fat_area < 100
+      ? { tone: 'good', text: '内脏脂肪在参考范围内', detail: `内脏脂肪面积 ${m.visceral_fat_area} cm²，常用参考线是 100。` }
+      : { tone: 'watch', text: '内脏脂肪超过常用参考线', detail: `内脏脂肪面积 ${m.visceral_fat_area} cm²，常用参考线是 100。建议咨询专业人士。` })
   } else if (m.visceral_fat_level != null) {
-    out.push({
-      level: 'info', source: 'industry',
-      text: `内脏脂肪等级 ${m.visceral_fat_level}。各家 BIA 设备的等级刻度不统一，跨设备不可比，`
-        + `应与同一台设备的历史记录对照看。`,
-    })
+    out.push(m.visceral_fat_level < 10
+      ? { tone: 'good', text: '内脏脂肪在设备的标准范围内', detail: `等级 ${m.visceral_fat_level}，这台设备的标准范围是 10 以下。` }
+      : { tone: 'watch', text: '内脏脂肪高于设备的标准范围', detail: `等级 ${m.visceral_fat_level}，这台设备的标准范围是 10 以下。建议咨询专业人士。` })
   }
 
-  // B13 细胞外水比
-  if (m.ecw_tbw_ratio != null) {
-    out.push({
-      level: 'info', source: 'industry',
-      text: `细胞外水比 ${m.ecw_tbw_ratio}。BIA 设备常用的参考区间为 0.360–0.390。`
-        + `该数值受当日水分与训练状态影响较大，宜连续观察而非单次解读。`,
-    })
+  // 左右对称性 —— 只在差异明显时才说，且明确不是伤病判断
+  for (const [pct, part] of [[m.arm_asymmetry_pct, '上肢'], [m.leg_asymmetry_pct, '下肢']] as const) {
+    if (pct != null && pct > 10) {
+      out.push({
+        tone: 'watch', text: `${part}左右肌肉量差得比较多`,
+        detail: `相差 ${pct}%。这只是一项记录，不代表有伤，可以跟教练聊聊平时的发力习惯。`,
+      })
+    }
   }
 
-  // 左右对称性 —— 仅作事实呈现，不做伤病判断
-  if (m.leg_asymmetry_pct != null && m.leg_asymmetry_pct > 10) {
+  // 体内水分分布 —— 只在超出常见范围时才提
+  if (m.ecw_tbw_ratio != null && (m.ecw_tbw_ratio < 0.36 || m.ecw_tbw_ratio > 0.39)) {
     out.push({
-      level: 'attention', source: 'industry',
-      text: `下肢左右瘦组织差异 ${m.leg_asymmetry_pct}%。这是一项事实记录，不构成任何伤病判断。`,
+      tone: 'watch', text: '体内水分分布偏离常见范围',
+      detail: `数值 ${m.ecw_tbw_ratio}，常见范围是 0.360–0.390。这项受当天喝水和训练影响很大，连着测几次更有参考价值。`,
     })
   }
 

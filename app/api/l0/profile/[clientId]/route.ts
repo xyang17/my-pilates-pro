@@ -7,11 +7,13 @@ const supabaseAdmin = createClient(
 )
 
 // B01 / B02 / B21 / B22 —— 不随每次测量变化的静态档案
-const WRITABLE = [
-  'sex', 'birth_date', 'training_years', 'injury_notes', 'unit_preference',
-  'data_use_consent', 'consent_version',
-]
-// consent_at / consent_withdrawn_at 由数据库触发器自动打戳，不接受前端写入
+// 教练/管理员可代会员填写的字段
+const WRITABLE = ['sex', 'birth_date', 'training_years', 'injury_notes', 'unit_preference']
+
+// 只有会员本人能改的字段。知情同意是本人的法律行为，不是数据录入，
+// 代勾的同意在证据上站不住，因此教练与管理员一律不可代办。
+// consent_at / consent_withdrawn_at 由数据库触发器打戳，不接受前端写入。
+const SELF_ONLY = ['data_use_consent', 'consent_version']
 
 function authorize(req: NextRequest, clientId: string) {
   const userId = req.headers.get('x-user-id')
@@ -57,6 +59,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ clie
     const body = await req.json()
     const payload: Record<string, any> = { user_id: clientId }
     for (const k of WRITABLE) if (k in body) payload[k] = body[k] === '' ? null : body[k]
+
+    // 同意字段只在会员本人操作时才写入；教练代填时静默忽略，不报错
+    if (auth.userId === clientId) {
+      for (const k of SELF_ONLY) if (k in body) payload[k] = body[k] === '' ? null : body[k]
+    }
 
     const { data, error } = await supabaseAdmin
       .from('client_profile')

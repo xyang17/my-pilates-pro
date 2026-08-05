@@ -12,6 +12,30 @@ export const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// ─── 权限模型 ────────────────────────────────────────────────
+//
+// 会员是自己数据的第一责任人：本人对自己的档案与测量记录有完整读写权。
+// 教练 / 管理员的定位是「必要时代为填写」，可代任何会员操作。
+// 谁录的记在 l0_body_metric.recorded_by，界面上会区分「本人录入 / 代录」。
+//
+// 例外：知情同意只能由会员本人勾选。代勾的同意在证据上站不住。
+
+/** 本人写自己的 → 放行；教练/管理员 → 放行（代填）；会员写别人的 → 拒绝。 */
+export function canWriteClientData(
+  userId: string | null, role: string | null, clientId: string,
+): boolean {
+  if (!userId) return false
+  if (role === 'CLIENT') return userId === clientId
+  return true
+}
+
+/** 取某条测量记录归属的会员 id，用于校验。记录不存在返回 null。 */
+export async function getMetricOwner(id: string): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from('l0_body_metric').select('client_id').eq('id', id).maybeSingle()
+  return data?.client_id ?? null
+}
+
 /** 可写入的原始列。派生列由 Postgres GENERATED 自动计算，不可写。 */
 export const L0_WRITABLE_COLUMNS = [
   'measured_at', 'measured_time', 'test_tier', 'device_type', 'device_model',

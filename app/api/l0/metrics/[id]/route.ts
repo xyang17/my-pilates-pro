@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sanitizeL0Payload, supabaseAdmin } from '@/lib/l0-server'
+import {
+  canWriteClientData, getMetricOwner, sanitizeL0Payload, supabaseAdmin,
+} from '@/lib/l0-server'
 
 // GET /api/l0/metrics/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -13,6 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .from('l0_body_metric_full').select('*').eq('id', id).single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+    // 会员只能看自己的
     if (userRole === 'CLIENT' && data.client_id !== userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -29,7 +32,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const userId = req.headers.get('x-user-id')
     const userRole = req.headers.get('x-user-role')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (userRole === 'CLIENT') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const owner = await getMetricOwner(id)
+    if (!owner) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!canWriteClientData(userId, userRole, owner)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const payload = sanitizeL0Payload(await req.json())
 
@@ -52,7 +60,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const userId = req.headers.get('x-user-id')
     const userRole = req.headers.get('x-user-role')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (userRole === 'CLIENT') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const owner = await getMetricOwner(id)
+    if (!owner) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!canWriteClientData(userId, userRole, owner)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const { error } = await supabaseAdmin.from('l0_body_metric').delete().eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

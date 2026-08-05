@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { inheritHeight, sanitizeL0Payload, supabaseAdmin } from '@/lib/l0-server'
+import {
+  canWriteClientData, inheritHeight, sanitizeL0Payload, supabaseAdmin,
+} from '@/lib/l0-server'
 
 // GET /api/l0/metrics?clientId=xxx&limit=100
 export async function GET(req: NextRequest) {
@@ -49,11 +51,14 @@ export async function POST(req: NextRequest) {
     const userId = req.headers.get('x-user-id')
     const userRole = req.headers.get('x-user-role')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (userRole === 'CLIENT') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const body = await req.json()
     const clientId = body.client_id
     if (!clientId) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
+    // 会员可为自己建记录；教练/管理员可代任何会员建
+    if (!canWriteClientData(userId, userRole, clientId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const payload = sanitizeL0Payload(body)
     await inheritHeight(clientId, payload)
