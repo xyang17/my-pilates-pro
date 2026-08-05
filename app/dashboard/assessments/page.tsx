@@ -12,9 +12,9 @@ interface Client {
   photo_url?: string
 }
 
-interface RecentAssessment {
+interface RecentMeasurement {
   client_id: string
-  assessed_at: string
+  measured_at: string
 }
 
 export default function AssessmentsPage() {
@@ -38,18 +38,18 @@ export default function AssessmentsPage() {
         fetch('/api/clients', {
           headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
         }),
-        fetch('/api/assessments', {
+        fetch('/api/l0/metrics?limit=500', {
           headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
         }),
       ])
       if (cRes.ok) setClients(await cRes.json())
       if (aRes.ok) {
-        const assessments: RecentAssessment[] = await aRes.json()
-        // Build map of clientId -> most recent assessed_at
+        const measurements: RecentMeasurement[] = await aRes.json()
+        // clientId -> 最近一次 measured_at
         const map: Record<string, string> = {}
-        for (const a of assessments) {
-          if (!map[a.client_id] || a.assessed_at > map[a.client_id]) {
-            map[a.client_id] = a.assessed_at
+        for (const m of measurements) {
+          if (!map[m.client_id] || m.measured_at > map[m.client_id]) {
+            map[m.client_id] = m.measured_at
           }
         }
         setLastAssessed(map)

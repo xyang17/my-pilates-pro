@@ -125,7 +125,7 @@ export default function ClientDetailPage() {
   const fetchAssessments = async () => {
     setALoading(true)
     try {
-      const res = await fetch(`/api/assessments?clientId=${clientId}`, {
+      const res = await fetch(`/api/l0/metrics?clientId=${clientId}`, {
         headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
       })
       if (res.ok) setAssessments(await res.json())
@@ -460,10 +460,10 @@ export default function ClientDetailPage() {
             ) : (
               assessments.map((a, i) => {
                 const metrics = [
-                  a.weight && `体重 ${a.weight}kg`,
+                  a.weight_kg && `体重 ${a.weight_kg}kg`,
                   a.body_fat_pct && `体脂 ${a.body_fat_pct}%`,
-                  a.muscle_mass && `肌肉 ${a.muscle_mass}kg`,
-                  a.resting_hr && `静息HR ${a.resting_hr}bpm`,
+                  a.smm_kg && `骨骼肌 ${a.smm_kg}kg`,
+                  a.whtr && `腰高比 ${a.whtr}`,
                 ].filter(Boolean).slice(0, 3)
                 return (
                   <Link
@@ -478,7 +478,7 @@ export default function ClientDetailPage() {
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', marginBottom: 4 }}>
-                        {new Date(a.assessed_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        {new Date(a.measured_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
                       </div>
                       {metrics.length > 0 && (
                         <div style={{ fontSize: 12, color: '#aaa' }}>

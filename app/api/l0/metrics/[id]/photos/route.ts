@@ -1,14 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { supabaseAdmin } from '@/lib/l0-server'
 
 const BUCKET = 'assessment-photos'
 
-// POST /api/assessments/[id]/photos — upload photo, returns public URL
+// POST /api/l0/metrics/[id]/photos — 上传体测照片/设备报告截图
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -21,27 +16,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const file = formData.get('file') as File | null
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
-    // Validate type
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic']
     if (!allowed.includes(file.type)) {
       return NextResponse.json({ error: '仅支持 JPG/PNG/WEBP/HEIC 格式' }, { status: 400 })
     }
 
     const ext = file.name.split('.').pop() || 'jpg'
-    const path = `${id}/${Date.now()}.${ext}`
-
+    const path = `l0/${id}/${Date.now()}.${ext}`
     const arrayBuffer = await file.arrayBuffer()
+
     const { error: uploadError } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .upload(path, arrayBuffer, { contentType: file.type, upsert: false })
+      .from(BUCKET).upload(path, arrayBuffer, { contentType: file.type, upsert: false })
 
     if (uploadError) {
-      // Bucket may not exist yet — try creating it then retry
       if (uploadError.message.includes('Bucket not found')) {
         await supabaseAdmin.storage.createBucket(BUCKET, { public: true })
         const { error: retryError } = await supabaseAdmin.storage
-          .from(BUCKET)
-          .upload(path, arrayBuffer, { contentType: file.type, upsert: false })
+          .from(BUCKET).upload(path, arrayBuffer, { contentType: file.type, upsert: false })
         if (retryError) return NextResponse.json({ error: retryError.message }, { status: 500 })
       } else {
         return NextResponse.json({ error: uploadError.message }, { status: 500 })
@@ -51,14 +42,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { data: urlData } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path)
     const publicUrl = urlData.publicUrl
 
-    // Append URL to the assessment's photo_urls array
     const { data: existing } = await supabaseAdmin
-      .from('body_assessment').select('photo_urls').eq('id', id).single()
+      .from('l0_body_metric').select('photo_urls').eq('id', id).single()
 
-    const currentUrls: string[] = existing?.photo_urls || []
     await supabaseAdmin
-      .from('body_assessment')
-      .update({ photo_urls: [...currentUrls, publicUrl] })
+      .from('l0_body_metric')
+      .update({ photo_urls: [...(existing?.photo_urls || []), publicUrl] })
       .eq('id', id)
 
     return NextResponse.json({ url: publicUrl })
@@ -67,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
-// DELETE /api/assessments/[id]/photos — remove a photo URL
+// DELETE /api/l0/metrics/[id]/photos  body: { url }
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -80,20 +69,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 })
 
     const { data: existing } = await supabaseAdmin
-      .from('body_assessment').select('photo_urls').eq('id', id).single()
+      .from('l0_body_metric').select('photo_urls').eq('id', id).single()
 
-    const filtered = (existing?.photo_urls || []).filter((u: string) => u !== url)
     await supabaseAdmin
-      .from('body_assessment')
-      .update({ photo_urls: filtered })
+      .from('l0_body_metric')
+      .update({ photo_urls: (existing?.photo_urls || []).filter((u: string) => u !== url) })
       .eq('id', id)
 
-    // Also delete from storage
-    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const storageBase = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`
+    const storageBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`
     if (url.startsWith(storageBase)) {
-      const storagePath = url.replace(storageBase, '')
-      await supabaseAdmin.storage.from(BUCKET).remove([storagePath])
+      await supabaseAdmin.storage.from(BUCKET).remove([url.replace(storageBase, '')])
     }
 
     return NextResponse.json({ ok: true })
