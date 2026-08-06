@@ -4,7 +4,10 @@ import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Calendar, ChevronRight, Clock, Users, ClipboardCheck, Plus } from 'lucide-react'
+import {
+  Calendar, ChevronRight, Clock, Users, ClipboardCheck, Plus,
+  Dumbbell, Activity, BookOpen, Trophy, ClipboardList, BarChart3, Ticket, User,
+} from 'lucide-react'
 
 interface ClassItem {
   id: string
@@ -82,6 +85,38 @@ export default function DashboardPage() {
   )
 
   const isTrainer = userRole === 'TRAINER' || userRole === 'ADMIN'
+
+  // ── 手机首页的功能入口 ──────────────────────────────────────
+  // 学员看不到：统计与课程金额、邀请码、教案（我的计划）、学员管理。
+  // 前三项服务端也有拦截（API 对 CLIENT 返回 403），这里只是不显示入口。
+  const featureEntries = isTrainer
+    ? [
+        { label: '课程日历', href: '/dashboard/calendar',     icon: Calendar },
+        { label: '课程训练', href: '/dashboard/classes',      icon: Dumbbell },
+        { label: '学员管理', href: '/dashboard/clients',      icon: Users },
+        { label: '身体测试', href: '/dashboard/assessments',  icon: Activity },
+        { label: '动作库',   href: '/dashboard/exercises',    icon: BookOpen },
+        { label: '我的计划', href: '/dashboard/plans',        icon: ClipboardList },
+        { label: '训练方案', href: '/dashboard/programs',     icon: Trophy },
+        { label: '课后作业', href: '/dashboard/workouts',     icon: ClipboardCheck },
+        { label: '统计',     href: '/dashboard/stats',        icon: BarChart3 },
+        ...(userRole === 'ADMIN'
+          ? [{ label: '邀请码', href: '/dashboard/invite-codes', icon: Ticket }]
+          : []),
+        { label: '我的主页', href: '/dashboard/profile',      icon: User },
+      ]
+    : [
+        { label: '课程日历', href: '/dashboard/calendar',     icon: Calendar },
+        { label: '我的课程', href: '/dashboard/classes',      icon: Dumbbell },
+        // 学员端的体测页要直接进自己那一页 ——
+        // /dashboard/assessments 是教练的学员列表，会员进去会被弹回首页
+        { label: '身体测试', href: `/dashboard/assessments/${user?.id ?? ''}`, icon: Activity },
+        { label: '动作库',   href: '/dashboard/exercises',    icon: BookOpen },
+        { label: '训练方案', href: '/dashboard/programs',     icon: Trophy },
+        { label: '课后作业', href: '/dashboard/workouts',     icon: ClipboardCheck },
+        { label: '我的主页', href: '/dashboard/profile',      icon: User },
+      ]
+
   const now = new Date()
   const dateLabel = `${now.getMonth() + 1}月${now.getDate()}日 · ${WEEKDAY_ZH[now.getDay()]}`
   const displayName = user?.user_metadata?.name || user?.email || ''
@@ -298,33 +333,36 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {/* Quick links — trainer only */}
-        {isTrainer && (
-          <section>
-            <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', margin: '0 0 12px' }}>快捷入口</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {[
-                { label: '课程日历',  href: '/dashboard/calendar',    emoji: '📅' },
-                { label: '学员管理',  href: '/dashboard/clients',     emoji: '👥' },
-                { label: '身体测试',  href: '/dashboard/assessments', emoji: '🧪' },
-                { label: '我的计划',  href: '/dashboard/plans',       emoji: '📋' },
-              ].map(item => (
-                <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
+        {/* 全部功能 —— 只在手机显示。
+            手机底部只有 5 个 tab，装不下十几项功能，这里补齐入口。
+            电脑上左侧有完整侧边栏，不重复显示。 */}
+        <section className="md:hidden">
+          <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', margin: '0 0 12px' }}>
+            全部功能
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {featureEntries.map(item => {
+              const Icon = item.icon
+              return (
+                <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
                   <div style={{
                     background: 'var(--c-card-bg)',
                     border: '1px solid var(--c-border)',
-                    borderRadius: 12, padding: '14px 16px',
-                    display: 'flex', alignItems: 'center', gap: 10,
+                    borderRadius: 12, padding: '16px 8px',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                    height: '100%', boxSizing: 'border-box',
                   }}>
-                    <span style={{ fontSize: 20 }}>{item.emoji}</span>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--c-text-primary)' }}>{item.label}</span>
-                    <ChevronRight size={14} color="var(--c-text-hint)" style={{ marginLeft: 'auto' }} />
+                    <Icon size={22} color="var(--c-brand)" />
+                    <span style={{
+                      fontSize: 12, fontWeight: 500, color: 'var(--c-text-primary)',
+                      textAlign: 'center', lineHeight: 1.3,
+                    }}>{item.label}</span>
                   </div>
                 </Link>
-              ))}
-            </div>
-          </section>
-        )}
+              )
+            })}
+          </div>
+        </section>
       </main>
     </div>
   )

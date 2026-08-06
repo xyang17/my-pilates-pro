@@ -391,6 +391,17 @@ export default function ClientL0Page() {
           .no-print { display: none !important; }
           @page { margin: 14mm; }
         }
+        /* 窄屏：历史列表从左侧竖栏改成顶部横向滚动条，把宽度让给内容 */
+        @media (max-width: 760px) {
+          #l0-main { flex-direction: column; gap: 12px; padding: 12px; }
+          #l0-history { width: 100% !important; }
+          #l0-history-list { display: flex; overflow-x: auto; }
+          #l0-history-list > button {
+            width: auto !important; min-width: 106px; flex-shrink: 0;
+            border-bottom: none !important; border-right: 1px solid var(--c-border);
+          }
+          #l0-history-title { display: none; }
+        }
       `}</style>
 
       <header className="no-print" style={{
@@ -413,16 +424,17 @@ export default function ClientL0Page() {
         }}>{toast}</div>
       )}
 
-      <main style={{
+      <main id="l0-main" style={{
         padding: 'var(--sp-4)', maxWidth: 1040, margin: '0 auto',
         display: 'flex', gap: 'var(--sp-4)', alignItems: 'flex-start',
       }}>
-        {/* 左：测量历史 */}
-        <div className="no-print" style={{ width: 170, flexShrink: 0 }}>
+        {/* 左：测量历史（窄屏时移到顶部横向滚动） */}
+        <div id="l0-history" className="no-print" style={{ width: 170, flexShrink: 0 }}>
           <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
-            <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--c-border)', fontSize: 12, color: '#999', fontWeight: 500 }}>
+            <div id="l0-history-title" style={{ padding: '10px 12px', borderBottom: '1px solid var(--c-border)', fontSize: 12, color: '#999', fontWeight: 500 }}>
               测量历史
             </div>
+            <div id="l0-history-list">
             {!isReadOnly && (
               <button onClick={() => selectRecord('new')} style={{
                 width: '100%', padding: '10px 12px', border: 'none', textAlign: 'left',
@@ -449,6 +461,7 @@ export default function ClientL0Page() {
                 </div>
               </button>
             ))}
+            </div>
           </div>
         </div>
 
