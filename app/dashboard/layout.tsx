@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
+import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -102,12 +103,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const pathname = usePathname()
 
+  // 未登录（或登录已过期）时跳回登录页。
+  // 之前这里直接 return null，结果是一片白屏，既无提示也不跳转。
+  useEffect(() => {
+    if (!loading && !user) router.replace('/auth/login')
+  }, [loading, user, router])
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--c-text-secondary)' }}>
       加载中…
     </div>
   )
-  if (!user) return null
+  if (!user) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--c-text-secondary)', fontSize: 14 }}>
+      正在跳转登录…
+    </div>
+  )
 
   const isTrainer = userRole === 'TRAINER' || userRole === 'ADMIN'
   const navGroups = isTrainer ? trainerNav : clientNav
