@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/db'
 import { addDays, expandOpenSlots, hm, type BusyInterval } from '@/lib/booking'
+import { studioToday } from '@/lib/time'
 
 // GET /api/booking/slots?trainerId=xxx&from=YYYY-MM-DD&days=7
 // 返回该教练在这段时间内还能被约的私教空档。
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
     const trainerId = sp.get('trainerId')
     if (!trainerId) return NextResponse.json({ error: 'trainerId required' }, { status: 400 })
 
-    const from = sp.get('from') || new Date().toISOString().slice(0, 10)
+    const from = sp.get('from') || studioToday()
     const days = Math.min(Number(sp.get('days') ?? 14), 60)
     const to = addDays(from, days - 1)
 

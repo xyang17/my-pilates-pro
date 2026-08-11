@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { studioToday } from '@/lib/time'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,9 +16,9 @@ export async function GET(req: NextRequest) {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // 用本地日期，不能用 toISOString（会按 UTC 算，晚上容易差一天）
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+    // 必须按门店时区算「今天」。线上是 UTC，直接用 new Date() 的本地方法，
+    // 北京时间凌晨 0-8 点会算成前一天，学员看到「今天没有课程安排」。
+    const dateStr = studioToday()
     const monthStart = dateStr.slice(0, 7) + '-01'
 
     const isTrainer = userRole === 'TRAINER' || userRole === 'ADMIN'
