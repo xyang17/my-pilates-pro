@@ -1298,6 +1298,11 @@ export default function ClassDetailPage() {
               </button>
             </div>
 
+            {/* 加进名单即同步，不需要再点「发送」 */}
+            <div style={{ fontSize: '11.5px', color: 'var(--c-text-hint)', lineHeight: 1.6, marginBottom: enrollments.length > 0 ? '10px' : '0' }}>
+              加进名单的学员，会自动在自己的「我的课程」里看到这节课和动作内容，不需要额外发送。
+            </div>
+
             {/* Enrolled students list */}
             {enrollments.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: showAddEnrollment ? '12px' : '0' }}>
@@ -1421,9 +1426,10 @@ export default function ClassDetailPage() {
               {isTrainer && classData.exercises.length > 0 && (
                 <>
                   {isGroupClass ? (
-                    <button onClick={() => { setShowDistribute(true); fetchClients() }}
+                    // 课程内容靠「学员名单」自动同步，这里只负责额外布置课后作业
+                    <button onClick={() => { setShowDistribute(true); setDistributeAsHomework(true); fetchClients() }}
                       style={{ padding: '5px 12px', background: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}>
-                      📤 {t('发送给学员', 'Send to Clients')}
+                      📋 {t('布置作业', 'Assign HW')}
                     </button>
                   ) : (
                     <button onClick={() => {
@@ -1906,8 +1912,10 @@ export default function ClassDetailPage() {
             {/* Header */}
             <div style={{ padding: '20px', borderBottom: '1px solid var(--c-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div>
-                <h2 style={{ margin: '0 0 2px 0', fontSize: '17px' }}>📤 {t('发送课程给学员', 'Send Class to Clients')}</h2>
-                <p style={{ margin: 0, fontSize: '13px', color: 'var(--c-text-secondary)' }}>{t('选择要发送的学员', 'Select clients to send to')}</p>
+                <h2 style={{ margin: '0 0 2px 0', fontSize: '17px' }}>📋 {t('布置课后作业', 'Assign Homework')}</h2>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--c-text-secondary)' }}>
+                  {t('课程内容已自动同步给名单里的学员，这里只是额外布置作业', 'Class content already synced; this assigns homework')}
+                </p>
               </div>
               <button onClick={() => { setShowDistribute(false); setDistributeSelected(new Set()) }}
                 style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--c-text-secondary)', padding: '4px 8px' }}>✕</button>
@@ -1961,34 +1969,14 @@ export default function ClassDetailPage() {
 
             {/* Footer */}
             <div style={{ padding: '16px 20px', borderTop: '1px solid var(--c-border)', flexShrink: 0 }}>
-              <label
-                onClick={() => setDistributeAsHomework(v => !v)}
-                style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '12px', cursor: 'pointer' }}>
-                <div style={{
-                  width: 20, height: 20, borderRadius: '4px', marginTop: 1, flexShrink: 0,
-                  border: `2px solid ${distributeAsHomework ? 'var(--c-brand)' : 'var(--c-border)'}`,
-                  background: distributeAsHomework ? 'var(--c-brand)' : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {distributeAsHomework && <span style={{ color: 'white', fontSize: '12px', fontWeight: 700 }}>✓</span>}
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--c-text-primary)', fontWeight: 500 }}>
-                    {t('同时布置为课后作业', 'Also assign as homework')}
-                  </p>
-                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--c-text-hint)' }}>
-                    {t('不勾选＝学员只在「我的课程」看到这节课的内容', 'Unchecked = students only see the class content')}
-                  </p>
-                </div>
-              </label>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => { setShowDistribute(false); setDistributeSelected(new Set()); setDistributeAsHomework(false) }}
+                <button onClick={() => { setShowDistribute(false); setDistributeSelected(new Set()) }}
                   style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--c-border)', background: 'transparent', cursor: 'pointer', fontSize: '14px' }}>
                   {t('取消', 'Cancel')}
                 </button>
                 <button onClick={handleDistribute} disabled={distributeSelected.size === 0 || distributing}
                   style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', background: 'var(--c-brand)', color: 'white', cursor: distributeSelected.size > 0 && !distributing ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '14px', opacity: distributeSelected.size > 0 && !distributing ? 1 : 0.5 }}>
-                  {distributing ? t('发送中…', 'Sending…') : `${t('发送给', 'Send to')} ${distributeSelected.size} ${t('位学员', 'clients')}`}
+                  {distributing ? t('布置中…', 'Saving…') : `${t('布置给', 'Assign to')} ${distributeSelected.size} ${t('位学员', 'clients')}`}
                 </button>
               </div>
             </div>
