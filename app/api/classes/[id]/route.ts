@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { projectClassForRole } from '@/lib/db'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,7 +37,8 @@ export async function GET(
       data.exercises.sort((a: any, b: any) => a.order - b.order)
     }
 
-    return NextResponse.json(data)
+    // 会员视角按白名单投影，营收类字段不会返回
+    return NextResponse.json(projectClassForRole(data, req.headers.get('x-user-role')))
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

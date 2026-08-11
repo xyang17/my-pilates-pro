@@ -1151,7 +1151,9 @@ export default function ClassDetailPage() {
                     </p>
                   </div>
                 )}
-                {classData.price != null && (
+                {/* 价格属于经营数据，只给教练与管理员看。
+                    接口层也会对会员剥掉这个字段，此处是第二道防线。 */}
+                {isTrainer && classData.price != null && (
                   <div>
                     <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>价格 Price</p>
                     <p style={{ margin: 0, fontWeight: 'bold' }}>¥{classData.price}</p>

@@ -25,10 +25,17 @@ export async function GET(req: NextRequest) {
 
     // ── 学员视角 ──────────────────────────────────────────────
     if (!isTrainer) {
-      const { data: enrolled } = await supabaseAdmin
+      const { data: enrolled, error: enrolledErr } = await supabaseAdmin
         .from('class_enrollment')
         .select('class_id')
         .eq('student_id', userId)
+
+      // 这里以前不查 error，一旦查询失败（例如表缺授权）就静默变成空数组，
+      // 学员端表现为「一节课都没有」，极难排查。宁可报错也不要假装没数据。
+      if (enrolledErr) {
+        return NextResponse.json(
+          { error: `读取报名记录失败：${enrolledErr.message}` }, { status: 500 })
+      }
 
       const enrolledIds = [...new Set((enrolled || []).map(e => e.class_id).filter(Boolean))]
 

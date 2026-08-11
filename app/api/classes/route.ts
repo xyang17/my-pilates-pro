@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { projectClassListForRole } from '@/lib/db'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,10 +30,17 @@ export async function GET(req: NextRequest) {
 
     // 学员：被指派的私教课 + 自己创建的 + 已报名的团课。
     // 分开查再合并，避免 PostgREST 的 or(...in...) 语法出问题。
-    const { data: enrolled } = await supabaseAdmin
+    const { data: enrolled, error: enrolledErr } = await supabaseAdmin
       .from('class_enrollment')
       .select('class_id')
       .eq('student_id', userId)
+
+    // 查询失败时必须报错。以前静默吞掉，学员会看到一个空的「我的课程」，
+    // 看起来像「课没同步过去」，实际是数据库权限问题。
+    if (enrolledErr) {
+      return NextResponse.json(
+        { error: `读取报名记录失败：${enrolledErr.message}` }, { status: 500 })
+    }
 
     const enrolledIds = [...new Set((enrolled || []).map(e => e.class_id).filter(Boolean))]
 
@@ -53,7 +61,8 @@ export async function GET(req: NextRequest) {
     ;[...(ownRes.data || []), ...(enrolledRes.data || [])].forEach(c => byId.set(c.id, c))
     const merged = [...byId.values()].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 
-    return NextResponse.json(merged)
+    // 会员视角按白名单投影，营收类字段不会返回
+    return NextResponse.json(projectClassListForRole(merged, userRole))
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
