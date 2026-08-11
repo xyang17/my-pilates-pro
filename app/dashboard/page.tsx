@@ -7,6 +7,7 @@ import Link from 'next/link'
 import {
   Calendar, ChevronRight, Clock, Users, ClipboardCheck, Plus,
   Dumbbell, Activity, BookOpen, Trophy, ClipboardList, BarChart3, Ticket, User,
+  CalendarCheck,
 } from 'lucide-react'
 
 interface ClassItem {
@@ -92,6 +93,8 @@ export default function DashboardPage() {
   const featureEntries = isTrainer
     ? [
         { label: '课程日历', href: '/dashboard/calendar',     icon: Calendar },
+        { label: '约课',     href: '/dashboard/booking',      icon: CalendarCheck },
+        { label: '可约时段', href: '/dashboard/availability', icon: Clock },
         { label: '课程训练', href: '/dashboard/classes',      icon: Dumbbell },
         { label: '学员管理', href: '/dashboard/clients',      icon: Users },
         { label: '身体测试', href: '/dashboard/assessments',  icon: Activity },
@@ -106,6 +109,7 @@ export default function DashboardPage() {
         { label: '我的主页', href: '/dashboard/profile',      icon: User },
       ]
     : [
+        { label: '约课',     href: '/dashboard/booking',      icon: CalendarCheck },
         { label: '课程日历', href: '/dashboard/calendar',     icon: Calendar },
         { label: '我的课程', href: '/dashboard/classes',      icon: Dumbbell },
         // 学员端的体测页要直接进自己那一页 ——

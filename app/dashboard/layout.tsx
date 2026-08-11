@@ -30,6 +30,8 @@ import {
   LogOut,
   Home,
   BarChart3,
+  Clock,
+  CalendarCheck,
 } from 'lucide-react'
 
 interface NavGroup {
@@ -46,8 +48,10 @@ const trainerNav: NavGroup[] = [
   {
     label: '教学',
     items: [
-      { label: '课程日历',  href: '/dashboard/calendar',    icon: Calendar },
-      { label: '课程训练',  href: '/dashboard/classes',     icon: Dumbbell },
+      { label: '课程日历',  href: '/dashboard/calendar',     icon: Calendar },
+      { label: '约课',      href: '/dashboard/booking',      icon: CalendarCheck },
+      { label: '可约时段',  href: '/dashboard/availability', icon: Clock },
+      { label: '课程训练',  href: '/dashboard/classes',      icon: Dumbbell },
       { label: '学员管理',  href: '/dashboard/clients',     icon: Users },
       { label: '身体测试',  href: '/dashboard/assessments', icon: Activity },
     ],
@@ -68,6 +72,7 @@ const clientNav: NavGroup[] = [
   {
     items: [
       { label: '首页',     href: '/dashboard',           icon: Home },
+      { label: '约课',     href: '/dashboard/booking',   icon: CalendarCheck },
       { label: '我的课程', href: '/dashboard/classes',   icon: Dumbbell },
       { label: '课后作业', href: '/dashboard/workouts',  icon: ClipboardList },
       { label: '训练方案', href: '/dashboard/programs',  icon: Trophy },

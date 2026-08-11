@@ -4,13 +4,10 @@
 //   共用逻辑必须放在这里。）
 // ============================================================
 
-import { createClient } from '@supabase/supabase-js'
 import { deriveAsm, L0_DERIVED_COLUMNS } from '@/lib/l0'
 
-export const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export { supabaseAdmin } from '@/lib/db'
+import { supabaseAdmin } from '@/lib/db'
 
 // ─── 权限模型 ────────────────────────────────────────────────
 //
