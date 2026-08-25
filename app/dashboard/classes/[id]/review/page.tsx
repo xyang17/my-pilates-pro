@@ -77,6 +77,7 @@ export default function ClassReviewPage() {
   const [shareBlob, setShareBlob] = useState<Blob | null>(null)
   const [generatingShare, setGeneratingShare] = useState(false)
   const [shareError, setShareError] = useState('')
+  const [shareLang, setShareLang] = useState<'zh' | 'en'>('zh')
 
   const { lang } = useLang()
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
@@ -94,7 +95,8 @@ export default function ClassReviewPage() {
   }, [user, authLoading, userRole])
 
   // 私教课有明确的学员（assigned_to），拿来给分享卡片抬头用；
-  // 团课没有单一学员就不强求，卡片上只显示课程名。
+  // 团课没有单一学员，改拿报名名单拼名字。仅用于页面上展示，
+  // 生成图片时会重新现查一次，不依赖这里的时机，避免"刚进页面就点生成"时名字还没查到。
   useEffect(() => {
     if (classData?.assigned_to && user) {
       fetch(`/api/clients/${classData.assigned_to}`, { headers: { 'x-user-id': user.id } })
@@ -103,6 +105,31 @@ export default function ClassReviewPage() {
         .catch(() => {})
     }
   }, [classData?.assigned_to, user])
+
+  // 生成图片前现查一次学员姓名，不依赖上面那个 useEffect 有没有查完——
+  // 避免"复盘页刚加载完，手一快就点生成"时标题显示成占位符而不是真名字。
+  const resolveClientName = async (): Promise<string> => {
+    if (!classData || !user) return ''
+    if (classData.assigned_to) {
+      try {
+        const res = await fetch(`/api/clients/${classData.assigned_to}`, { headers: { 'x-user-id': user.id } })
+        const data = res.ok ? await res.json() : null
+        if (data?.name) return data.name
+      } catch {}
+      return clientName // 现查失败就退回已有的（如果有）
+    }
+    // 团课：拿报名名单拼名字
+    try {
+      const res = await fetch(`/api/classes/${classId}/enrollments`, { headers: { 'x-user-id': user.id } })
+      const list = res.ok ? await res.json() : []
+      const names = (list || []).map((e: any) => e.student?.name).filter(Boolean)
+      if (names.length === 0) return ''
+      if (names.length <= 2) return names.join('、')
+      return `${names.slice(0, 2).join('、')} 等${names.length}人`
+    } catch {
+      return ''
+    }
+  }
 
   const fetchClassData = async () => {
     try {
@@ -369,11 +396,15 @@ export default function ClassReviewPage() {
     setGeneratingShare(true)
     setShareError('')
     try {
+      const resolvedName = await resolveClientName()
+      if (resolvedName) setClientName(resolvedName)
+
       const blob = await generateReviewShareCard({
+        lang: shareLang,
         studioName: 'MyFitnessPro',
-        clientName: clientName || '学员',
+        clientName: resolvedName,
         className: classData.name,
-        dateLabel: new Date(classData.date).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),
+        date: new Date(classData.date),
         exercises: exercises.map(ex => ({
           name_cn: ex.master_exercise.name_cn || ex.master_exercise.name_en,
           name_en: ex.master_exercise.name_en,
@@ -384,6 +415,7 @@ export default function ClassReviewPage() {
           setDetails: ex.set_details.length > 0
             ? ex.set_details.map(s => ({ set_no: s.set_no, reps: s.reps === '' ? null : Number(s.reps), weight: s.weight === '' ? null : Number(s.weight) }))
             : undefined,
+          note: ex.post_note || undefined,
         })),
         summary: postSummary,
         qrUrl: 'https://myfitnesspro.co',
@@ -815,6 +847,38 @@ export default function ClassReviewPage() {
             }}>
               ✓ 本课已完成记录
             </div>
+
+            {/* 分享图片语言选择 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--c-text-secondary)' }}>
+              <span>分享图片语言：</span>
+              <div style={{ display: 'flex', gap: '4px', background: 'var(--c-fill-light)', borderRadius: '999px', padding: '3px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShareLang('zh')}
+                  style={{
+                    padding: '4px 14px', borderRadius: '999px', border: 'none', cursor: 'pointer', fontSize: '13px',
+                    background: shareLang === 'zh' ? 'var(--c-brand)' : 'transparent',
+                    color: shareLang === 'zh' ? 'white' : 'var(--c-text-secondary)',
+                    fontWeight: shareLang === 'zh' ? 600 : 400,
+                  }}
+                >
+                  中文
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShareLang('en')}
+                  style={{
+                    padding: '4px 14px', borderRadius: '999px', border: 'none', cursor: 'pointer', fontSize: '13px',
+                    background: shareLang === 'en' ? 'var(--c-brand)' : 'transparent',
+                    color: shareLang === 'en' ? 'white' : 'var(--c-text-secondary)',
+                    fontWeight: shareLang === 'en' ? 600 : 400,
+                  }}
+                >
+                  English
+                </button>
+              </div>
+            </div>
+
             <button
               onClick={handleGenerateShare}
               disabled={generatingShare}

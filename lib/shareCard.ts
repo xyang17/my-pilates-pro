@@ -4,6 +4,9 @@ import QRCode from 'qrcode'
 // 设计目标：内容能自动撑开高度（动作多/总结长都不会截断），
 // 右下角带个二维码——扫码跳转官网登录页，客户想看更详细的训练记录/趋势就点进去，
 // 顺便也是给还没注册的人的一个入口。
+// 支持中/英两种语言输出，教练生成时自己选。
+
+export type ShareCardLang = 'zh' | 'en'
 
 export interface ShareCardExercise {
   name_cn: string
@@ -16,13 +19,15 @@ export interface ShareCardExercise {
   actualReps?: number | null
   actualWeight?: number | null
   setDetails?: { set_no: number; reps: number | null; weight: number | null }[]
+  note?: string
 }
 
 export interface ShareCardData {
+  lang: ShareCardLang
   studioName: string
   clientName: string
   className: string
-  dateLabel: string
+  date: Date
   exercises: ShareCardExercise[]
   summary?: string
   qrUrl: string
@@ -31,12 +36,42 @@ export interface ShareCardData {
 const BRAND = '#9880B8'
 const LAVENDER = '#C2AFCC'
 const PAGE_BG = '#F5F0F8'
+const SUMMARY_BG = '#EFE7F4'
 const TEXT_PRIMARY = '#5A4878'
 const TEXT_SECONDARY = '#8A7A9E'
 const FONT = '"PingFang SC", "Microsoft YaHei", -apple-system, sans-serif'
 
 const SCALE = 2 // 输出图放大2倍，微信里看着不糊
 const W = 720
+
+const LABELS: Record<ShareCardLang, {
+  headerTag: string
+  summaryTitle: string
+  qrTitle: string
+  qrSub: string
+  done: string
+  reps: string
+  setsX: string
+}> = {
+  zh: {
+    headerTag: '训练记录',
+    summaryTitle: '📝 课后总结',
+    qrTitle: '扫码登录',
+    qrSub: '查看完整训练记录与历史趋势',
+    done: '已完成',
+    reps: '次',
+    setsX: '组 × ',
+  },
+  en: {
+    headerTag: 'Training Record',
+    summaryTitle: "📝 Coach's Notes",
+    qrTitle: 'Scan to Log In',
+    qrSub: 'View full training history & trends',
+    done: 'Done',
+    reps: 'reps',
+    setsX: ' sets × ',
+  },
+}
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = []
@@ -54,24 +89,33 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return lines
 }
 
-function exerciseLine(ex: ShareCardExercise): string {
+function exerciseLine(ex: ShareCardExercise, lang: ShareCardLang): string {
+  const L = LABELS[lang]
   // 有每组明细就展开显示（比如 8/8/6次），没有就用汇总的 actual_sets x actual_reps
   if (ex.setDetails && ex.setDetails.length > 0) {
     const reps = ex.setDetails.map(s => s.reps ?? '-').join('/')
     const w = ex.setDetails[0]?.weight
-    return w != null ? `${reps} 次 · ${w}${ex.weightUnit || 'kg'}` : `${reps} 次`
+    return w != null ? `${reps} ${L.reps} · ${w}${ex.weightUnit || 'kg'}` : `${reps} ${L.reps}`
   }
   const sets = ex.actualSets ?? ex.sets
   const reps = ex.actualReps ?? ex.reps
   const weight = ex.actualWeight ?? ex.weight
   const parts: string[] = []
-  if (sets != null && reps != null) parts.push(`${sets}组 × ${reps}次`)
-  else if (reps != null) parts.push(`${reps}次`)
+  if (sets != null && reps != null) parts.push(`${sets}${L.setsX}${reps}${L.reps}`)
+  else if (reps != null) parts.push(`${reps}${L.reps}`)
   if (weight != null) parts.push(`${weight}${ex.weightUnit || 'kg'}`)
-  return parts.length > 0 ? parts.join(' · ') : '已完成'
+  return parts.length > 0 ? parts.join(' · ') : L.done
 }
 
 export async function generateReviewShareCard(data: ShareCardData): Promise<Blob> {
+  const L = LABELS[data.lang]
+  const exName = (ex: ShareCardExercise) =>
+    data.lang === 'zh' ? (ex.name_cn || ex.name_en) : (ex.name_en || ex.name_cn)
+
+  const dateLabel = data.lang === 'zh'
+    ? data.date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+    : data.date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+
   // 先用一张量尺寸用的画布把要占的高度算出来，再建真正尺寸的画布画正式内容——
   // 这样动作再多、总结再长，图片都会自动变长，不会被裁掉。
   const measureCanvas = document.createElement('canvas')
@@ -83,14 +127,15 @@ export async function generateReviewShareCard(data: ShareCardData): Promise<Blob
   y += 96 // 客户/课程/日期信息块
   y += 24 // 分隔线间距
 
-  mctx.font = `500 26px ${FONT}`
   const exerciseRowHeights: number[] = []
   for (const ex of data.exercises) {
     mctx.font = `500 26px ${FONT}`
-    const nameLines = wrapText(mctx, `${ex.name_cn}`, W - padX * 2 - 40)
+    const nameLines = wrapText(mctx, exName(ex), W - padX * 2 - 40)
     mctx.font = `400 22px ${FONT}`
-    const detailLines = wrapText(mctx, exerciseLine(ex), W - padX * 2 - 40)
-    const rowH = 16 + nameLines.length * 34 + detailLines.length * 30 + 14
+    const detailLines = wrapText(mctx, exerciseLine(ex, data.lang), W - padX * 2 - 40)
+    mctx.font = `400 20px ${FONT}`
+    const noteLines = ex.note ? wrapText(mctx, ex.note, W - padX * 2 - 40) : []
+    const rowH = 16 + nameLines.length * 34 + detailLines.length * 30 + noteLines.length * 27 + 14
     exerciseRowHeights.push(rowH)
     y += rowH
   }
@@ -98,9 +143,9 @@ export async function generateReviewShareCard(data: ShareCardData): Promise<Blob
 
   let summaryLines: string[] = []
   if (data.summary) {
-    mctx.font = `400 24px ${FONT}`
-    summaryLines = wrapText(mctx, data.summary, W - padX * 2 - 32)
-    y += 56 + summaryLines.length * 34 + 24
+    mctx.font = `400 25px ${FONT}`
+    summaryLines = wrapText(mctx, data.summary, W - padX * 2 - 40)
+    y += 64 + summaryLines.length * 36 + 32
   }
 
   y += 160 // footer（二维码区）
@@ -128,7 +173,7 @@ export async function generateReviewShareCard(data: ShareCardData): Promise<Blob
   ctx.font = `400 20px ${FONT}`
   ctx.fillStyle = 'rgba(255,255,255,0.85)'
   ctx.textAlign = 'right'
-  ctx.fillText('训练记录', W - padX, 50)
+  ctx.fillText(L.headerTag, W - padX, 50)
   ctx.textAlign = 'left'
   cy = 100
 
@@ -137,10 +182,11 @@ export async function generateReviewShareCard(data: ShareCardData): Promise<Blob
   ctx.fillRect(0, cy, W, 96)
   ctx.fillStyle = TEXT_PRIMARY
   ctx.font = `700 30px ${FONT}`
-  ctx.fillText(`${data.clientName} · ${data.className}`, padX, cy + 36)
+  const titleLine = data.clientName ? `${data.clientName} · ${data.className}` : data.className
+  ctx.fillText(titleLine, padX, cy + 36)
   ctx.fillStyle = TEXT_SECONDARY
   ctx.font = `400 22px ${FONT}`
-  ctx.fillText(data.dateLabel, padX, cy + 72)
+  ctx.fillText(dateLabel, padX, cy + 72)
   cy += 96
 
   cy += 24
@@ -165,7 +211,7 @@ export async function generateReviewShareCard(data: ShareCardData): Promise<Blob
     let rowY = cy + 16
     ctx.fillStyle = TEXT_PRIMARY
     ctx.font = `500 26px ${FONT}`
-    const nameLines = wrapText(ctx, ex.name_cn, W - padX * 2 - 40)
+    const nameLines = wrapText(ctx, exName(ex), W - padX * 2 - 40)
     nameLines.forEach(line => {
       ctx.fillText(line, padX + 40, rowY + 18)
       rowY += 34
@@ -173,32 +219,45 @@ export async function generateReviewShareCard(data: ShareCardData): Promise<Blob
 
     ctx.fillStyle = TEXT_SECONDARY
     ctx.font = `400 22px ${FONT}`
-    const detailLines = wrapText(ctx, exerciseLine(ex), W - padX * 2 - 40)
+    const detailLines = wrapText(ctx, exerciseLine(ex, data.lang), W - padX * 2 - 40)
     detailLines.forEach(line => {
       ctx.fillText(line, padX + 40, rowY + 14)
       rowY += 30
     })
+
+    if (ex.note) {
+      ctx.fillStyle = '#B3A6C4'
+      ctx.font = `italic 400 20px ${FONT}`
+      const noteLines = wrapText(ctx, ex.note, W - padX * 2 - 40)
+      noteLines.forEach(line => {
+        ctx.fillText(line, padX + 40, rowY + 12)
+        rowY += 27
+      })
+    }
 
     cy += rowH
   })
 
   cy += 20
 
-  // 课后总结
+  // 课后总结——加大字号、整块底色，跟上面动作列表明显分开
   if (data.summary && summaryLines.length > 0) {
-    ctx.fillStyle = LAVENDER
-    ctx.fillRect(padX, cy, 4, summaryLines.length * 34 + 40)
+    const boxH = 64 + summaryLines.length * 36 + 24
+    ctx.fillStyle = SUMMARY_BG
+    ctx.fillRect(padX - 8, cy, W - (padX - 8) * 2, boxH)
+    ctx.fillStyle = BRAND
+    ctx.fillRect(padX - 8, cy, 6, boxH)
     ctx.fillStyle = TEXT_PRIMARY
-    ctx.font = `700 24px ${FONT}`
-    ctx.fillText('课后总结', padX + 20, cy + 20)
-    ctx.fillStyle = TEXT_SECONDARY
-    ctx.font = `400 24px ${FONT}`
-    let sy = cy + 56
+    ctx.font = `700 27px ${FONT}`
+    ctx.fillText(L.summaryTitle, padX + 20, cy + 30)
+    ctx.fillStyle = TEXT_PRIMARY
+    ctx.font = `400 25px ${FONT}`
+    let sy = cy + 68
     summaryLines.forEach(line => {
       ctx.fillText(line, padX + 20, sy)
-      sy += 34
+      sy += 36
     })
-    cy += 56 + summaryLines.length * 34 + 24
+    cy += boxH + 24
   }
 
   // 分隔线
@@ -217,10 +276,10 @@ export async function generateReviewShareCard(data: ShareCardData): Promise<Blob
 
   ctx.fillStyle = TEXT_PRIMARY
   ctx.font = `700 22px ${FONT}`
-  ctx.fillText('扫码登录', padX, cy + 40)
+  ctx.fillText(L.qrTitle, padX, cy + 40)
   ctx.fillStyle = TEXT_SECONDARY
   ctx.font = `400 19px ${FONT}`
-  ctx.fillText('查看完整训练记录与历史趋势', padX, cy + 70)
+  ctx.fillText(L.qrSub, padX, cy + 70)
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(blob => {
