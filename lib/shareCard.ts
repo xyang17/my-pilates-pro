@@ -117,11 +117,9 @@ export async function generateReviewShareCard(data: ShareCardData): Promise<Blob
   const exName = (ex: ShareCardExercise) =>
     data.lang === 'zh' ? (ex.name_cn || ex.name_en) : (ex.name_en || ex.name_cn)
 
-  // logo.png 是完整的品牌卡片（图标+文字+大片留白），不是单独的图标素材，
-  // 这里在画布上按比例只截取中间花瓣图标那一小块——不依赖图片实际像素尺寸，
-  // 换更高分辨率的 logo 图也不用改这几个比例。加载失败（文件还没放）就不画，不影响其余内容生成。
+  // logo 加载失败也不影响其余内容生成，直接不画图标就好
   let logoImg: HTMLImageElement | null = null
-  try { logoImg = await loadImage('/logo.png') } catch {}
+  try { logoImg = await loadImage('/logo.svg') } catch {}
 
   const dateLabel = data.lang === 'zh'
     ? data.date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -181,24 +179,14 @@ export async function generateReviewShareCard(data: ShareCardData): Promise<Blob
 
   let nameX = padX
   if (logoImg) {
-    const logoSize = 44
-    // 按比例截取 logo 图中间的花瓣图标区域（约占原图 40%~60% 宽 / 29%~49% 高）
-    const sx = logoImg.naturalWidth * 0.40
-    const sy = logoImg.naturalHeight * 0.29
-    const sSize = logoImg.naturalWidth * 0.20
+    const logoSize = 40
     ctx.save()
     ctx.beginPath()
-    const r = 10
-    ctx.moveTo(padX + r, 50 - logoSize / 2)
-    ctx.arcTo(padX + logoSize, 50 - logoSize / 2, padX + logoSize, 50 + logoSize / 2, r)
-    ctx.arcTo(padX + logoSize, 50 + logoSize / 2, padX, 50 + logoSize / 2, r)
-    ctx.arcTo(padX, 50 + logoSize / 2, padX, 50 - logoSize / 2, r)
-    ctx.arcTo(padX, 50 - logoSize / 2, padX + logoSize, 50 - logoSize / 2, r)
-    ctx.closePath()
+    ctx.arc(padX + logoSize / 2, 50, logoSize / 2, 0, Math.PI * 2)
     ctx.fillStyle = '#FFFFFF'
     ctx.fill()
     ctx.clip()
-    ctx.drawImage(logoImg, sx, sy, sSize, sSize, padX, 50 - logoSize / 2, logoSize, logoSize)
+    ctx.drawImage(logoImg, padX + 3, 50 - logoSize / 2 + 3, logoSize - 6, logoSize - 6)
     ctx.restore()
     nameX = padX + logoSize + 12
   }

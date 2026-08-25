@@ -12,8 +12,8 @@ export const metadata: Metadata = {
   title: "MyFitnessPro",
   description: "Pilates & Fitness Training App",
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
+    icon: "/logo.svg",
+    apple: "/logo.svg",
   },
 };
 

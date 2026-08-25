@@ -140,18 +140,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar className="hidden md:flex">
         <SidebarHeader className="px-5 py-4 border-b border-sidebar-border">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div
-              role="img"
-              aria-label=""
-              style={{
-                width: 24, height: 24, borderRadius: 6,
-                backgroundImage: "url('/logo.png')",
-                backgroundSize: '500% 500%',
-                backgroundPosition: '50% 36.25%',
-                backgroundRepeat: 'no-repeat',
-                flexShrink: 0,
-              }}
-            />
+            <img src="/logo.svg" alt="" style={{ width: 24, height: 24, flexShrink: 0 }} />
             <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--c-text-primary)' }}>
               MyFitnessPro
             </span>
