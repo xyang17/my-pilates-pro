@@ -67,6 +67,37 @@ export const projectClassListForRole = <T extends Record<string, any>>(
   rows: T[], role: string | null,
 ) => rows.map(r => projectClassForRole(r, role))
 
+// ─── 动作库完整度过滤 ──────────────────────────────────────────
+//
+// 动作库里有一批（主要是导入的力量训练器械动作）还没有真正的中文名/双语简介，
+// name_cn 目前存的是跟 name_en 一样的英文占位。这类"半成品"动作只给教练/
+// 管理员看到（继续编辑、补充翻译），学员端先不展示，翻译和简介补完后自动出现——
+// 不需要额外的"发布"操作，数据补完的那一刻它就完整了。
+
+/** 判断一条动作数据是否"完整"：有真正的中文名，且中英文简介都不为空。 */
+export function isExerciseComplete(row: {
+  name_cn?: string | null
+  name_en?: string | null
+  description_cn?: string | null
+  description_en?: string | null
+}): boolean {
+  const hasRealNameCn = !!row.name_cn && row.name_cn.trim() !== '' && row.name_cn !== row.name_en
+  const hasDescCn = !!row.description_cn && row.description_cn.trim() !== ''
+  const hasDescEn = !!row.description_en && row.description_en.trim() !== ''
+  return hasRealNameCn && hasDescCn && hasDescEn
+}
+
+/** 教练/管理员看到全部动作；学员只看到已经补完翻译和简介的"完整"动作。 */
+export function filterExercisesForRole<T extends {
+  name_cn?: string | null
+  name_en?: string | null
+  description_cn?: string | null
+  description_en?: string | null
+}>(rows: T[], role: string | null): T[] {
+  if (isStaff(role)) return rows
+  return rows.filter(isExerciseComplete)
+}
+
 /** 教练只能管自己的排班，管理员可代任何教练管理。 */
 export function canManageTrainer(
   userId: string | null, role: string | null, trainerId: string,

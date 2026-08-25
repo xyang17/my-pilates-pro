@@ -46,11 +46,17 @@ export async function GET(req: NextRequest) {
     if (recentIds.length === 0) return NextResponse.json([])
 
     // Step 3: fetch exercise details
-    const { data: exercises } = await supabaseAdmin
+    // 注意：master_exercise 表没有 category 字段，之前误写导致这个查询一直
+    // permission-denied/column-not-exist 静默失败，"最近使用的动作"功能一直是空的。
+    const { data: exercises, error: exercisesErr } = await supabaseAdmin
       .from('master_exercise')
-      .select('id, name_cn, name_en, type_cn, type_en, difficulty_cn, category')
+      .select('id, name_cn, name_en, type_cn, type_en, difficulty_cn')
       .in('id', recentIds)
       .eq('is_active', true)
+
+    if (exercisesErr) {
+      return NextResponse.json({ error: exercisesErr.message }, { status: 500 })
+    }
 
     // Sort back to recency order
     const map: Record<string, any> = {}

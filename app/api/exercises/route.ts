@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { filterExercisesForRole } from '@/lib/db'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,7 +23,8 @@ export async function GET(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-    return NextResponse.json(data)
+    // 学员只看到中文名/双语简介已经补完的动作，未翻译的先只对教练/管理员可见
+    return NextResponse.json(filterExercisesForRole(data || [], req.headers.get('x-user-role')))
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

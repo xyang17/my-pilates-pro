@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useLang } from '@/context/LanguageContext'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -16,6 +17,7 @@ export default function SignupPage() {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
+  const { lang, setLang, t } = useLang()
 
   const checkInviteCode = async (code: string) => {
     if (code.trim().length < 4) { setInviteStatus('idle'); return }
@@ -33,7 +35,7 @@ export default function SignupPage() {
         setInviteId(data.inviteId)
       } else {
         setInviteStatus('invalid')
-        setError(data.error || '邀请码无效')
+        setError(data.error || t('邀请码无效', 'Invalid invite code'))
       }
     } catch {
       setInviteStatus('invalid')
@@ -43,7 +45,7 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     if (inviteStatus !== 'valid') {
-      setError('请输入有效的邀请码')
+      setError(t('请输入有效的邀请码', 'Please enter a valid invite code'))
       return
     }
     setLoading(true)
@@ -68,7 +70,7 @@ export default function SignupPage() {
 
       router.push('/auth/login?registered=1')
     } catch (err: any) {
-      setError(err.message || '注册失败')
+      setError(err.message || t('注册失败', 'Sign up failed'))
     } finally {
       setLoading(false)
     }
@@ -85,7 +87,14 @@ export default function SignupPage() {
       alignItems: 'center',
       justifyContent: 'center',
       padding: 'var(--sp-5)',
+      position: 'relative',
     }}>
+      {/* Language toggle */}
+      <div style={{ position: 'absolute', top: 'var(--sp-5)', right: 'var(--sp-5)', display: 'flex', gap: 4, background: 'var(--c-card-bg)', borderRadius: 'var(--r-full)', border: '1px solid var(--c-border)', padding: '4px 6px' }}>
+        <button onClick={() => setLang('zh')} style={{ padding: '3px 10px', borderRadius: 'var(--r-full)', border: 'none', background: lang === 'zh' ? 'var(--c-fill-mid)' : 'transparent', color: lang === 'zh' ? 'var(--c-brand)' : 'var(--c-text-hint)', fontSize: 'var(--text-xs)', fontWeight: lang === 'zh' ? 600 : 400, cursor: 'pointer' }}>中</button>
+        <button onClick={() => setLang('en')} style={{ padding: '3px 10px', borderRadius: 'var(--r-full)', border: 'none', background: lang === 'en' ? 'var(--c-fill-mid)' : 'transparent', color: lang === 'en' ? 'var(--c-brand)' : 'var(--c-text-hint)', fontSize: 'var(--text-xs)', fontWeight: lang === 'en' ? 600 : 400, cursor: 'pointer' }}>EN</button>
+      </div>
+
       {/* Logo */}
       <div style={{ textAlign: 'center', marginBottom: 'var(--sp-8)' }}>
         <div style={{
@@ -98,7 +107,7 @@ export default function SignupPage() {
           MyFitnessPro
         </h1>
         <p style={{ margin: 'var(--sp-1) 0 0', fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>
-          教练与学员专属平台
+          {t('教练与学员专属平台', 'For Trainers & Clients')}
         </p>
       </div>
 
@@ -110,7 +119,7 @@ export default function SignupPage() {
         padding: 'var(--sp-8) var(--sp-6)',
       }}>
         <h2 style={{ margin: '0 0 var(--sp-6)', fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--c-text-primary)' }}>
-          创建账号
+          {t('创建账号', 'Create Account')}
         </h2>
 
         <form onSubmit={handleSignup}>
@@ -118,7 +127,7 @@ export default function SignupPage() {
           {/* 邀请码 */}
           <div style={{ marginBottom: 'var(--sp-5)' }}>
             <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)', marginBottom: 'var(--sp-2)' }}>
-              邀请码 <span style={{ color: '#e53935' }}>*</span>
+              {t('邀请码', 'Invite Code')} <span style={{ color: '#e53935' }}>*</span>
             </label>
             <div style={{ position: 'relative' }}>
               <input
@@ -143,11 +152,11 @@ export default function SignupPage() {
                 }}
               />
               {inviteStatus === 'checking' && (
-                <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: '#999' }}>验证中…</span>
+                <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: '#999' }}>{t('验证中…', 'Checking…')}</span>
               )}
               {inviteStatus === 'valid' && (
                 <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: '#4CAF50' }}>
-                  ✓ {inviteRole === 'TRAINER' ? '教练账号' : inviteRole === 'ADMIN' ? '管理员账号' : '学员账号'}
+                  ✓ {inviteRole === 'TRAINER' ? t('教练账号', 'Trainer account') : inviteRole === 'ADMIN' ? t('管理员账号', 'Admin account') : t('学员账号', 'Client account')}
                 </span>
               )}
               {inviteStatus === 'invalid' && (
@@ -155,18 +164,18 @@ export default function SignupPage() {
               )}
             </div>
             <p style={{ margin: '6px 0 0', fontSize: '12px', color: 'var(--c-text-hint)' }}>
-              请联系你的教练获取邀请码
+              {t('请联系你的教练获取邀请码', 'Contact your trainer to get an invite code')}
             </p>
           </div>
 
           {/* 姓名 */}
           <div style={{ marginBottom: 'var(--sp-5)' }}>
             <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)', marginBottom: 'var(--sp-2)' }}>
-              姓名
+              {t('姓名', 'Name')}
             </label>
             <input
               type="text" value={name} onChange={e => setName(e.target.value)}
-              placeholder="你的名字" required
+              placeholder={t('你的名字', 'Your name')} required
               style={{ width: '100%', padding: '12px var(--sp-4)', fontSize: 'var(--text-base)' }}
             />
           </div>
@@ -174,7 +183,7 @@ export default function SignupPage() {
           {/* Email */}
           <div style={{ marginBottom: 'var(--sp-5)' }}>
             <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)', marginBottom: 'var(--sp-2)' }}>
-              邮箱
+              {t('邮箱', 'Email')}
             </label>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)}
@@ -186,15 +195,15 @@ export default function SignupPage() {
           {/* 密码 */}
           <div style={{ marginBottom: 'var(--sp-2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-2)' }}>
-              <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)' }}>密码</label>
+              <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)' }}>{t('密码', 'Password')}</label>
               <button type="button" onClick={() => setShowPassword(!showPassword)}
                 style={{ background: 'none', border: 'none', color: 'var(--c-brand)', cursor: 'pointer', fontSize: 'var(--text-sm)', padding: 0 }}>
-                {showPassword ? '隐藏' : '显示'}
+                {showPassword ? t('隐藏', 'Hide') : t('显示', 'Show')}
               </button>
             </div>
             <input
               type={showPassword ? 'text' : 'password'} value={password}
-              onChange={e => setPassword(e.target.value)} placeholder="至少 6 位" required
+              onChange={e => setPassword(e.target.value)} placeholder={t('至少 6 位', 'At least 6 characters')} required
               style={{ width: '100%', padding: '12px var(--sp-4)', fontSize: 'var(--text-base)' }}
             />
           </div>
@@ -222,13 +231,13 @@ export default function SignupPage() {
               transition: 'background 0.15s', letterSpacing: '0.2px',
             }}
           >
-            {loading ? '注册中…' : '注册'}
+            {loading ? t('注册中…', 'Signing up…') : t('注册', 'Sign Up')}
           </button>
         </form>
 
         <p style={{ marginTop: 'var(--sp-6)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>
-          已有账号？{' '}
-          <Link href="/auth/login" style={{ color: 'var(--c-brand)', textDecoration: 'none', fontWeight: 500 }}>直接登录</Link>
+          {t('已有账号？', 'Already have an account? ')}{' '}
+          <Link href="/auth/login" style={{ color: 'var(--c-brand)', textDecoration: 'none', fontWeight: 500 }}>{t('直接登录', 'Sign in')}</Link>
         </p>
       </div>
     </div>

@@ -19,42 +19,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No exercises provided' }, { status: 400 })
     }
 
+    // 表格里某一格没填 -> Excel 解析后这个 key 压根不存在（不是空字符串）。
+    // pick() 只在原始表格里真的有这一列时才返回值，没有就返回 undefined。
+    // 新增记录时用默认值兜底；更新已有记录时，undefined 的字段一律不放进
+    // updateRow，Supabase 的 update() 就不会碰这些列——避免"只想改中文名和
+    // 简介，结果说明文字/图片/gif 这些没填的列被清空"这种重新导入把老数据冲掉的问题。
+    const pick = (ex: any, ...keys: string[]) => {
+      for (const k of keys) {
+        if (ex[k] !== undefined && ex[k] !== null && ex[k] !== '') return ex[k]
+      }
+      return undefined
+    }
+    const pickInt = (ex: any, ...keys: string[]) => {
+      const v = pick(ex, ...keys)
+      return v === undefined ? undefined : parseInt(v)
+    }
+    const pickFloat = (ex: any, ...keys: string[]) => {
+      const v = pick(ex, ...keys)
+      return v === undefined ? undefined : parseFloat(v)
+    }
+
     const rows = exercises.map((ex: any) => ({
-      name_en: ex.name_en || ex.nameEN || '',
-      name_cn: ex.name_cn || ex.nameCN || '',
-      description_en: ex.description_en || ex.descriptionEN || ex.description || '',
-      description_cn: ex.description_cn || ex.descriptionCN || '',
-      instructions_en: ex.instructions_en || ex.instructionsEN || ex.instructions || '',
-      instructions_cn: ex.instructions_cn || ex.instructionsCN || '',
-      series_cn: ex.series_cn || ex.seriesCN || null,
-      series_en: ex.series_en || ex.seriesEN || null,
-      type_en: ex.type_en || ex.typeEN || ex.type || '',
-      type_cn: ex.type_cn || ex.typeCN || '',
-      difficulty_en: ex.difficulty_en || ex.difficultyEN || ex.difficulty || '',
-      difficulty_cn: ex.difficulty_cn || ex.difficultyCN || '',
-      target_muscles_en: ex.target_muscles_en || ex.targetMusclesEN || ex.targetMuscles || '',
-      target_muscles_cn: ex.target_muscles_cn || ex.targetMusclesCN || '',
-      secondary_muscles_en: ex.secondary_muscles_en || ex.secondaryMusclesEN || null,
-      secondary_muscles_cn: ex.secondary_muscles_cn || ex.secondaryMusclesCN || null,
-      body_position_en: ex.body_position_en || ex.bodyPositionEN || null,
-      body_position_cn: ex.body_position_cn || ex.bodyPositionCN || null,
-      equipment_en: ex.equipment_en || ex.equipmentEN || null,
-      equipment_cn: ex.equipment_cn || ex.equipmentCN || null,
-      equipment_setup_en: ex.equipment_setup_en || ex.equipmentSetupEN || null,
-      equipment_setup_cn: ex.equipment_setup_cn || ex.equipmentSetupCN || null,
-      cues_en: ex.cues_en || ex.cuesEN || null,
-      cues_cn: ex.cues_cn || ex.cuesCN || null,
-      contraindications_en: ex.contraindications_en || ex.contraindicationsEN || null,
-      contraindications_cn: ex.contraindications_cn || ex.contraindicationsCN || null,
-      featured_image_url: ex.featured_image_url || ex.featuredImageUrl || ex.imageUrl1 || ex.image_url || null,
-      gif_url: ex.gif_url || ex.gifUrl || null,
-      default_sets: ex.default_sets || ex.defaultSets ? parseInt(ex.default_sets || ex.defaultSets) : null,
-      default_reps: ex.default_reps || ex.defaultReps ? parseInt(ex.default_reps || ex.defaultReps) : null,
-      default_weight: ex.default_weight || ex.defaultWeight ? parseFloat(ex.default_weight || ex.defaultWeight) : null,
-      default_weight_unit: ex.default_weight_unit || ex.defaultWeightUnit || 'kg',
-      default_duration: ex.default_duration || ex.defaultDuration ? parseInt(ex.default_duration || ex.defaultDuration) : null,
-      default_duration_unit: ex.default_duration_unit || ex.defaultDurationUnit || 'minutes',
-      created_by: userId,
+      name_en: pick(ex, 'name_en', 'nameEN'),
+      name_cn: pick(ex, 'name_cn', 'nameCN'),
+      description_en: pick(ex, 'description_en', 'descriptionEN', 'description'),
+      description_cn: pick(ex, 'description_cn', 'descriptionCN'),
+      instructions_en: pick(ex, 'instructions_en', 'instructionsEN', 'instructions'),
+      instructions_cn: pick(ex, 'instructions_cn', 'instructionsCN'),
+      series_cn: pick(ex, 'series_cn', 'seriesCN'),
+      series_en: pick(ex, 'series_en', 'seriesEN'),
+      type_en: pick(ex, 'type_en', 'typeEN', 'type'),
+      type_cn: pick(ex, 'type_cn', 'typeCN'),
+      difficulty_en: pick(ex, 'difficulty_en', 'difficultyEN', 'difficulty'),
+      difficulty_cn: pick(ex, 'difficulty_cn', 'difficultyCN'),
+      target_muscles_en: pick(ex, 'target_muscles_en', 'targetMusclesEN', 'targetMuscles'),
+      target_muscles_cn: pick(ex, 'target_muscles_cn', 'targetMusclesCN'),
+      secondary_muscles_en: pick(ex, 'secondary_muscles_en', 'secondaryMusclesEN'),
+      secondary_muscles_cn: pick(ex, 'secondary_muscles_cn', 'secondaryMusclesCN'),
+      body_position_en: pick(ex, 'body_position_en', 'bodyPositionEN'),
+      body_position_cn: pick(ex, 'body_position_cn', 'bodyPositionCN'),
+      equipment_en: pick(ex, 'equipment_en', 'equipmentEN'),
+      equipment_cn: pick(ex, 'equipment_cn', 'equipmentCN'),
+      equipment_setup_en: pick(ex, 'equipment_setup_en', 'equipmentSetupEN'),
+      equipment_setup_cn: pick(ex, 'equipment_setup_cn', 'equipmentSetupCN'),
+      cues_en: pick(ex, 'cues_en', 'cuesEN'),
+      cues_cn: pick(ex, 'cues_cn', 'cuesCN'),
+      contraindications_en: pick(ex, 'contraindications_en', 'contraindicationsEN'),
+      contraindications_cn: pick(ex, 'contraindications_cn', 'contraindicationsCN'),
+      featured_image_url: pick(ex, 'featured_image_url', 'featuredImageUrl', 'imageUrl1', 'image_url'),
+      gif_url: pick(ex, 'gif_url', 'gifUrl'),
+      default_sets: pickInt(ex, 'default_sets', 'defaultSets'),
+      default_reps: pickInt(ex, 'default_reps', 'defaultReps'),
+      default_weight: pickFloat(ex, 'default_weight', 'defaultWeight'),
+      default_weight_unit: pick(ex, 'default_weight_unit', 'defaultWeightUnit'),
+      default_duration: pickInt(ex, 'default_duration', 'defaultDuration'),
+      default_duration_unit: pick(ex, 'default_duration_unit', 'defaultDurationUnit'),
     }))
 
     // 按 name_en 匹配：已存在就更新，不存在就新增
@@ -77,8 +96,12 @@ export async function POST(req: NextRequest) {
         .maybeSingle()
 
       if (existing) {
-        // 更新时不覆盖 created_by（保留原创建者）
-        const { created_by, ...updateRow } = row
+        // 只更新表格里真的填了的字段（partial update）：
+        // 没填的列保持原值不动，不覆盖成空。
+        const updateRow: Record<string, any> = { updated_at: new Date().toISOString() }
+        for (const [k, v] of Object.entries(row)) {
+          if (v !== undefined) updateRow[k] = v
+        }
         const { error } = await supabaseAdmin
           .from('master_exercise')
           .update(updateRow)
@@ -89,7 +112,45 @@ export async function POST(req: NextRequest) {
           updated++
         }
       } else {
-        const { error } = await supabaseAdmin.from('master_exercise').insert([row])
+        // 新增记录：没填的字段用合理默认值兜底，避免必填/非空字段插入失败
+        const insertRow = {
+          name_en: row.name_en,
+          name_cn: row.name_cn || '',
+          description_en: row.description_en || '',
+          description_cn: row.description_cn || '',
+          instructions_en: row.instructions_en || '',
+          instructions_cn: row.instructions_cn || '',
+          series_cn: row.series_cn ?? null,
+          series_en: row.series_en ?? null,
+          type_en: row.type_en || '',
+          type_cn: row.type_cn || '',
+          difficulty_en: row.difficulty_en || '',
+          difficulty_cn: row.difficulty_cn || '',
+          target_muscles_en: row.target_muscles_en || '',
+          target_muscles_cn: row.target_muscles_cn || '',
+          secondary_muscles_en: row.secondary_muscles_en ?? null,
+          secondary_muscles_cn: row.secondary_muscles_cn ?? null,
+          body_position_en: row.body_position_en ?? null,
+          body_position_cn: row.body_position_cn ?? null,
+          equipment_en: row.equipment_en ?? null,
+          equipment_cn: row.equipment_cn ?? null,
+          equipment_setup_en: row.equipment_setup_en ?? null,
+          equipment_setup_cn: row.equipment_setup_cn ?? null,
+          cues_en: row.cues_en ?? null,
+          cues_cn: row.cues_cn ?? null,
+          contraindications_en: row.contraindications_en ?? null,
+          contraindications_cn: row.contraindications_cn ?? null,
+          featured_image_url: row.featured_image_url ?? null,
+          gif_url: row.gif_url ?? null,
+          default_sets: row.default_sets ?? null,
+          default_reps: row.default_reps ?? null,
+          default_weight: row.default_weight ?? null,
+          default_weight_unit: row.default_weight_unit || 'kg',
+          default_duration: row.default_duration ?? null,
+          default_duration_unit: row.default_duration_unit || 'minutes',
+          created_by: userId,
+        }
+        const { error } = await supabaseAdmin.from('master_exercise').insert([insertRow])
         if (error) {
           errors.push({ exercise: row.name_en || row.name_cn || 'Unknown', error: error.message })
         } else {

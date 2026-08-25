@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { isExerciseComplete, isStaff } from '@/lib/db'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,6 +27,11 @@ export async function GET(
 
     if (error || !data) {
       return NextResponse.json({ error: error?.message || 'Exercise not found' }, { status: 404 })
+    }
+
+    // 未补完中文名/双语简介的动作，学员直接用 id 访问也不给看
+    if (!isStaff(req.headers.get('x-user-role')) && !isExerciseComplete(data)) {
+      return NextResponse.json({ error: 'Exercise not found' }, { status: 404 })
     }
 
     // 图片和笔记单独查，失败也不影响主数据

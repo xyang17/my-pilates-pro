@@ -24,7 +24,10 @@ export default function LoginPage() {
       // 请求会一直不 resolve，导致按钮永远转圈却没有任何提示。
       // 这里给 15 秒上限，超时就报错让用户重试，而不是无限等待。
       const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('登录超时，请刷新页面后重试（如果开了多个标签页，建议先关掉其他标签页）')), 15000)
+        setTimeout(() => reject(new Error(t(
+          '登录超时，请刷新页面后重试（如果开了多个标签页，建议先关掉其他标签页）',
+          'Login timed out. Please refresh and try again (if you have multiple tabs open, try closing the others first).'
+        ))), 15000)
       )
       const { error } = await Promise.race([
         supabase.auth.signInWithPassword({ email, password }),
@@ -33,7 +36,7 @@ export default function LoginPage() {
       if (error) { setError(error.message); return }
       router.push('/dashboard')
     } catch (err: any) {
-      setError(err.message || '登录失败')
+      setError(err.message || t('登录失败', 'Login failed'))
     } finally {
       setLoading(false)
     }
@@ -85,7 +88,7 @@ export default function LoginPage() {
           fontSize: 'var(--text-sm)',
           color: 'var(--c-text-secondary)',
         }}>
-          教练与学员专属平台
+          {t('教练与学员专属平台', 'For Trainers & Clients')}
         </p>
       </div>
 
@@ -118,7 +121,7 @@ export default function LoginPage() {
               color: 'var(--c-text-primary)',
               marginBottom: 'var(--sp-2)',
             }}>
-              邮箱
+              {t('邮箱', 'Email')}
             </label>
             <input
               type="email"
@@ -142,7 +145,7 @@ export default function LoginPage() {
                 fontWeight: 500,
                 color: 'var(--c-text-primary)',
               }}>
-                密码
+                {t('密码', 'Password')}
               </label>
               <button
                 type="button"
@@ -156,7 +159,7 @@ export default function LoginPage() {
                   padding: 0,
                 }}
               >
-                {showPassword ? '隐藏' : '显示'}
+                {showPassword ? t('隐藏', 'Hide') : t('显示', 'Show')}
               </button>
             </div>
             <input
@@ -209,16 +212,16 @@ export default function LoginPage() {
             onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--c-brand-hover)' }}
             onMouseLeave={e => { if (!loading) e.currentTarget.style.background = 'var(--c-brand)' }}
           >
-            {loading ? '登录中…' : '登录'}
+            {loading ? t('登录中…', 'Signing in…') : t('登录', 'Sign In')}
           </button>
         </form>
 
         {/* 注册链接 */}
         <div style={{ marginTop: 'var(--sp-6)', textAlign: 'center' }}>
           <p style={{ margin: '0 0 8px', fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>
-            还没有账号？{' '}
+            {t('还没有账号？', "Don't have an account? ")}{' '}
             <Link href="/auth/signup" style={{ color: 'var(--c-brand)', textDecoration: 'none', fontWeight: 500 }}>
-              立即注册
+              {t('立即注册', 'Sign up')}
             </Link>
           </p>
           <p style={{
@@ -231,7 +234,7 @@ export default function LoginPage() {
             padding: '8px 12px',
             lineHeight: 1.6,
           }}>
-            🔑 注册需要邀请码，请联系你的教练或场馆管理员获取
+            {t('🔑 注册需要邀请码，请联系你的教练或场馆管理员获取', '🔑 Registration requires an invite code — contact your trainer or studio admin to get one')}
           </p>
         </div>
       </div>
