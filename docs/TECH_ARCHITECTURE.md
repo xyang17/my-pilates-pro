@@ -746,6 +746,42 @@ useEffect(() => {
 
 ---
 
+### August 25, 2026 — 依赖版本锁定策略
+
+**背景：** 有人质疑技术栈（Next.js 16 + React 19 + Tailwind v4）太新风险高，建议降级。评估后结论是不降级（切换成本远大于收益，且目前遇到的生产 bug 全部是应用逻辑问题，与框架版本无关），但顺带发现 `package.json` 里 `tailwindcss` 和 `@tailwindcss/postcss` 写的是 `^4`（次版本浮动），存在"重装依赖时被动装到未测试过的新版本"的风险，已改为精确版本锁定。
+
+**改动：**
+```diff
+- "tailwindcss": "^4",
+- "@tailwindcss/postcss": "^4",
++ "tailwindcss": "4.3.1",
++ "@tailwindcss/postcss": "4.3.1",
+```
+
+**为什么锁精确版本：** `^4` 允许 npm 在 `node_modules`/`package-lock.json` 被清空重建时（换机器、CI 重建、`npm update`）静默装到 4.x 范围内的更新版本，代码没改但依赖已经变了，出问题很难查。锁精确版本后，任何时候重装都保证装出来的是同一个版本。
+
+**核心依赖（`next`、`react`、`react-dom`）本来就已经是精确版本，这次是把 `tailwindcss` 相关的两个补齐，做法一致。**
+
+**什么情况下需要主动升级依赖版本：**
+
+| 情况 | 怎么做 |
+|------|--------|
+| 官方发布安全补丁（CVE） | 尽快升级，优先级最高 |
+| 需要新版本才有的功能 | 评估后升级，升级前后各跑一遍 `npm run build` 确认无破坏性变更 |
+| 当前版本某个已知 bug 影响到业务 | 查 changelog 确认修复了，再升级 |
+| 纯粹"很久没升级了" | 不必频繁升级，稳定运行优先；每季度看一眼是否有必须升的理由即可 |
+
+**升级流程：**
+```bash
+npm install tailwindcss@<目标版本> @tailwindcss/postcss@<目标版本>
+npm run build   # 确认没有报错
+git add -A && git commit -m "升级 tailwindcss 到 <版本>" && git push
+```
+
+**不允许发生的情况：** 因为清缓存、重装 `node_modules`，或者装别的包时被动带出新版本——这类"没人决定但版本变了"的升级，正是锁精确版本要防止的。
+
+---
+
 ## Documentation & Knowledge Base
 
 ### How to Keep This Doc Updated
@@ -929,6 +965,6 @@ Same as above (set in Vercel project settings)
 
 ---
 
-**Last Updated:** July 4, 2026  
-**Next Review:** August 4, 2026  
+**Last Updated:** August 25, 2026  
+**Next Review:** September 25, 2026  
 **Status:** Core Features Live — UI Polish + Data Integrity Hardening Phase
