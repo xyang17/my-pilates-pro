@@ -99,12 +99,14 @@ export default function ClassReviewPage() {
   // 生成图片时会重新现查一次，不依赖这里的时机，避免"刚进页面就点生成"时名字还没查到。
   useEffect(() => {
     if (classData?.assigned_to && user) {
-      fetch(`/api/clients/${classData.assigned_to}`, { headers: { 'x-user-id': user.id } })
+      fetch(`/api/clients/${classData.assigned_to}`, {
+        headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' },
+      })
         .then(res => res.ok ? res.json() : null)
         .then(data => { if (data?.name) setClientName(data.name) })
         .catch(() => {})
     }
-  }, [classData?.assigned_to, user])
+  }, [classData?.assigned_to, user, userRole])
 
   // 生成图片前现查一次学员姓名，不依赖上面那个 useEffect 有没有查完——
   // 避免"复盘页刚加载完，手一快就点生成"时标题显示成占位符而不是真名字。
@@ -112,7 +114,9 @@ export default function ClassReviewPage() {
     if (!classData || !user) return ''
     if (classData.assigned_to) {
       try {
-        const res = await fetch(`/api/clients/${classData.assigned_to}`, { headers: { 'x-user-id': user.id } })
+        const res = await fetch(`/api/clients/${classData.assigned_to}`, {
+          headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' },
+        })
         const data = res.ok ? await res.json() : null
         if (data?.name) return data.name
       } catch {}
