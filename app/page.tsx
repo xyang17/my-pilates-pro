@@ -36,7 +36,7 @@ export default function Home() {
         textAlign: 'center',
         maxWidth: 280,
       }}>
-        专业普拉提教练管理平台
+        私人教练与学员训练管理平台
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 280 }}>

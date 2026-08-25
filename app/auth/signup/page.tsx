@@ -106,7 +106,7 @@ export default function SignupPage() {
           MyFitnessPro
         </h1>
         <p style={{ margin: 'var(--sp-1) 0 0', fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>
-          {t('教练与学员专属平台', 'For Trainers & Clients')}
+          {t('私人教练与学员训练管理平台', 'Training Management for Trainers & Clients')}
         </p>
       </div>
 

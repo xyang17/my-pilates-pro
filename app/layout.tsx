@@ -10,7 +10,7 @@ const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "MyFitnessPro",
-  description: "Pilates & Fitness Training App",
+  description: "Training Management for Trainers & Clients",
   icons: {
     icon: "/logo.svg",
     apple: "/logo.svg",
