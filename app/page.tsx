@@ -12,13 +12,17 @@ export default function Home() {
       padding: '40px 24px',
       fontFamily: 'var(--font-body)',
     }}>
-      {/* Logo */}
-      <img
-        src="/logo.png"
-        alt="MyFitnessPro"
+      {/* Logo —— 原图是带文字/大片留白的完整卡片，这里用背景定位只截取中间的花瓣图标 */}
+      <div
+        role="img"
+        aria-label="MyFitnessPro"
         style={{
           width: 96, height: 96, borderRadius: 20,
-          marginBottom: 16, objectFit: 'cover',
+          marginBottom: 16,
+          backgroundImage: "url('/logo.png')",
+          backgroundSize: '500% 500%',
+          backgroundPosition: '50% 36.25%',
+          backgroundRepeat: 'no-repeat',
         }}
       />
 

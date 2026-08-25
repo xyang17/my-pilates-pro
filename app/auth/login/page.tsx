@@ -61,12 +61,16 @@ export default function LoginPage() {
 
       {/* Logo 区域 */}
       <div style={{ textAlign: 'center', marginBottom: 'var(--sp-8)' }}>
-        <img
-          src="/logo.png"
-          alt="MyFitnessPro"
+        <div
+          role="img"
+          aria-label="MyFitnessPro"
           style={{
             width: 56, height: 56, borderRadius: 'var(--r-lg)',
-            margin: '0 auto var(--sp-4)', display: 'block', objectFit: 'cover',
+            margin: '0 auto var(--sp-4)',
+            backgroundImage: "url('/logo.png')",
+            backgroundSize: '500% 500%',
+            backgroundPosition: '50% 36.25%',
+            backgroundRepeat: 'no-repeat',
           }}
         />
         <h1 style={{
