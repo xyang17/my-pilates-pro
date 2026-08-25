@@ -24,7 +24,8 @@ export async function GET(
         *,
         exercises:class_exercise_instance(
           *,
-          master_exercise(id, name_en, name_cn, type_cn, type_en, difficulty_cn, featured_image_url, description_en, description_cn)
+          master_exercise(id, name_en, name_cn, type_cn, type_en, difficulty_cn, featured_image_url, description_en, description_cn),
+          set_details:exercise_instance_set(id, set_no, reps, weight, weight_unit, notes)
         )
       `)
       .eq('id', id)
@@ -32,9 +33,12 @@ export async function GET(
 
     if (error) return NextResponse.json({ error: error.message }, { status: 404 })
 
-    // Sort exercises by order
+    // Sort exercises by order, and each exercise's set-by-set records by set_no
     if (data.exercises) {
       data.exercises.sort((a: any, b: any) => a.order - b.order)
+      data.exercises.forEach((ex: any) => {
+        if (ex.set_details) ex.set_details.sort((a: any, b: any) => a.set_no - b.set_no)
+      })
     }
 
     // 会员视角按白名单投影，营收类字段不会返回

@@ -12,6 +12,14 @@ interface MasterExercise {
   name_cn: string
 }
 
+interface SetDetail {
+  id?: string
+  set_no: number
+  reps: number | ''
+  weight: number | ''
+  weight_unit: string
+}
+
 interface ExerciseReview {
   id: string
   order: number
@@ -27,6 +35,8 @@ interface ExerciseReview {
   actual_reps: number | ''
   actual_weight: number | ''
   post_note: string
+  // 每组明细（训练容量）——默认不填，展开才有；填了就是每组的真实次数/重量
+  set_details: SetDetail[]
   master_exercise: MasterExercise
 }
 
@@ -59,6 +69,7 @@ export default function ClassReviewPage() {
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState('')
   const [isEditing, setIsEditing] = useState(false)
+  const [expandedSets, setExpandedSets] = useState<Record<string, boolean>>({})
 
   const { lang } = useLang()
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
@@ -102,6 +113,15 @@ export default function ClassReviewPage() {
           actual_weight: ex.actual_weight ?? '',
           // Pre-fill from planned notes if no post_note yet
           post_note: ex.post_note ?? ex.instance_notes ?? '',
+          set_details: (ex.set_details || [])
+            .map((s: any) => ({
+              id: s.id,
+              set_no: s.set_no,
+              reps: s.reps ?? '',
+              weight: s.weight ?? '',
+              weight_unit: s.weight_unit || 'kg',
+            }))
+            .sort((a: SetDetail, b: SetDetail) => a.set_no - b.set_no),
           master_exercise: ex.master_exercise,
         }))
       )
@@ -141,6 +161,81 @@ export default function ClassReviewPage() {
       setSaveStatus('idle')
     }
   }, [classId, user])
+
+  // 保存"每组明细"：把当前这个动作的整组数组传给后端，后端负责增删改。
+  // 顺便把 actual_sets 同步成明细的组数——填了明细就不用再手动改一遍组数了。
+  const saveSets = useCallback(async (ex: ExerciseReview) => {
+    setSaveStatus('saving')
+    try {
+      const res = await fetch(`/api/classes/${classId}/exercises/${ex.id}/sets`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        body: JSON.stringify({
+          sets: ex.set_details.map(s => ({
+            set_no: s.set_no,
+            reps: s.reps === '' ? null : Number(s.reps),
+            weight: s.weight === '' ? null : Number(s.weight),
+            weight_unit: s.weight_unit,
+          })),
+        }),
+      })
+      if (!res.ok) { setSaveStatus('idle'); return }
+
+      // 组数明细数量同步回 actual_sets，省得再手动改一遍
+      const newActualSets = ex.set_details.length > 0 ? ex.set_details.length : ''
+      updateExercise(ex.id, 'actual_sets', newActualSets)
+      await fetch(`/api/classes/${classId}/exercises/${ex.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        body: JSON.stringify({ actual_sets: newActualSets === '' ? null : Number(newActualSets) }),
+      })
+
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 1500)
+    } catch {
+      setSaveStatus('idle')
+    }
+  }, [classId, user])
+
+  const toggleSetDetails = (ex: ExerciseReview) => {
+    const willExpand = !expandedSets[ex.id]
+    setExpandedSets(prev => ({ ...prev, [ex.id]: willExpand }))
+
+    // 第一次展开、还没有任何明细时，按"计划/已填组数"自动生成对应行数，
+    // 每行预填实际（或计划）次数/重量——教练只需要改有变化的那一组，不用从零开始填。
+    if (willExpand && ex.set_details.length === 0) {
+      const count = Number(ex.actual_sets) || Number(ex.sets) || 1
+      const reps = ex.actual_reps !== '' ? ex.actual_reps : (ex.reps ?? '')
+      const weight = ex.actual_weight !== '' ? ex.actual_weight : (ex.weight ?? '')
+      const rows: SetDetail[] = Array.from({ length: count }, (_, i) => ({
+        set_no: i + 1, reps, weight, weight_unit: ex.weight_unit || 'kg',
+      }))
+      updateExercise(ex.id, 'set_details', rows)
+    }
+  }
+
+  const addSet = (ex: ExerciseReview) => {
+    const last = ex.set_details[ex.set_details.length - 1]
+    const row: SetDetail = last
+      ? { ...last, set_no: last.set_no + 1 }
+      : { set_no: 1, reps: ex.reps ?? '', weight: ex.weight ?? '', weight_unit: ex.weight_unit || 'kg' }
+    const updated = [...ex.set_details, row]
+    updateExercise(ex.id, 'set_details', updated)
+    saveSets({ ...ex, set_details: updated })
+  }
+
+  const removeSet = (ex: ExerciseReview, setNo: number) => {
+    const updated = ex.set_details
+      .filter(s => s.set_no !== setNo)
+      .map((s, i) => ({ ...s, set_no: i + 1 })) // 重新编号，组号不留空
+    updateExercise(ex.id, 'set_details', updated)
+    saveSets({ ...ex, set_details: updated })
+  }
+
+  const updateSetField = (ex: ExerciseReview, setNo: number, field: 'reps' | 'weight', value: string) => {
+    const updated = ex.set_details.map(s => s.set_no === setNo ? { ...s, [field]: value } : s)
+    updateExercise(ex.id, 'set_details', updated)
+  }
 
   const handleComplete = async () => {
     if (isSaving) return
@@ -392,6 +487,78 @@ export default function ClassReviewPage() {
                       }}
                     />
                   </div>
+                </div>
+
+                {/* 每组明细（训练容量）：默认收起，不影响原来的填写方式 */}
+                <div style={{ marginBottom: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => toggleSetDetails(ex)}
+                    style={{
+                      background: 'none', border: 'none', padding: 0,
+                      color: 'var(--c-brand)', fontSize: '12px', cursor: 'pointer',
+                    }}
+                  >
+                    {expandedSets[ex.id]
+                      ? '▾ 收起每组明细'
+                      : ex.set_details.length > 0
+                        ? `▸ 已记录 ${ex.set_details.length} 组明细`
+                        : '▸ 每组次数/重量不一样？点这里记录'}
+                  </button>
+
+                  {expandedSets[ex.id] && (
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {ex.set_details.map((s) => (
+                        <div key={s.set_no} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '12px', color: '#999', width: '38px', flexShrink: 0 }}>第{s.set_no}组</span>
+                          <input
+                            type="number" min="0"
+                            placeholder="次数"
+                            value={s.reps}
+                            disabled={readOnly}
+                            onChange={(e) => updateSetField(ex, s.set_no, 'reps', e.target.value)}
+                            onBlur={() => saveSets(ex)}
+                            style={{ width: '70px', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box' }}
+                          />
+                          <span style={{ fontSize: '12px', color: '#bbb' }}>次</span>
+                          <input
+                            type="number" min="0" step="0.5"
+                            placeholder="重量"
+                            value={s.weight}
+                            disabled={readOnly}
+                            onChange={(e) => updateSetField(ex, s.set_no, 'weight', e.target.value)}
+                            onBlur={() => saveSets(ex)}
+                            style={{ width: '70px', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box' }}
+                          />
+                          <span style={{ fontSize: '12px', color: '#bbb' }}>{s.weight_unit || 'kg'}</span>
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              onClick={() => removeSet(ex, s.set_no)}
+                              style={{ background: 'none', border: 'none', color: '#bbb', cursor: 'pointer', fontSize: '14px', marginLeft: '2px' }}
+                              title="删除这一组"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          onClick={() => addSet(ex)}
+                          style={{
+                            alignSelf: 'flex-start', marginTop: '2px',
+                            background: 'var(--c-fill-light)', border: '1px solid var(--c-border)',
+                            borderRadius: '6px', padding: '5px 10px', fontSize: '12px',
+                            color: 'var(--c-text-secondary)', cursor: 'pointer',
+                          }}
+                        >
+                          + 加一组
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Per-exercise note */}
