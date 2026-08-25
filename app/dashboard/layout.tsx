@@ -139,9 +139,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Desktop sidebar — hidden on mobile */}
       <Sidebar className="hidden md:flex">
         <SidebarHeader className="px-5 py-4 border-b border-sidebar-border">
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--c-text-primary)' }}>
-            MyFitnessPro
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <img src="/logo.png" alt="" style={{ width: 24, height: 24, borderRadius: 6, objectFit: 'cover' }} />
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--c-text-primary)' }}>
+              MyFitnessPro
+            </span>
+          </div>
         </SidebarHeader>
 
         <SidebarContent className="py-2">

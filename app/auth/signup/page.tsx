@@ -97,12 +97,14 @@ export default function SignupPage() {
 
       {/* Logo */}
       <div style={{ textAlign: 'center', marginBottom: 'var(--sp-8)' }}>
-        <div style={{
-          width: 56, height: 56, borderRadius: 'var(--r-lg)',
-          background: 'var(--c-lavender)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          fontSize: 28, margin: '0 auto var(--sp-4)',
-        }}>🌸</div>
+        <img
+          src="/logo.png"
+          alt="MyFitnessPro"
+          style={{
+            width: 56, height: 56, borderRadius: 'var(--r-lg)',
+            margin: '0 auto var(--sp-4)', display: 'block', objectFit: 'cover',
+          }}
+        />
         <h1 style={{ margin: 0, fontSize: 'var(--text-xl)', fontWeight: 600, color: 'var(--c-text-primary)', letterSpacing: '-0.3px' }}>
           MyFitnessPro
         </h1>

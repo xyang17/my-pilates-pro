@@ -13,15 +13,14 @@ export default function Home() {
       fontFamily: 'var(--font-body)',
     }}>
       {/* Logo */}
-      <div style={{
-        width: 72, height: 72, borderRadius: 20,
-        background: 'var(--c-fill-light)',
-        border: '1.5px solid var(--c-pink-mist)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 36, marginBottom: 24,
-      }}>
-        🌸
-      </div>
+      <img
+        src="/logo.png"
+        alt="MyFitnessPro"
+        style={{
+          width: 96, height: 96, borderRadius: 20,
+          marginBottom: 16, objectFit: 'cover',
+        }}
+      />
 
       <h1 style={{
         margin: '0 0 8px',
