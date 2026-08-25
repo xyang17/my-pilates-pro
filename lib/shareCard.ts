@@ -73,19 +73,24 @@ const LABELS: Record<ShareCardLang, {
   },
 }
 
+// 先按原文里的换行拆段落，每段再按宽度自动折行——
+// 教练在总结/备注里手动敲的换行会被保留，不会被强行拼成一行。
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = []
-  let line = ''
-  for (const ch of text) {
-    const test = line + ch
-    if (ctx.measureText(test).width > maxWidth && line) {
-      lines.push(line)
-      line = ch
-    } else {
-      line = test
+  for (const para of text.split('\n')) {
+    if (para === '') { lines.push(''); continue }
+    let line = ''
+    for (const ch of para) {
+      const test = line + ch
+      if (ctx.measureText(test).width > maxWidth && line) {
+        lines.push(line)
+        line = ch
+      } else {
+        line = test
+      }
     }
+    if (line) lines.push(line)
   }
-  if (line) lines.push(line)
   return lines
 }
 
