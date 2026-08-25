@@ -5,6 +5,7 @@ import { useLang } from '@/context/LanguageContext'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { generateReviewShareCard } from '@/lib/shareCard'
 
 interface MasterExercise {
   id: string
@@ -50,6 +51,7 @@ interface ClassData {
   status: string
   notes?: string
   post_summary?: string
+  assigned_to?: string
   exercises: any[]
 }
 
@@ -70,6 +72,11 @@ export default function ClassReviewPage() {
   const [aiError, setAiError] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [expandedSets, setExpandedSets] = useState<Record<string, boolean>>({})
+  const [clientName, setClientName] = useState('')
+  const [shareImageUrl, setShareImageUrl] = useState<string | null>(null)
+  const [shareBlob, setShareBlob] = useState<Blob | null>(null)
+  const [generatingShare, setGeneratingShare] = useState(false)
+  const [shareError, setShareError] = useState('')
 
   const { lang } = useLang()
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
@@ -85,6 +92,17 @@ export default function ClassReviewPage() {
     }
     if (user) fetchClassData()
   }, [user, authLoading, userRole])
+
+  // 私教课有明确的学员（assigned_to），拿来给分享卡片抬头用；
+  // 团课没有单一学员就不强求，卡片上只显示课程名。
+  useEffect(() => {
+    if (classData?.assigned_to && user) {
+      fetch(`/api/clients/${classData.assigned_to}`, { headers: { 'x-user-id': user.id } })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => { if (data?.name) setClientName(data.name) })
+        .catch(() => {})
+    }
+  }, [classData?.assigned_to, user])
 
   const fetchClassData = async () => {
     try {
@@ -341,6 +359,64 @@ export default function ClassReviewPage() {
       setTimeout(() => setSaveStatus('idle'), 1500)
     } catch {
       setSaveStatus('idle')
+    }
+  }
+
+  // 生成一张可以直接发微信的复盘分享图。右下角带二维码，
+  // 扫码跳到官网登录页——客户想看更详细的历史记录/趋势，扫一下就能进来。
+  const handleGenerateShare = async () => {
+    if (!classData) return
+    setGeneratingShare(true)
+    setShareError('')
+    try {
+      const blob = await generateReviewShareCard({
+        studioName: 'MyFitnessPro',
+        clientName: clientName || '学员',
+        className: classData.name,
+        dateLabel: new Date(classData.date).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),
+        exercises: exercises.map(ex => ({
+          name_cn: ex.master_exercise.name_cn || ex.master_exercise.name_en,
+          name_en: ex.master_exercise.name_en,
+          sets: ex.sets, reps: ex.reps, weight: ex.weight, weightUnit: ex.weight_unit,
+          actualSets: ex.actual_sets === '' ? null : Number(ex.actual_sets),
+          actualReps: ex.actual_reps === '' ? null : Number(ex.actual_reps),
+          actualWeight: ex.actual_weight === '' ? null : Number(ex.actual_weight),
+          setDetails: ex.set_details.length > 0
+            ? ex.set_details.map(s => ({ set_no: s.set_no, reps: s.reps === '' ? null : Number(s.reps), weight: s.weight === '' ? null : Number(s.weight) }))
+            : undefined,
+        })),
+        summary: postSummary,
+        qrUrl: 'https://myfitnesspro.co',
+      })
+      if (shareImageUrl) URL.revokeObjectURL(shareImageUrl)
+      setShareBlob(blob)
+      setShareImageUrl(URL.createObjectURL(blob))
+    } catch (err: any) {
+      setShareError(err.message || '生成图片失败，请重试')
+    } finally {
+      setGeneratingShare(false)
+    }
+  }
+
+  const handleDownloadShare = () => {
+    if (!shareImageUrl || !classData) return
+    const a = document.createElement('a')
+    a.href = shareImageUrl
+    a.download = `${classData.name}_训练记录.png`
+    a.click()
+  }
+
+  const handleShareNative = async () => {
+    if (!shareBlob || !classData) return
+    const file = new File([shareBlob], `${classData.name}_训练记录.png`, { type: 'image/png' })
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: classData.name })
+      } catch {
+        // 用户取消分享，不用报错
+      }
+    } else {
+      handleDownloadShare()
     }
   }
 
@@ -740,6 +816,22 @@ export default function ClassReviewPage() {
               ✓ 本课已完成记录
             </div>
             <button
+              onClick={handleGenerateShare}
+              disabled={generatingShare}
+              style={{
+                padding: '12px',
+                backgroundColor: generatingShare ? '#bbb' : 'var(--c-brand)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '15px',
+                fontWeight: 'bold',
+                cursor: generatingShare ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {generatingShare ? '生成中…' : '📤 生成分享图片，发给学员'}
+            </button>
+            <button
               onClick={() => setIsEditing(true)}
               style={{
                 padding: '10px',
@@ -753,6 +845,47 @@ export default function ClassReviewPage() {
             >
               ✏️ 编辑修改
             </button>
+          </div>
+        )}
+
+        {shareError && (
+          <div style={{ marginTop: '12px', padding: '10px 12px', background: '#FFF3E0', border: '1px solid #FFE0B2', borderRadius: '8px', fontSize: '13px', color: '#E65100' }}>
+            ⚠️ {shareError}
+          </div>
+        )}
+
+        {/* 分享图片预览 */}
+        {shareImageUrl && (
+          <div style={{ marginTop: '16px', background: 'var(--c-card-bg)', borderRadius: '8px', padding: '16px' }}>
+            <p style={{ margin: '0 0 10px', fontWeight: 'bold', color: '#444', fontSize: '14px' }}>预览</p>
+            <img
+              src={shareImageUrl}
+              alt="训练记录分享图"
+              style={{ width: '100%', borderRadius: '8px', border: '1px solid var(--c-border)', display: 'block', marginBottom: '12px' }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={handleShareNative}
+                style={{
+                  flex: 1, padding: '12px', backgroundColor: 'var(--c-brand)', color: 'white',
+                  border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer',
+                }}
+              >
+                分享 / 保存到相册
+              </button>
+              <button
+                onClick={handleDownloadShare}
+                style={{
+                  padding: '12px 16px', backgroundColor: 'var(--c-fill-light)', color: 'var(--c-text-secondary)',
+                  border: '1px solid var(--c-border)', borderRadius: '8px', fontSize: '14px', cursor: 'pointer',
+                }}
+              >
+                下载
+              </button>
+            </div>
+            <p style={{ margin: '10px 0 0', fontSize: '12px', color: '#999' }}>
+              长按图片可直接保存/转发到微信；桌面浏览器点"下载"存到电脑。
+            </p>
           </div>
         )}
       </main>
