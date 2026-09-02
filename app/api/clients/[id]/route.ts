@@ -23,7 +23,7 @@ export async function GET(
 
     const { data: userRow, error } = await supabaseAdmin
       .from('user')
-      .select('id, name, email, photo_url, bio, created_at, role')
+      .select('id, name, email, photo_url, bio, created_at, role, sex, birth_date, height_cm')
       .eq('id', id)
       .single()
 
@@ -72,6 +72,17 @@ export async function PUT(
 
     const body = await req.json()
     const { injury_notes, goals, emergency_contact } = body
+
+    // 性别/出生日期/身高 存在 user 表上（账号级基础资料，不是这条 client 记录），单独更新
+    const userUpdates: Record<string, unknown> = {}
+    if (body.sex        !== undefined) userUpdates.sex        = body.sex || null
+    if (body.birth_date !== undefined) userUpdates.birth_date = body.birth_date || null
+    if (body.height_cm  !== undefined) userUpdates.height_cm  = body.height_cm === '' ? null : body.height_cm
+    if (Object.keys(userUpdates).length > 0) {
+      userUpdates.updated_at = new Date().toISOString()
+      const { error: userErr } = await supabaseAdmin.from('user').update(userUpdates).eq('id', id)
+      if (userErr) return NextResponse.json({ error: userErr.message }, { status: 400 })
+    }
 
     // Select-then-update-or-insert (no unique constraint on user_id yet)
     const { data: existing } = await supabaseAdmin

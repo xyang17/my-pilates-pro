@@ -9,6 +9,9 @@ export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [sex, setSex] = useState('')
+  const [birthDate, setBirthDate] = useState('')
+  const [heightCm, setHeightCm] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [inviteStatus, setInviteStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle')
   const [inviteRole, setInviteRole] = useState<string>('')
@@ -54,7 +57,10 @@ export default function SignupPage() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name, role: inviteRole }),
+        body: JSON.stringify({
+          email, password, name, role: inviteRole,
+          sex, birth_date: birthDate, height_cm: heightCm ? Number(heightCm) : null,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error); return }
@@ -176,6 +182,42 @@ export default function SignupPage() {
               type="text" value={name} onChange={e => setName(e.target.value)}
               placeholder={t('你的名字', 'Your name')} required
               style={{ width: '100%', padding: '12px var(--sp-4)', fontSize: 'var(--text-base)' }}
+            />
+          </div>
+
+          {/* 性别 / 出生日期 / 身高 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3)', marginBottom: 'var(--sp-5)' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)', marginBottom: 'var(--sp-2)' }}>
+                {t('性别', 'Sex')}
+              </label>
+              <select value={sex} onChange={e => setSex(e.target.value)} required
+                style={{ width: '100%', padding: '12px var(--sp-4)', fontSize: 'var(--text-base)', boxSizing: 'border-box' }}>
+                <option value="" disabled>{t('请选择', 'Select')}</option>
+                <option value="MALE">{t('男', 'Male')}</option>
+                <option value="FEMALE">{t('女', 'Female')}</option>
+                <option value="OTHER">{t('其他', 'Other')}</option>
+                <option value="UNDISCLOSED">{t('不便告知', 'Prefer not to say')}</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)', marginBottom: 'var(--sp-2)' }}>
+                {t('出生日期', 'Birth date')}
+              </label>
+              <input
+                type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} required
+                style={{ width: '100%', padding: '12px var(--sp-4)', fontSize: 'var(--text-base)', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+          <div style={{ marginBottom: 'var(--sp-5)' }}>
+            <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)', marginBottom: 'var(--sp-2)' }}>
+              {t('身高 (cm)', 'Height (cm)')}
+            </label>
+            <input
+              type="number" min="0" value={heightCm} onChange={e => setHeightCm(e.target.value)}
+              placeholder={t('例如 165', 'e.g. 165')} required
+              style={{ width: '100%', padding: '12px var(--sp-4)', fontSize: 'var(--text-base)', boxSizing: 'border-box' }}
             />
           </div>
 

@@ -49,9 +49,27 @@ interface Client {
   bio?: string
   injury_notes?: string
   goals?: string
+  sex?: 'MALE' | 'FEMALE' | 'OTHER' | 'UNDISCLOSED' | null
+  birth_date?: string | null
+  height_cm?: number | null
   created_at: string
   classes: ClientClass[]
 }
+
+interface CycleLog {
+  id: string
+  start_date: string
+  end_date?: string | null
+  flow_level?: 'LIGHT' | 'MEDIUM' | 'HEAVY' | null
+  pain_level?: 'NONE' | 'MILD' | 'MODERATE' | 'SEVERE' | null
+  notes?: string | null
+  recorded_by: string
+  created_at: string
+}
+
+const SEX_LABELS: Record<string, string> = { MALE: '男', FEMALE: '女', OTHER: '其他', UNDISCLOSED: '不便告知' }
+const FLOW_LABELS: Record<string, string> = { LIGHT: '量少', MEDIUM: '量中', HEAVY: '量多' }
+const PAIN_LABELS: Record<string, string> = { NONE: '无痛感', MILD: '轻微', MODERATE: '中等', SEVERE: '严重' }
 
 export default function ClientDetailPage() {
   const { user, userRole, loading: authLoading } = useAuth()
@@ -66,7 +84,7 @@ export default function ClientDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [hwLoading, setHwLoading] = useState(false)
   const [aLoading, setALoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'classes' | 'homework' | 'assessments'>('classes')
+  const [activeTab, setActiveTab] = useState<'classes' | 'homework' | 'assessments' | 'cycle'>('classes')
   const [expandedHw, setExpandedHw] = useState<Set<string>>(new Set())
   const [deletingHwId, setDeletingHwId] = useState<string | null>(null)
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
@@ -74,8 +92,16 @@ export default function ClientDetailPage() {
     lang === 'zh' ? title : title.replace(/\s*作业$/, ' Homework')
   // Trainer notes edit
   const [editNotes, setEditNotes] = useState(false)
-  const [notesForm, setNotesForm] = useState({ injury_notes: '', goals: '' })
+  const [notesForm, setNotesForm] = useState({ injury_notes: '', goals: '', sex: '', birth_date: '', height_cm: '' })
   const [savingNotes, setSavingNotes] = useState(false)
+
+  // 生理周期记录
+  const [cycleLogs, setCycleLogs] = useState<CycleLog[]>([])
+  const [cycleLoading, setCycleLoading] = useState(false)
+  const [showAddCycle, setShowAddCycle] = useState(false)
+  const [cycleForm, setCycleForm] = useState({ start_date: '', end_date: '', flow_level: '', pain_level: '', notes: '' })
+  const [savingCycle, setSavingCycle] = useState(false)
+  const [deletingCycleId, setDeletingCycleId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) { router.push('/auth/login'); return }
@@ -85,6 +111,7 @@ export default function ClientDetailPage() {
   useEffect(() => {
     if (activeTab === 'homework' && homework.length === 0 && user) fetchHomework()
     if (activeTab === 'assessments' && assessments.length === 0 && user) fetchAssessments()
+    if (activeTab === 'cycle' && cycleLogs.length === 0 && user) fetchCycleLogs()
   }, [activeTab, user])
 
   const fetchClient = async () => {
@@ -99,7 +126,13 @@ export default function ClientDetailPage() {
   }
 
   const openEditNotes = () => {
-    setNotesForm({ injury_notes: client?.injury_notes || '', goals: client?.goals || '' })
+    setNotesForm({
+      injury_notes: client?.injury_notes || '',
+      goals: client?.goals || '',
+      sex: client?.sex || '',
+      birth_date: client?.birth_date || '',
+      height_cm: client?.height_cm != null ? String(client.height_cm) : '',
+    })
     setEditNotes(true)
   }
 
@@ -110,15 +143,66 @@ export default function ClientDetailPage() {
       const res = await fetch(`/api/clients/${clientId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
-        body: JSON.stringify(notesForm),
+        body: JSON.stringify({
+          ...notesForm,
+          height_cm: notesForm.height_cm === '' ? null : Number(notesForm.height_cm),
+        }),
       })
       if (!res.ok) throw new Error('保存失败')
-      setClient(prev => prev ? { ...prev, ...notesForm } : prev)
+      await fetchClient()
       setEditNotes(false)
     } catch (err: any) {
       alert(err.message)
     } finally {
       setSavingNotes(false)
+    }
+  }
+
+  const fetchCycleLogs = async () => {
+    setCycleLoading(true)
+    try {
+      const res = await fetch(`/api/cycle-logs?userId=${clientId}`, {
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (res.ok) setCycleLogs(await res.json())
+    } finally {
+      setCycleLoading(false)
+    }
+  }
+
+  const handleAddCycle = async () => {
+    if (!cycleForm.start_date || savingCycle) return
+    setSavingCycle(true)
+    try {
+      const res = await fetch('/api/cycle-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({ user_id: clientId, ...cycleForm }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '保存失败')
+      setCycleLogs(prev => [data, ...prev].sort((a, b) => b.start_date.localeCompare(a.start_date)))
+      setCycleForm({ start_date: '', end_date: '', flow_level: '', pain_level: '', notes: '' })
+      setShowAddCycle(false)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setSavingCycle(false)
+    }
+  }
+
+  const handleDeleteCycle = async (id: string) => {
+    if (!window.confirm('确定删除这条周期记录？')) return
+    setDeletingCycleId(id)
+    try {
+      const res = await fetch(`/api/cycle-logs/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (res.ok) setCycleLogs(prev => prev.filter(c => c.id !== id))
+      else alert('删除失败，请重试')
+    } finally {
+      setDeletingCycleId(null)
     }
   }
 
@@ -203,6 +287,10 @@ export default function ClientDetailPage() {
               <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '13px' }}>📧 {client.email}</p>
               <p style={{ margin: 0, color: '#bbb', fontSize: '12px' }}>
                 加入时间: {new Date(client.created_at).toLocaleDateString('zh-CN')}
+                {(client.sex || client.birth_date || client.height_cm) && ' · '}
+                {client.sex && SEX_LABELS[client.sex]}
+                {client.birth_date && ` · ${client.birth_date}`}
+                {client.height_cm != null && ` · ${client.height_cm}cm`}
               </p>
             </div>
           </div>
@@ -243,6 +331,28 @@ export default function ClientDetailPage() {
 
             {editNotes ? (
               <div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#999', fontWeight: 'bold', marginBottom: '4px' }}>性别</label>
+                    <select value={notesForm.sex} onChange={e => setNotesForm(p => ({ ...p, sex: e.target.value }))}
+                      style={{ width: '100%', padding: '7px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }}>
+                      <option value="">未设置</option>
+                      {Object.entries(SEX_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#999', fontWeight: 'bold', marginBottom: '4px' }}>出生日期</label>
+                    <input type="date" value={notesForm.birth_date}
+                      onChange={e => setNotesForm(p => ({ ...p, birth_date: e.target.value }))}
+                      style={{ width: '100%', padding: '7px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#999', fontWeight: 'bold', marginBottom: '4px' }}>身高 (cm)</label>
+                    <input type="number" min="0" value={notesForm.height_cm}
+                      onChange={e => setNotesForm(p => ({ ...p, height_cm: e.target.value }))}
+                      style={{ width: '100%', padding: '7px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} />
+                  </div>
+                </div>
                 <div style={{ marginBottom: '10px' }}>
                   <label style={{ display: 'block', fontSize: '11px', color: '#E8763A', fontWeight: 'bold', marginBottom: '4px' }}>⚠️ 伤病 / 体态问题</label>
                   <textarea value={notesForm.injury_notes}
@@ -293,11 +403,15 @@ export default function ClientDetailPage() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '2px', borderBottom: '2px solid #eee', marginBottom: '0' }}>
-          {([
-            { key: 'classes', label: `课程记录 (${client.classes.length})` },
-            { key: 'homework', label: `作业 (${homework.length || '…'})` },
-            { key: 'assessments', label: `测试记录 (${assessments.length || '…'})` },
-          ] as const).map(tab => (
+          {(() => {
+            const tabs: { key: 'classes' | 'homework' | 'assessments' | 'cycle'; label: string }[] = [
+              { key: 'classes', label: `课程记录 (${client.classes.length})` },
+              { key: 'homework', label: `作业 (${homework.length || '…'})` },
+              { key: 'assessments', label: `测试记录 (${assessments.length || '…'})` },
+            ]
+            if (client.sex === 'FEMALE') tabs.push({ key: 'cycle', label: `生理周期 (${cycleLogs.length || '…'})` })
+            return tabs
+          })().map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               style={{
                 padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px',
@@ -494,6 +608,108 @@ export default function ClientDetailPage() {
                   </Link>
                 )
               })
+            )}
+          </div>
+        )}
+
+        {/* 生理周期 tab */}
+        {activeTab === 'cycle' && (
+          <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--c-border)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowAddCycle(v => !v)}
+                style={{ fontSize: 13, color: 'var(--c-brand)', border: '1px solid var(--c-brand)', borderRadius: 6, padding: '5px 14px', background: 'none', cursor: 'pointer', fontWeight: 500 }}>
+                {showAddCycle ? '取消' : '＋ 记录一次'}
+              </button>
+            </div>
+
+            {showAddCycle && (
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--c-border)', background: 'var(--c-fill-light)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>开始日期 *</label>
+                    <input type="date" value={cycleForm.start_date}
+                      onChange={e => setCycleForm(p => ({ ...p, start_date: e.target.value }))}
+                      style={{ width: '100%', padding: '7px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>结束日期</label>
+                    <input type="date" value={cycleForm.end_date}
+                      onChange={e => setCycleForm(p => ({ ...p, end_date: e.target.value }))}
+                      style={{ width: '100%', padding: '7px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>流量</label>
+                    <select value={cycleForm.flow_level} onChange={e => setCycleForm(p => ({ ...p, flow_level: e.target.value }))}
+                      style={{ width: '100%', padding: '7px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }}>
+                      <option value="">不记录</option>
+                      {Object.entries(FLOW_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>痛经程度</label>
+                    <select value={cycleForm.pain_level} onChange={e => setCycleForm(p => ({ ...p, pain_level: e.target.value }))}
+                      style={{ width: '100%', padding: '7px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }}>
+                      <option value="">不记录</option>
+                      {Object.entries(PAIN_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#999', marginBottom: '4px' }}>备注</label>
+                  <textarea rows={2} value={cycleForm.notes}
+                    onChange={e => setCycleForm(p => ({ ...p, notes: e.target.value }))}
+                    placeholder="例：情绪波动大，腰酸..."
+                    style={{ width: '100%', padding: '7px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box' }} />
+                </div>
+                <button onClick={handleAddCycle} disabled={!cycleForm.start_date || savingCycle}
+                  style={{
+                    padding: '7px 18px',
+                    background: !cycleForm.start_date || savingCycle ? 'var(--c-lavender)' : 'var(--c-brand)',
+                    color: '#fff', border: 'none', borderRadius: 'var(--r-sm)',
+                    cursor: !cycleForm.start_date || savingCycle ? 'not-allowed' : 'pointer',
+                    fontSize: 'var(--text-sm)', fontWeight: 500,
+                  }}>
+                  {savingCycle ? '保存中...' : '保存'}
+                </button>
+              </div>
+            )}
+
+            {cycleLoading ? (
+              <p style={{ padding: '40px', textAlign: 'center', color: '#bbb', margin: 0 }}>加载中…</p>
+            ) : cycleLogs.length === 0 ? (
+              <p style={{ padding: '40px', textAlign: 'center', color: '#bbb', margin: 0 }}>暂无周期记录</p>
+            ) : (
+              cycleLogs.map((c, i) => (
+                <div key={c.id} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 20px',
+                  borderBottom: i < cycleLogs.length - 1 ? '1px solid var(--c-border)' : 'none',
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', marginBottom: 4 }}>
+                      {c.start_date}{c.end_date && ` → ${c.end_date}`}
+                    </div>
+                    {(c.flow_level || c.pain_level) && (
+                      <div style={{ fontSize: 12, color: '#aaa' }}>
+                        {[c.flow_level && FLOW_LABELS[c.flow_level], c.pain_level && PAIN_LABELS[c.pain_level]].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                    {c.notes && <div style={{ fontSize: 12, color: '#bbb', marginTop: 2 }}>💬 {c.notes}</div>}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteCycle(c.id)}
+                    disabled={deletingCycleId === c.id}
+                    title="删除记录"
+                    style={{
+                      width: 26, height: 26, border: 'none', borderRadius: '50%',
+                      background: 'transparent', color: '#ccc', fontSize: 13,
+                      cursor: deletingCycleId === c.id ? 'not-allowed' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}
+                  >
+                    {deletingCycleId === c.id ? '…' : '✕'}
+                  </button>
+                </div>
+              ))
             )}
           </div>
         )}

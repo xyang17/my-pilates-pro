@@ -8,7 +8,7 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, name, role } = await req.json()
+    const { email, password, name, role, sex, birth_date, height_cm } = await req.json()
 
     if (!email || !password || !name) {
       return NextResponse.json({ error: 'Email, password, and name are required' }, { status: 400 })
@@ -33,7 +33,12 @@ export async function POST(req: NextRequest) {
     // Insert into user table
     const { error: dbError } = await supabaseAdmin
       .from('user')
-      .insert([{ id: userId, email, name, role: userRole }])
+      .insert([{
+        id: userId, email, name, role: userRole,
+        sex: sex || null,
+        birth_date: birth_date || null,
+        height_cm: height_cm ?? null,
+      }])
 
     if (dbError) {
       // Rollback: delete the auth user
