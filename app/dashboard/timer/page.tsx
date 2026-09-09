@@ -97,10 +97,18 @@ function TimerInner() {
     if (!loading && !user) router.push('/auth/login')
   }, [user, loading])
 
-  const [workSec, setWorkSec] = useState(() => Number(searchParams.get('work')) || 30)
-  const [restSec, setRestSec] = useState(() => Number(searchParams.get('rest')) || 15)
-  const [rounds, setRounds] = useState(() => Number(searchParams.get('rounds')) || 3)
+  // 三个数字输入框存成字符串——存成数字的话，用户一删空就会被立刻补回默认值，
+  // 光标卡在那儿删不掉（只能在前面硬加数字，出现 "005" 这种）。
+  // 存字符串就允许「暂时是空的」这个中间状态，用的时候再转数字。
+  const [workInput, setWorkInput] = useState(() => searchParams.get('work') || '30')
+  const [restInput, setRestInput] = useState(() => searchParams.get('rest') || '15')
+  const [roundsInput, setRoundsInput] = useState(() => searchParams.get('rounds') || '3')
   const [label, setLabel] = useState(() => searchParams.get('name') || '')
+
+  const workSec = Math.max(0, Math.floor(Number(workInput) || 0))
+  const restSec = Math.max(0, Math.floor(Number(restInput) || 0))
+  const rounds = Math.max(0, Math.floor(Number(roundsInput) || 0))
+  const canStart = workSec >= 1 && rounds >= 1
   const [soundOn, setSoundOn] = useState(true)
   // 从课后作业点过来时带的动作 id，记录自我练习时能把动作一起记上
   const exerciseId = searchParams.get('ex') || ''
@@ -109,6 +117,7 @@ function TimerInner() {
   const isClient = userRole === 'CLIENT'
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
+  const [savedClassId, setSavedClassId] = useState('')
 
   const [phase, setPhase] = useState<Phase>('setup')
   const [remaining, setRemaining] = useState(0)
@@ -211,9 +220,10 @@ function TimerInner() {
     setPaused(false)
     setSaveState('idle')
     setSaveError('')
+    setSavedClassId('')
   }
 
-  const handleRecord = async () => {
+  const handleRecord = useCallback(async () => {
     if (!user || saveState === 'saving' || saveState === 'saved') return
     setSaveState('saving')
     setSaveError('')
@@ -231,12 +241,18 @@ function TimerInner() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '记录失败')
+      setSavedClassId(data.id || '')
       setSaveState('saved')
     } catch (err: any) {
       setSaveState('error')
       setSaveError(err.message || '记录失败，请重试')
     }
-  }
+  }, [user, userRole, saveState, label, exerciseId, workSec, restSec, rounds])
+
+  // 练完自动记一条，不用再手动点一下——失败了下面会给重试按钮
+  useEffect(() => {
+    if (phase === 'done' && isClient && saveState === 'idle') handleRecord()
+  }, [phase, isClient, saveState, handleRecord])
 
   const handleReset = () => {
     setPhase('setup')
@@ -286,24 +302,43 @@ function TimerInner() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 13, color: 'var(--c-text-secondary)', marginBottom: 6 }}>单组时长（秒）</label>
-                  <input type="number" min={1} value={workSec} onChange={e => setWorkSec(Math.max(1, Number(e.target.value) || 1))}
+                  <input type="number" inputMode="numeric" min={1} value={workInput}
+                    onChange={e => setWorkInput(e.target.value)}
+                    onFocus={e => e.currentTarget.select()}
+                    onBlur={() => setWorkInput(workSec >= 1 ? String(workSec) : '')}
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 13, color: 'var(--c-text-secondary)', marginBottom: 6 }}>组间休息（秒）</label>
-                  <input type="number" min={0} value={restSec} onChange={e => setRestSec(Math.max(0, Number(e.target.value) || 0))}
+                  <input type="number" inputMode="numeric" min={0} value={restInput}
+                    onChange={e => setRestInput(e.target.value)}
+                    onFocus={e => e.currentTarget.select()}
+                    onBlur={() => setRestInput(String(restSec))}
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
                 </div>
               </div>
               <div style={{ marginBottom: 20 }}>
                 <label style={{ display: 'block', fontSize: 13, color: 'var(--c-text-secondary)', marginBottom: 6 }}>重复次数（组数）</label>
-                <input type="number" min={1} value={rounds} onChange={e => setRounds(Math.max(1, Number(e.target.value) || 1))}
+                <input type="number" inputMode="numeric" min={1} value={roundsInput}
+                  onChange={e => setRoundsInput(e.target.value)}
+                  onFocus={e => e.currentTarget.select()}
+                  onBlur={() => setRoundsInput(rounds >= 1 ? String(rounds) : '')}
                   style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
               </div>
-              <button onClick={handleStart}
-                style={{ width: '100%', padding: 14, background: 'var(--c-brand)', color: 'white', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={handleStart} disabled={!canStart}
+                style={{
+                  width: '100%', padding: 14,
+                  background: canStart ? 'var(--c-brand)' : 'var(--c-lavender)',
+                  color: 'white', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 700,
+                  cursor: canStart ? 'pointer' : 'not-allowed',
+                }}>
                 ▶ 开始
               </button>
+              {!canStart && (
+                <p style={{ margin: '8px 0 0', fontSize: 12, color: '#c0392b' }}>
+                  单组时长和组数都要填，且至少为 1
+                </p>
+              )}
               <p style={{ margin: '14px 0 0', fontSize: 12, color: '#999', lineHeight: 1.6 }}>
                 开始前有 3 秒准备倒计时；每次休息快结束时也会有 3 秒提示音，提醒马上要开始下一组。计时期间屏幕会保持常亮，但请让这个页面留在前台，切到别的 App 可能会暂停计时。
                 <br />
@@ -347,40 +382,52 @@ function TimerInner() {
               {label ? `${label} · ` : ''}共 {rounds} 组，做得很好
             </p>
 
-            {/* 一键记进自己的训练记录，算作自我练习（只有学员本人能记） */}
+            {/* 练完自动记进自己的训练记录，算作自我练习（只有学员本人会记） */}
             {isClient && (
               <div style={{ marginBottom: 28 }}>
                 {saveState === 'saved' ? (
-                  <div style={{ fontSize: 14, opacity: 0.95 }}>
-                    ✓ 已记入我的训练记录（自我练习）
-                    <div style={{ marginTop: 10 }}>
-                      <Link href="/dashboard/classes" style={{ color: 'white', fontSize: 13, textDecoration: 'underline', opacity: 0.9 }}>
-                        去看看 →
-                      </Link>
-                    </div>
-                  </div>
-                ) : (
                   <>
-                    <button onClick={handleRecord} disabled={saveState === 'saving'}
+                    <p style={{ margin: '0 0 14px', fontSize: 14, opacity: 0.95 }}>
+                      ✓ 已记录在自我练习中
+                    </p>
+                    <Link
+                      href={savedClassId ? `/dashboard/classes/${savedClassId}` : '/dashboard/classes'}
                       style={{
-                        padding: '12px 24px', borderRadius: 999, border: '1.5px solid white',
-                        background: 'rgba(255,255,255,0.15)', color: 'white',
+                        display: 'inline-block', padding: '12px 24px', borderRadius: 999,
+                        background: 'white', color: '#2E7D32', textDecoration: 'none',
                         fontSize: 14, fontWeight: 700,
-                        cursor: saveState === 'saving' ? 'wait' : 'pointer',
                       }}>
-                      {saveState === 'saving' ? '记录中…' : '📝 记入训练记录（自我练习）'}
-                    </button>
-                    {saveState === 'error' && (
-                      <p style={{ margin: '10px 0 0', fontSize: 12, opacity: 0.95 }}>⚠️ {saveError}</p>
-                    )}
+                      去看看这次的练习记录 →
+                    </Link>
                   </>
+                ) : saveState === 'error' ? (
+                  <>
+                    <p style={{ margin: '0 0 10px', fontSize: 13, opacity: 0.95 }}>⚠️ {saveError}</p>
+                    <button onClick={handleRecord}
+                      style={{
+                        padding: '10px 22px', borderRadius: 999, border: '1.5px solid white',
+                        background: 'rgba(255,255,255,0.15)', color: 'white',
+                        fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                      }}>
+                      重试记录
+                    </button>
+                  </>
+                ) : (
+                  <p style={{ margin: 0, fontSize: 14, opacity: 0.85 }}>记录中…</p>
                 )}
               </div>
             )}
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               <button onClick={handleStart}
-                style={{ padding: '12px 24px', borderRadius: 999, border: 'none', background: 'white', color: '#2E7D32', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                style={{
+                  padding: '12px 24px', borderRadius: 999, fontSize: 14, cursor: 'pointer',
+                  // 学员那边主按钮是「去看看练习记录」，这里就退成次要样式，避免两个白按钮抢眼
+                  border: isClient ? '1.5px solid white' : 'none',
+                  background: isClient ? 'transparent' : 'white',
+                  color: isClient ? 'white' : '#2E7D32',
+                  fontWeight: isClient ? 600 : 700,
+                }}>
                 🔁 再来一遍
               </button>
               <button onClick={handleReset}

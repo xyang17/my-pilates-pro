@@ -139,6 +139,10 @@ export default function ClassDetailPage() {
   const [libFilterMuscle, setLibFilterMuscle] = useState('')
   const [libFilterSeries, setLibFilterSeries] = useState('')
   const [recentExIds, setRecentExIds] = useState<string[]>([])
+  // 自我练习的备注（练完可以自己补一句感受），存在 class.notes 上
+  const [selfNote, setSelfNote] = useState('')
+  const [savingSelfNote, setSavingSelfNote] = useState(false)
+  const [selfNoteSaved, setSelfNoteSaved] = useState(false)
   // 临时新建动作（写计划时库里没有这个动作，不用跳出去，直接就地建好并加进本课）
   const [showQuickCreate, setShowQuickCreate] = useState(false)
   const [quickCreateForm, setQuickCreateForm] = useState({ name_cn: '', name_en: '', type_cn: '' })
@@ -172,6 +176,9 @@ export default function ClassDetailPage() {
   const { showToast } = useToast()
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
   const isGroupClass = classData?.class_type === 'group'
+  // 自我练习（学员自己用计时器练完记的）不是一节课，
+  // 类别/形式/难度这些课程属性对它没意义，动作列表也不需要编辑，只留一个备注
+  const isSelfPractice = classData?.class_type === 'self_practice'
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -471,6 +478,35 @@ export default function ClassDetailPage() {
       showToast(err.message, 'error')
     } finally {
       setAdding(false)
+    }
+  }
+
+  // 备注只在打开这条记录时灌一次，避免正在打字时被后台刷新覆盖掉
+  useEffect(() => {
+    if (classData) setSelfNote(classData.notes || '')
+  }, [classData?.id])
+
+  const handleSaveSelfNote = async () => {
+    if (!classData || savingSelfNote) return
+    if ((classData.notes || '') === selfNote) return // 没改就不用存
+    setSavingSelfNote(true)
+    try {
+      const res = await fetch(`/api/classes/${classId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({ notes: selfNote || null }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || '保存失败')
+      }
+      setClassData(prev => prev ? { ...prev, notes: selfNote } : prev)
+      setSelfNoteSaved(true)
+      setTimeout(() => setSelfNoteSaved(false), 1500)
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setSavingSelfNote(false)
     }
   }
 
@@ -1172,15 +1208,19 @@ export default function ClassDetailPage() {
                   <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>时长 Duration</p>
                   <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.duration} 分钟</p>
                 </div>
-                <div>
-                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>类别 Discipline</p>
-                  <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.discipline || classData.type || '—'}</p>
-                </div>
-                <div>
-                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>形式 Format</p>
-                  <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.class_type === 'group' ? '👥 团课' : '🧘 私教'}</p>
-                </div>
-                {classData.level && (
+                {!isSelfPractice && (
+                  <div>
+                    <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>类别 Discipline</p>
+                    <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.discipline || classData.type || '—'}</p>
+                  </div>
+                )}
+                {!isSelfPractice && (
+                  <div>
+                    <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>形式 Format</p>
+                    <p style={{ margin: 0, fontWeight: 'bold' }}>{classData.class_type === 'group' ? '👥 团课' : '🧘 私教'}</p>
+                  </div>
+                )}
+                {!isSelfPractice && classData.level && (
                   <div>
                     <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>难度 Level</p>
                     <p style={{ margin: 0, fontWeight: 'bold' }}>
@@ -1219,16 +1259,40 @@ export default function ClassDetailPage() {
                 </div>
               )}
 
-              {classData.notes && (
+              {isSelfPractice && classData.created_by === user?.id ? (
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
+                  <p style={{ margin: '0 0 6px 0', color: '#999', fontSize: '11px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    备注 Notes
+                    <span style={{ color: '#ccc' }}>练完的感受、调整，选填</span>
+                    {savingSelfNote && <span style={{ color: 'var(--c-brand)' }}>保存中…</span>}
+                    {selfNoteSaved && <span style={{ color: 'var(--c-brand)' }}>✓ 已保存</span>}
+                  </p>
+                  <textarea
+                    value={selfNote}
+                    onChange={e => setSelfNote(e.target.value)}
+                    onBlur={handleSaveSelfNote}
+                    rows={3}
+                    placeholder="例：今天状态不错，下次可以加到 40 秒…"
+                    style={{
+                      width: '100%', boxSizing: 'border-box', padding: '10px',
+                      border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px',
+                      fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.6,
+                      background: 'var(--c-card-bg)', color: 'var(--c-text-primary)',
+                    }}
+                  />
+                </div>
+              ) : classData.notes ? (
                 <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
                   <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>备注 Notes</p>
-                  <p style={{ margin: 0, color: '#444' }}>{classData.notes}</p>
+                  <p style={{ margin: 0, color: '#444', whiteSpace: 'pre-wrap' }}>{classData.notes}</p>
                 </div>
-              )}
+              ) : null}
 
               {classData.post_summary && (
                 <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>
-                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>课后总结 Post Summary</p>
+                  <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>
+                    {isSelfPractice ? '练习内容' : '课后总结 Post Summary'}
+                  </p>
                   <p style={{ margin: 0, color: '#444' }}>{classData.post_summary}</p>
                 </div>
               )}
@@ -1443,8 +1507,8 @@ export default function ClassDetailPage() {
           </div>
         )}
 
-        {/* Exercise List */}
-        {activeTab === 'exercises' && (
+        {/* Exercise List —— 自我练习没有动作时整块不显示（改用上面那张卡片里的备注） */}
+        {activeTab === 'exercises' && !(isSelfPractice && classData.exercises.length === 0) && (
           <div style={{ background: 'var(--c-card-bg)', borderRadius: isTrainer && isGroupClass ? '0 0 10px 10px' : '10px', overflow: 'hidden' }}>
             {/* Header */}
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1618,8 +1682,8 @@ export default function ClassDetailPage() {
               })
             )}
 
-            {/* Inline exercise library (trainer only) */}
-            {isTrainer && (() => {
+            {/* Inline exercise library (trainer only；自我练习不给加动作) */}
+            {isTrainer && !isSelfPractice && (() => {
               const alreadyAdded = new Set(classData.exercises.map(e => e.exercise_id))
               const allTypes = [...new Set(availableExercises.map(e => e.type_en).filter(Boolean))].sort() as string[]
               const allDiffs = [...new Set(availableExercises.map(e => e.difficulty_en).filter(Boolean))].sort() as string[]
