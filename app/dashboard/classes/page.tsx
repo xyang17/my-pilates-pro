@@ -14,6 +14,7 @@ interface ClassItem {
   type: string
   discipline?: string
   status: 'planned' | 'in_progress' | 'completed'
+  class_type?: string
   created_by: string
   assigned_to: string | null
   created_at: string
@@ -34,6 +35,8 @@ export default function ClassesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // 自我练习跟课程排在同一个列表里，用筛选按钮分开看
+  const [listFilter, setListFilter] = useState<'all' | 'class' | 'self'>('all')
 
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
 
@@ -78,6 +81,13 @@ export default function ClassesPage() {
   }
 
   const S = (s: string) => STATUS_CONFIG[s] || STATUS_CONFIG.planned
+
+  const selfCount = classes.filter(c => c.class_type === 'self_practice').length
+  const visibleClasses = classes.filter(c =>
+    listFilter === 'all' ? true
+      : listFilter === 'self' ? c.class_type === 'self_practice'
+      : c.class_type !== 'self_practice'
+  )
 
   if (loading || isLoading) return (
     <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -134,7 +144,28 @@ export default function ClassesPage() {
           }}>{error}</div>
         )}
 
-        {classes.length === 0 ? (
+        {selfCount > 0 && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 'var(--sp-4)' }}>
+            {([
+              { key: 'all', label: `全部 (${classes.length})` },
+              { key: 'class', label: `课程 (${classes.length - selfCount})` },
+              { key: 'self', label: `自我练习 (${selfCount})` },
+            ] as const).map(f => (
+              <button key={f.key} onClick={() => setListFilter(f.key)}
+                style={{
+                  padding: '5px 14px', borderRadius: 'var(--r-full)', fontSize: 'var(--text-xs)', cursor: 'pointer',
+                  border: `1px solid ${listFilter === f.key ? 'var(--c-brand)' : 'var(--c-border)'}`,
+                  background: listFilter === f.key ? 'var(--c-brand)' : 'var(--c-card-bg)',
+                  color: listFilter === f.key ? '#fff' : 'var(--c-text-secondary)',
+                  fontWeight: listFilter === f.key ? 600 : 400,
+                }}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {visibleClasses.length === 0 ? (
           <div style={{
             background: 'var(--c-card-bg)',
             border: '1px solid var(--c-border)',
@@ -151,7 +182,7 @@ export default function ClassesPage() {
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 'var(--sp-3)' }}>
-            {classes.map(cls => {
+            {visibleClasses.map(cls => {
               const cfg = S(cls.status)
               const isDeleting = deletingId === cls.id
               return (
@@ -163,7 +194,7 @@ export default function ClassesPage() {
                       border: '1px solid var(--c-border)',
                       borderRadius: 'var(--r-lg)',
                       padding: 'var(--sp-4) var(--sp-5)',
-                      paddingRight: isTrainer ? '68px' : undefined,
+                      paddingRight: (isTrainer || cls.class_type === 'self_practice') ? '68px' : undefined,
                       display: 'flex',
                       alignItems: 'center',
                       gap: 'var(--sp-4)',
@@ -183,8 +214,13 @@ export default function ClassesPage() {
                     <div style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: cfg.bar, flexShrink: 0 }} />
 
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ margin: '0 0 var(--sp-1)', fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--c-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {cls.name}
+                      <p style={{ margin: '0 0 var(--sp-1)', fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--c-text-primary)', display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls.name}</span>
+                        {cls.class_type === 'self_practice' && (
+                          <span style={{ fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-brand)', border: '1px solid var(--c-border-em)', flexShrink: 0 }}>
+                            自我练习
+                          </span>
+                        )}
                       </p>
                       <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>
                         {new Date(cls.date + 'T12:00:00').toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
@@ -213,8 +249,8 @@ export default function ClassesPage() {
                     {!isTrainer && <span style={{ color: 'var(--c-text-hint)', fontSize: 'var(--text-base)', flexShrink: 0 }}>›</span>}
                   </div>
 
-                  {/* Delete button — trainer only, absolute positioned */}
-                  {isTrainer && (
+                  {/* 删除：教练可删自己的课；学员可删自己记错的自我练习 */}
+                  {(isTrainer || cls.class_type === 'self_practice') && (
                     <button
                       onClick={e => { e.stopPropagation(); handleDeleteClass(cls) }}
                       disabled={isDeleting}

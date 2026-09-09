@@ -358,7 +358,7 @@ export default function WorkoutsPage() {
                               </div>
                               {ex.duration && (
                                 <Link
-                                  href={`/dashboard/timer?work=${ex.duration_unit === 'seconds' ? ex.duration : ex.duration * 60}&rounds=${ex.sets || 1}&name=${encodeURIComponent(lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn))}`}
+                                  href={`/dashboard/timer?work=${ex.duration_unit === 'seconds' ? ex.duration : ex.duration * 60}&rounds=${ex.sets || 1}&ex=${ex.master_exercise.id}&name=${encodeURIComponent(lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn))}`}
                                   onClick={e => e.stopPropagation()}
                                   style={{
                                     flexShrink: 0, fontSize: 'var(--text-xs)', color: 'var(--c-brand)',

@@ -199,6 +199,9 @@ export async function GET(req: NextRequest) {
       .select('id, date, price, duration, status, class_type, created_by, assigned_to')
       .gte('date', startStr)
       .lte('date', endStr)
+      // 学员自己练的（自我练习）不是教练带的课，完全不进课时/收入统计。
+      // 注意 scope='store' 时下面没有 created_by 过滤，不在这里排掉就会混进门店数据。
+      .neq('class_type', 'self_practice')
 
     if (scope === 'own') query = query.eq('created_by', userId)
 

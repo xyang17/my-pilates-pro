@@ -86,7 +86,12 @@ export async function GET(req: NextRequest) {
     }
 
     // ── 教练视角 ──────────────────────────────────────────────
-    const scopeOwn = (q: any) => userRole === 'ADMIN' ? q : q.eq('created_by', userId)
+    // ADMIN 没有 created_by 过滤（要看全店），所以必须显式排掉学员的自我练习，
+    // 否则学员在家练一次，教练首页的「本月课时」「待复盘」就会多一条。
+    const scopeOwn = (q: any) => {
+      const base = q.neq('class_type', 'self_practice')
+      return userRole === 'ADMIN' ? base : base.eq('created_by', userId)
+    }
 
     const { data: todayClassesRaw } = await scopeOwn(
       supabaseAdmin.from('class').select(CLASS_FIELDS).eq('date', dateStr)

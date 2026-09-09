@@ -89,7 +89,7 @@ function vibrate(pattern: number | number[]) {
 }
 
 function TimerInner() {
-  const { user, loading } = useAuth()
+  const { user, userRole, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -102,6 +102,13 @@ function TimerInner() {
   const [rounds, setRounds] = useState(() => Number(searchParams.get('rounds')) || 3)
   const [label, setLabel] = useState(() => searchParams.get('name') || '')
   const [soundOn, setSoundOn] = useState(true)
+  // 从课后作业点过来时带的动作 id，记录自我练习时能把动作一起记上
+  const exerciseId = searchParams.get('ex') || ''
+
+  // 一键记录到训练记录（自我练习）——只有学员本人能记自己的
+  const isClient = userRole === 'CLIENT'
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveError, setSaveError] = useState('')
 
   const [phase, setPhase] = useState<Phase>('setup')
   const [remaining, setRemaining] = useState(0)
@@ -202,6 +209,33 @@ function TimerInner() {
     setPhase('ready')
     setRemaining(3)
     setPaused(false)
+    setSaveState('idle')
+    setSaveError('')
+  }
+
+  const handleRecord = async () => {
+    if (!user || saveState === 'saving' || saveState === 'saved') return
+    setSaveState('saving')
+    setSaveError('')
+    try {
+      const res = await fetch('/api/self-practice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user.id, 'x-user-role': userRole || '' },
+        body: JSON.stringify({
+          name: label,
+          exercise_id: exerciseId || undefined,
+          work_sec: workSec,
+          rest_sec: restSec,
+          rounds,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '记录失败')
+      setSaveState('saved')
+    } catch (err: any) {
+      setSaveState('error')
+      setSaveError(err.message || '记录失败，请重试')
+    }
   }
 
   const handleReset = () => {
@@ -309,9 +343,41 @@ function TimerInner() {
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 72, marginBottom: 12 }}>🎉</div>
             <h2 style={{ margin: '0 0 8px', fontSize: 28, fontWeight: 800 }}>完成！</h2>
-            <p style={{ margin: '0 0 32px', fontSize: 15, opacity: 0.9 }}>
+            <p style={{ margin: '0 0 24px', fontSize: 15, opacity: 0.9 }}>
               {label ? `${label} · ` : ''}共 {rounds} 组，做得很好
             </p>
+
+            {/* 一键记进自己的训练记录，算作自我练习（只有学员本人能记） */}
+            {isClient && (
+              <div style={{ marginBottom: 28 }}>
+                {saveState === 'saved' ? (
+                  <div style={{ fontSize: 14, opacity: 0.95 }}>
+                    ✓ 已记入我的训练记录（自我练习）
+                    <div style={{ marginTop: 10 }}>
+                      <Link href="/dashboard/classes" style={{ color: 'white', fontSize: 13, textDecoration: 'underline', opacity: 0.9 }}>
+                        去看看 →
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <button onClick={handleRecord} disabled={saveState === 'saving'}
+                      style={{
+                        padding: '12px 24px', borderRadius: 999, border: '1.5px solid white',
+                        background: 'rgba(255,255,255,0.15)', color: 'white',
+                        fontSize: 14, fontWeight: 700,
+                        cursor: saveState === 'saving' ? 'wait' : 'pointer',
+                      }}>
+                      {saveState === 'saving' ? '记录中…' : '📝 记入训练记录（自我练习）'}
+                    </button>
+                    {saveState === 'error' && (
+                      <p style={{ margin: '10px 0 0', fontSize: 12, opacity: 0.95 }}>⚠️ {saveError}</p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               <button onClick={handleStart}
                 style={{ padding: '12px 24px', borderRadius: 999, border: 'none', background: 'white', color: '#2E7D32', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>

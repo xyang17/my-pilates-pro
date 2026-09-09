@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
         .from('class')
         .select('*')
         .order('date', { ascending: false })
+        // 教练的「课程训练」列表只放自己带的课；学员的自我练习去学员详情页里看
+        .neq('class_type', 'self_practice')
 
       if (userRole === 'TRAINER') query = query.eq('created_by', userId)
 

@@ -102,6 +102,8 @@ export default function ClientDetailPage() {
   const [cycleForm, setCycleForm] = useState({ start_date: '', end_date: '', flow_level: '', pain_level: '', notes: '' })
   const [savingCycle, setSavingCycle] = useState(false)
   const [deletingCycleId, setDeletingCycleId] = useState<string | null>(null)
+  // 课程记录筛选：全部 / 只看课程 / 只看自我练习
+  const [classFilter, setClassFilter] = useState<'all' | 'class' | 'self'>('all')
 
   useEffect(() => {
     if (!authLoading && !user) { router.push('/auth/login'); return }
@@ -259,8 +261,15 @@ export default function ClientDetailPage() {
     </div>
   )
 
-  const upcoming = client.classes.filter(c => c.status !== 'completed')
-  const past = client.classes.filter(c => c.status === 'completed')
+  // 自我练习（学员自己用计时器练完记的）跟正常课排在同一条时间线上，用筛选按钮分开看
+  const visibleClasses = client.classes.filter(c =>
+    classFilter === 'all' ? true
+      : classFilter === 'self' ? c.class_type === 'self_practice'
+      : c.class_type !== 'self_practice'
+  )
+  const selfPracticeCount = client.classes.filter(c => c.class_type === 'self_practice').length
+  const upcoming = visibleClasses.filter(c => c.status !== 'completed')
+  const past = visibleClasses.filter(c => c.status === 'completed')
   const hwDone = homework.filter(h => h.status === 'completed').length
 
   return (
@@ -427,8 +436,30 @@ export default function ClientDetailPage() {
         {/* Classes tab */}
         {activeTab === 'classes' && (
           <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
-            {client.classes.length === 0 ? (
-              <p style={{ padding: '40px', textAlign: 'center', color: '#bbb', margin: 0 }}>暂无课程记录</p>
+            {selfPracticeCount > 0 && (
+              <div style={{ display: 'flex', gap: 6, padding: '12px 20px', borderBottom: '1px solid var(--c-border)' }}>
+                {([
+                  { key: 'all', label: `全部 (${client.classes.length})` },
+                  { key: 'class', label: `课程 (${client.classes.length - selfPracticeCount})` },
+                  { key: 'self', label: `自我练习 (${selfPracticeCount})` },
+                ] as const).map(f => (
+                  <button key={f.key} onClick={() => setClassFilter(f.key)}
+                    style={{
+                      padding: '4px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
+                      border: `1px solid ${classFilter === f.key ? 'var(--c-brand)' : 'var(--c-border)'}`,
+                      background: classFilter === f.key ? 'var(--c-brand)' : 'transparent',
+                      color: classFilter === f.key ? '#fff' : 'var(--c-text-secondary)',
+                      fontWeight: classFilter === f.key ? 600 : 400,
+                    }}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {visibleClasses.length === 0 ? (
+              <p style={{ padding: '40px', textAlign: 'center', color: '#bbb', margin: 0 }}>
+                {client.classes.length === 0 ? '暂无课程记录' : '这个分类下暂无记录'}
+              </p>
             ) : (
               <>
                 {upcoming.length > 0 && (
@@ -735,7 +766,14 @@ function ClassRow({ c, onDelete }: { c: ClientClass; onDelete?: () => void }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f5f5f5' }}>
       <div style={{ width: 3, height: 40, borderRadius: 2, background: c.color || 'var(--c-lavender)', flexShrink: 0 }} />
       <Link href={`/dashboard/classes/${c.id}`} style={{ textDecoration: 'none', color: 'inherit', flex: 1, minWidth: 0 }}>
-        <p style={{ margin: '0 0 3px 0', fontWeight: 'bold', fontSize: '14px' }}>{c.name}</p>
+        <p style={{ margin: '0 0 3px 0', fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {c.name}
+          {c.class_type === 'self_practice' && (
+            <span style={{ fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-brand)', border: '1px solid var(--c-border-em)', flexShrink: 0 }}>
+              自我练习
+            </span>
+          )}
+        </p>
         <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
           {new Date(c.date + 'T12:00:00').toLocaleDateString('zh-CN')}
           {c.start_time && ` · ${c.start_time.slice(0, 5)}`}
