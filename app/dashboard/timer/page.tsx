@@ -88,6 +88,47 @@ function vibrate(pattern: number | number[]) {
   }
 }
 
+// 数字输入框。故意用 type="text" + inputMode="numeric" 而不是 type="number"：
+//
+// type="number" 在受控组件里有个很烦的行为——浏览器只要认为当前内容"不是一个合法数字"，
+// e.target.value 就直接给你空字符串，你的 onChange 收到的是 ""，用户敲的那一下等于被吞了。
+// 手机上尤其明显：删到只剩一个字符、或者中间态（比如刚敲了个 "0"）都可能触发，
+// 表现出来就是"这个 1 怎么都删不掉""必须先填别的数字才能改"。
+//
+// 换成 text + inputMode="numeric"，手机照样弹数字键盘，但输入内容原样传回来，
+// 我们自己用正则只留数字。不做任何自动补默认值、不在失焦时改写用户输入——
+// 空着就空着，下面给一行提示，别跟用户的光标抢。
+//
+// 注意：这个组件必须定义在 TimerInner 外面。定义在里面的话每次 render 都是一个新组件类型，
+// React 会把 input 卸载重建，光标和焦点每敲一个字就丢一次。
+function NumField({ label, value, onChange, hint }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  hint?: string
+}) {
+  return (
+    <div>
+      <label style={{ display: 'block', fontSize: 13, color: 'var(--c-text-secondary)', marginBottom: 6 }}>
+        {label}
+      </label>
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={value}
+        onChange={e => onChange(e.target.value.replace(/\D/g, ''))}
+        style={{
+          width: '100%', padding: '10px 12px',
+          border: `1px solid ${hint ? '#e57373' : '#ddd'}`,
+          borderRadius: 8, fontSize: 14, boxSizing: 'border-box',
+        }}
+      />
+      {hint && <p style={{ margin: '4px 0 0', fontSize: 11, color: '#c0392b' }}>{hint}</p>}
+    </div>
+  )
+}
+
 function TimerInner() {
   const { user, userRole, loading } = useAuth()
   const router = useRouter()
@@ -300,30 +341,25 @@ function TimerInner() {
                   style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, color: 'var(--c-text-secondary)', marginBottom: 6 }}>单组时长（秒）</label>
-                  <input type="number" inputMode="numeric" min={1} value={workInput}
-                    onChange={e => setWorkInput(e.target.value)}
-                    onFocus={e => e.currentTarget.select()}
-                    onBlur={() => setWorkInput(workSec >= 1 ? String(workSec) : '')}
-                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, color: 'var(--c-text-secondary)', marginBottom: 6 }}>组间休息（秒）</label>
-                  <input type="number" inputMode="numeric" min={0} value={restInput}
-                    onChange={e => setRestInput(e.target.value)}
-                    onFocus={e => e.currentTarget.select()}
-                    onBlur={() => setRestInput(String(restSec))}
-                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
-                </div>
+                <NumField
+                  label="单组时长（秒）"
+                  value={workInput}
+                  onChange={setWorkInput}
+                  hint={workInput === '' ? '请填写' : workSec < 1 ? '至少 1 秒' : undefined}
+                />
+                <NumField
+                  label="组间休息（秒）"
+                  value={restInput}
+                  onChange={setRestInput}
+                />
               </div>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ display: 'block', fontSize: 13, color: 'var(--c-text-secondary)', marginBottom: 6 }}>重复次数（组数）</label>
-                <input type="number" inputMode="numeric" min={1} value={roundsInput}
-                  onChange={e => setRoundsInput(e.target.value)}
-                  onFocus={e => e.currentTarget.select()}
-                  onBlur={() => setRoundsInput(rounds >= 1 ? String(rounds) : '')}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+                <NumField
+                  label="重复次数（组数）"
+                  value={roundsInput}
+                  onChange={setRoundsInput}
+                  hint={roundsInput === '' ? '请填写' : rounds < 1 ? '至少 1 组' : undefined}
+                />
               </div>
               <button onClick={handleStart} disabled={!canStart}
                 style={{
@@ -334,11 +370,6 @@ function TimerInner() {
                 }}>
                 ▶ 开始
               </button>
-              {!canStart && (
-                <p style={{ margin: '8px 0 0', fontSize: 12, color: '#c0392b' }}>
-                  单组时长和组数都要填，且至少为 1
-                </p>
-              )}
               <p style={{ margin: '14px 0 0', fontSize: 12, color: '#999', lineHeight: 1.6 }}>
                 开始前有 3 秒准备倒计时；每次休息快结束时也会有 3 秒提示音，提醒马上要开始下一组。计时期间屏幕会保持常亮，但请让这个页面留在前台，切到别的 App 可能会暂停计时。
                 <br />

@@ -60,7 +60,8 @@ interface ClassData {
   duration: number
   type: string
   discipline?: string
-  class_type: 'private' | 'group'
+  // self_practice = 学员自己用计时器练完记下的一条，不是教练带的课
+  class_type: 'private' | 'group' | 'self_practice'
   level?: string
   description?: string
   max_capacity?: number
