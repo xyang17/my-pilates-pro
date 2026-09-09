@@ -110,6 +110,39 @@ function TimerInner() {
 
   const beeper = useBeeper(soundOn)
   const lastTickRef = useRef<number>(-1)
+  const wakeLockRef = useRef<any>(null)
+
+  // 屏幕常亮——手机做训练时不去碰屏幕，几十秒就自动锁屏了，一锁计时就停。
+  // Wake Lock API：安卓 Chrome 和 iOS 16.4+ 的 Safari 都支持；不支持的浏览器静默跳过。
+  // 注意：切到后台时系统会自动释放，所以回到前台要重新申请一次。
+  useEffect(() => {
+    const running = phase === 'ready' || phase === 'work' || phase === 'rest'
+
+    const acquire = async () => {
+      if (!running) return
+      try {
+        const nav = navigator as any
+        if (nav.wakeLock?.request) {
+          wakeLockRef.current = await nav.wakeLock.request('screen')
+        }
+      } catch { /* 用户拒绝或系统不支持，忽略即可 */ }
+    }
+
+    const release = () => {
+      try { wakeLockRef.current?.release?.() } catch {}
+      wakeLockRef.current = null
+    }
+
+    if (running) acquire()
+    else release()
+
+    const onVisible = () => { if (document.visibilityState === 'visible' && running) acquire() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      release()
+    }
+  }, [phase])
 
   // 页面标题显示剩余秒数，切到别的标签页也能瞄一眼
   useEffect(() => {
@@ -238,7 +271,9 @@ function TimerInner() {
                 ▶ 开始
               </button>
               <p style={{ margin: '14px 0 0', fontSize: 12, color: '#999', lineHeight: 1.6 }}>
-                开始前有 3 秒准备倒计时；每次休息快结束时也会有 3 秒提示音，提醒马上要开始下一组。计时期间请让这个页面保持在前台，锁屏或切后台可能会暂停计时。
+                开始前有 3 秒准备倒计时；每次休息快结束时也会有 3 秒提示音，提醒马上要开始下一组。计时期间屏幕会保持常亮，但请让这个页面留在前台，切到别的 App 可能会暂停计时。
+                <br />
+                <span style={{ color: '#bbb' }}>iPhone 用户：如果听不到提示音，检查一下手机侧面的静音开关（静音模式下网页声音会被系统挡掉）。</span>
               </p>
             </div>
           </div>
