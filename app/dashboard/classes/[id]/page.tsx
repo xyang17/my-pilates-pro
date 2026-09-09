@@ -139,6 +139,10 @@ export default function ClassDetailPage() {
   const [libFilterMuscle, setLibFilterMuscle] = useState('')
   const [libFilterSeries, setLibFilterSeries] = useState('')
   const [recentExIds, setRecentExIds] = useState<string[]>([])
+  // 临时新建动作（写计划时库里没有这个动作，不用跳出去，直接就地建好并加进本课）
+  const [showQuickCreate, setShowQuickCreate] = useState(false)
+  const [quickCreateForm, setQuickCreateForm] = useState({ name_cn: '', name_en: '', type_cn: '' })
+  const [creatingExercise, setCreatingExercise] = useState(false)
   // Class copy modal
   const [showCopyModal, setShowCopyModal] = useState(false)
   const [copyForm, setCopyForm] = useState({ name: '', date: '', start_time: '', assigned_to: '', price: '', duration: '' })
@@ -467,6 +471,39 @@ export default function ClassDetailPage() {
       showToast(err.message, 'error')
     } finally {
       setAdding(false)
+    }
+  }
+
+  // 就地新建一个动作库还没有的动作，建好直接加进本课，不用先跳去动作库页面
+  const handleQuickCreateExercise = async () => {
+    const name_cn = quickCreateForm.name_cn.trim()
+    if (!name_cn || creatingExercise) return
+    setCreatingExercise(true)
+    try {
+      const res = await fetch('/api/exercises', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        body: JSON.stringify({
+          name_cn,
+          name_en: quickCreateForm.name_en.trim() || name_cn,
+          type_cn: quickCreateForm.type_cn.trim() || undefined,
+        }),
+      })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || '新建动作失败')
+      }
+      const newEx = await res.json()
+      setAvailableExercises(prev => [newEx, ...prev])
+      setShowQuickCreate(false)
+      setQuickCreateForm({ name_cn: '', name_en: '', type_cn: '' })
+      setLibSearch('')
+      await handleAddExercise(newEx.id)
+      showToast('已新建并加入本课', 'success')
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setCreatingExercise(false)
     }
   }
 
@@ -1628,8 +1665,62 @@ export default function ClassDetailPage() {
                       <span style={{ fontSize: '12px', color: '#999', whiteSpace: 'nowrap' }}>
                         {noFilter ? `⏱ 最近 ${libResults.length} 个` : `${libResults.length} ${t('个', '')}`}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowQuickCreate(v => !v)
+                          if (!showQuickCreate) setQuickCreateForm(f => ({ ...f, name_cn: libSearch }))
+                        }}
+                        style={{ padding: '6px 10px', border: '1px solid var(--c-brand)', borderRadius: '16px', fontSize: '11px', background: showQuickCreate ? 'var(--c-brand)' : 'white', color: showQuickCreate ? 'white' : 'var(--c-brand)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {showQuickCreate ? t('取消', 'Cancel') : t('＋ 新建动作', '＋ New')}
+                      </button>
                     </div>
-                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
+
+                    {showQuickCreate && (
+                      <div style={{ marginTop: '8px', padding: '10px', background: 'white', border: '1px dashed var(--c-brand)', borderRadius: '8px' }}>
+                        <p style={{ margin: '0 0 8px', fontSize: '11px', color: '#999' }}>
+                          {t('库里还没有这个动作？直接新建一个，会自动加进本课，之后再去动作库里补充图片/说明。', "Not in the library yet? Create it here — it'll be added to this class right away; fill in details later from the exercise library.")}
+                        </p>
+                        <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                          <input
+                            type="text" autoFocus
+                            placeholder={t('中文名 *', 'Name (CN) *')}
+                            value={quickCreateForm.name_cn}
+                            onChange={e => setQuickCreateForm(f => ({ ...f, name_cn: e.target.value }))}
+                            style={{ flex: 1, padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px' }}
+                          />
+                          <input
+                            type="text"
+                            placeholder={t('英文名（选填）', 'Name (EN, optional)')}
+                            value={quickCreateForm.name_en}
+                            onChange={e => setQuickCreateForm(f => ({ ...f, name_en: e.target.value }))}
+                            style={{ flex: 1, padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            placeholder={t('分类（选填，如：核心/下肢）', 'Category (optional)')}
+                            value={quickCreateForm.type_cn}
+                            onChange={e => setQuickCreateForm(f => ({ ...f, type_cn: e.target.value }))}
+                            style={{ flex: 1, padding: '7px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleQuickCreateExercise}
+                            disabled={!quickCreateForm.name_cn.trim() || creatingExercise}
+                            style={{
+                              padding: '7px 16px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 600, flexShrink: 0,
+                              background: !quickCreateForm.name_cn.trim() || creatingExercise ? 'var(--c-lavender)' : 'var(--c-brand)',
+                              color: 'white', cursor: !quickCreateForm.name_cn.trim() || creatingExercise ? 'not-allowed' : 'pointer',
+                            }}>
+                            {creatingExercise ? t('新建中…', 'Creating…') : t('新建并加入', 'Create & add')}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px', marginTop: '8px' }}>
                       <select value={libFilterType} onChange={e => setLibFilterType(e.target.value)}
                         style={{ padding: '5px 8px', border: `1px solid ${libFilterType ? 'var(--c-brand)' : '#ddd'}`, borderRadius: '16px', fontSize: '11px', backgroundColor: libFilterType ? '#f0eaf8' : 'white', color: libFilterType ? 'var(--c-brand)' : '#666', cursor: 'pointer', flexShrink: 0 }}>
                         <option value="">{t('全部分类', 'All types')}</option>

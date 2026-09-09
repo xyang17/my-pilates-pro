@@ -33,6 +33,7 @@ import {
   BarChart3,
   Clock,
   CalendarCheck,
+  Timer,
 } from 'lucide-react'
 
 interface NavGroup {
@@ -64,6 +65,7 @@ const trainerNav: NavGroup[] = [
       { label: '我的计划', href: '/dashboard/plans',      icon: ClipboardList },
       { label: '训练方案', href: '/dashboard/programs',   icon: Trophy },
       { label: '课后作业', href: '/dashboard/workouts',   icon: ClipboardList },
+      { label: '计时器',   href: '/dashboard/timer',      icon: Timer },
       { label: '统计',    href: '/dashboard/stats',      icon: BarChart3 },
     ],
   },
@@ -76,6 +78,7 @@ const clientNav: NavGroup[] = [
       { label: '约课',     href: '/dashboard/booking',   icon: CalendarCheck },
       { label: '我的课程', href: '/dashboard/classes',   icon: Dumbbell },
       { label: '课后作业', href: '/dashboard/workouts',  icon: ClipboardList },
+      { label: '计时器',   href: '/dashboard/timer',     icon: Timer },
       { label: '训练方案', href: '/dashboard/programs',  icon: Trophy },
       { label: '我的主页', href: '/dashboard/profile',   icon: User },
     ],

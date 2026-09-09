@@ -356,6 +356,18 @@ export default function WorkoutsPage() {
                                 </p>
                                 {ex.notes && <p style={{ margin: '3px 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-brand)', fontStyle: 'italic' }}>📌 {ex.notes}</p>}
                               </div>
+                              {ex.duration && (
+                                <Link
+                                  href={`/dashboard/timer?work=${ex.duration_unit === 'seconds' ? ex.duration : ex.duration * 60}&rounds=${ex.sets || 1}&name=${encodeURIComponent(lang === 'zh' ? (ex.master_exercise.name_cn || ex.master_exercise.name_en) : (ex.master_exercise.name_en || ex.master_exercise.name_cn))}`}
+                                  onClick={e => e.stopPropagation()}
+                                  style={{
+                                    flexShrink: 0, fontSize: 'var(--text-xs)', color: 'var(--c-brand)',
+                                    border: '1px solid var(--c-brand)', borderRadius: 999, padding: '3px 10px',
+                                    textDecoration: 'none', fontWeight: 600, whiteSpace: 'nowrap',
+                                  }}>
+                                  ⏱ {t('计时', 'Timer')}
+                                </Link>
+                              )}
                               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-brand)', flexShrink: 0 }}>{t('详情', 'Details')} ›</span>
                             </div>
 
