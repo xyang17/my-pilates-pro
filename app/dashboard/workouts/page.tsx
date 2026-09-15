@@ -403,6 +403,22 @@ export default function WorkoutsPage() {
                         )
                       })}
 
+                      {/* 连播：整份作业一次跑完，只在有计时型动作时才出现 */}
+                      {!isTrainer && hw.homework_exercise.some(e => e.duration != null && Number(e.duration) > 0) && (
+                        <div style={{ padding: 'var(--sp-3) var(--sp-4) 0' }}>
+                          <Link
+                            href={`/dashboard/workouts/${hw.id}/play`}
+                            style={{
+                              display: 'block', width: '100%', padding: 'var(--sp-3)',
+                              borderRadius: 'var(--r-md)', background: 'var(--c-brand)',
+                              color: '#fff', textAlign: 'center', textDecoration: 'none',
+                              fontWeight: 700, fontSize: 'var(--text-base)', boxSizing: 'border-box',
+                            }}>
+                            ▶ {t('开始练这份作业', 'Start this workout')}
+                          </Link>
+                        </div>
+                      )}
+
                       {/* Complete button (student only) */}
                       {!isTrainer && (
                         <div style={{ padding: 'var(--sp-3) var(--sp-4)' }}>

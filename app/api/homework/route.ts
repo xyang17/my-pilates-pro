@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
         class:class_id(id, name, date, discipline),
         student:student_id(id, name, email, photo_url),
         homework_exercise(
-          id, sets, reps, weight, weight_unit, duration, duration_unit, notes, client_note, order_num,
+          id, sets, reps, weight, weight_unit, duration, duration_unit, rest_sec, notes, client_note, order_num,
           master_exercise:exercise_id(id, name_cn, name_en, featured_image_url, type_cn, type_en)
         )
       `)
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { class_id, student_id, title, due_date, notes, exercises } = body
+    const { class_id, student_id, title, due_date, notes, exercises, circuit_mode, transition_rest_sec } = body
 
     if (!student_id || !title || !Array.isArray(exercises) || exercises.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -69,7 +69,16 @@ export async function POST(req: NextRequest) {
     // Create homework record
     const { data: hw, error: hwErr } = await supabaseAdmin
       .from('homework')
-      .insert([{ class_id: class_id || null, student_id, created_by: userId, title, due_date: due_date || null, notes: notes || null }])
+      .insert([{
+        class_id: class_id || null,
+        student_id,
+        created_by: userId,
+        title,
+        due_date: due_date || null,
+        notes: notes || null,
+        circuit_mode: circuit_mode === 'circuit' ? 'circuit' : 'sequential',
+        transition_rest_sec: transition_rest_sec == null ? 30 : Number(transition_rest_sec),
+      }])
       .select()
       .single()
 
@@ -86,6 +95,7 @@ export async function POST(req: NextRequest) {
       weight_unit: ex.weight_unit || 'kg',
       duration: ex.duration || null,
       duration_unit: ex.duration_unit || 'minutes',
+      rest_sec: ex.rest_sec == null || ex.rest_sec === '' ? null : Number(ex.rest_sec),
       notes: ex.notes || null,
       order_num: ex.order_num || 1,
     }))

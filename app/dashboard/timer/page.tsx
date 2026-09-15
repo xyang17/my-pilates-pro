@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState, Suspense, useCallback } from 'react'
 import Link from 'next/link'
+import { useBeeper, vibrate, useWakeLock } from '@/lib/timerKit'
 
 // ─── 提醒方式说明 ──────────────────────────────────────────────
 // 能用的提醒手段主要这几种：
@@ -36,56 +37,6 @@ const PHASE_LABEL: Record<Phase, string> = {
   work: '训练中',
   rest: '休息',
   done: '完成',
-}
-
-// ─── 声音：现场合成，不依赖外部文件 ──────────────────────────────
-function useBeeper(enabled: boolean) {
-  const ctxRef = useRef<AudioContext | null>(null)
-
-  const ensureCtx = useCallback(() => {
-    if (!enabled) return null
-    if (!ctxRef.current) {
-      const AC = window.AudioContext || (window as any).webkitAudioContext
-      if (!AC) return null
-      ctxRef.current = new AC()
-    }
-    if (ctxRef.current.state === 'suspended') ctxRef.current.resume()
-    return ctxRef.current
-  }, [enabled])
-
-  const beep = useCallback((freq: number, durationMs: number, volume = 0.2) => {
-    const ctx = ensureCtx()
-    if (!ctx) return
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.type = 'sine'
-    osc.frequency.value = freq
-    gain.gain.value = volume
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    const now = ctx.currentTime
-    gain.gain.setValueAtTime(volume, now)
-    gain.gain.exponentialRampToValueAtTime(0.001, now + durationMs / 1000)
-    osc.start(now)
-    osc.stop(now + durationMs / 1000)
-  }, [ensureCtx])
-
-  const tick = useCallback(() => beep(880, 100, 0.15), [beep])
-  const goWork = useCallback(() => beep(1175, 280, 0.22), [beep])
-  const goRest = useCallback(() => beep(440, 280, 0.18), [beep])
-  const finish = useCallback(() => {
-    const ctx = ensureCtx()
-    if (!ctx) return
-    ;[660, 880, 1175].forEach((f, i) => setTimeout(() => beep(f, 220, 0.22), i * 150))
-  }, [beep, ensureCtx])
-
-  return { ensureCtx, tick, goWork, goRest, finish }
-}
-
-function vibrate(pattern: number | number[]) {
-  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-    try { navigator.vibrate(pattern) } catch {}
-  }
 }
 
 // 数字输入框。故意用 type="text" + inputMode="numeric" 而不是 type="number"：
@@ -167,39 +118,9 @@ function TimerInner() {
 
   const beeper = useBeeper(soundOn)
   const lastTickRef = useRef<number>(-1)
-  const wakeLockRef = useRef<any>(null)
 
-  // 屏幕常亮——手机做训练时不去碰屏幕，几十秒就自动锁屏了，一锁计时就停。
-  // Wake Lock API：安卓 Chrome 和 iOS 16.4+ 的 Safari 都支持；不支持的浏览器静默跳过。
-  // 注意：切到后台时系统会自动释放，所以回到前台要重新申请一次。
-  useEffect(() => {
-    const running = phase === 'ready' || phase === 'work' || phase === 'rest'
-
-    const acquire = async () => {
-      if (!running) return
-      try {
-        const nav = navigator as any
-        if (nav.wakeLock?.request) {
-          wakeLockRef.current = await nav.wakeLock.request('screen')
-        }
-      } catch { /* 用户拒绝或系统不支持，忽略即可 */ }
-    }
-
-    const release = () => {
-      try { wakeLockRef.current?.release?.() } catch {}
-      wakeLockRef.current = null
-    }
-
-    if (running) acquire()
-    else release()
-
-    const onVisible = () => { if (document.visibilityState === 'visible' && running) acquire() }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible)
-      release()
-    }
-  }, [phase])
+  // 屏幕常亮（实现见 lib/timerKit）
+  useWakeLock(phase === 'ready' || phase === 'work' || phase === 'rest')
 
   // 页面标题显示剩余秒数，切到别的标签页也能瞄一眼
   useEffect(() => {

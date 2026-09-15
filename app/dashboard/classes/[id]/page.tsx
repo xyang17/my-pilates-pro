@@ -117,6 +117,12 @@ export default function ClassDetailPage() {
   const [homeworkNotes, setHomeworkNotes] = useState('')
   const [homeworkStudentId, setHomeworkStudentId] = useState('')
   const [homeworkSubmitting, setHomeworkSubmitting] = useState(false)
+  // 作业连播参数：每个动作的时长/组数/休息，以及整份作业的练法和间隔休息。
+  // key 用 'c:课内动作实例id' / 'x:动作库id' 区分两类来源。
+  const [hwParams, setHwParams] = useState<Record<string, { work: string; sets: string; rest: string }>>({})
+  const [hwMode, setHwMode] = useState<'sequential' | 'circuit'>('sequential')
+  const [hwTransitionRest, setHwTransitionRest] = useState('30')
+  const [hwBatchRest, setHwBatchRest] = useState('')
   // Group class distribute
   const [showDistribute, setShowDistribute] = useState(false)
   const [distributeAsHomework, setDistributeAsHomework] = useState(false)
@@ -549,25 +555,35 @@ export default function ClassDetailPage() {
     if (!homeworkStudentId || totalSelected === 0) return
     setHomeworkSubmitting(true)
     try {
+      // 连播参数：填了时长的动作学员可以一键连播，没填的仍按次数自己做
+      const paramOf = (key: string) => hwParams[key] || { work: '', sets: '', rest: '' }
+      const num = (v: string) => (v === '' ? null : Number(v))
+
       // Class exercises
       const classExercises = Array.from(homeworkSelected).map((instanceId, i) => {
         const ex = classData?.exercises.find(e => e.id === instanceId)
+        const p = paramOf(`c:${instanceId}`)
         return {
           exercise_id: ex?.exercise_id,
           class_instance_id: instanceId,
-          sets: ex?.sets, reps: ex?.reps, weight: ex?.weight,
+          sets: num(p.sets) ?? ex?.sets, reps: ex?.reps, weight: ex?.weight,
           weight_unit: ex?.weight_unit || 'kg', notes: ex?.instance_notes || '',
+          duration: num(p.work), duration_unit: 'seconds',
+          rest_sec: num(p.rest),
           order_num: i + 1,
         }
       })
       // Extra exercises from library
       const extraExercises = Array.from(hwExtraSelected).map((exId, i) => {
         const ex = availableExercises.find(e => e.id === exId)
+        const p = paramOf(`x:${exId}`)
         return {
           exercise_id: exId,
           class_instance_id: null,
-          sets: ex?.default_sets || null, reps: ex?.default_reps || null, weight: ex?.default_weight || null,
+          sets: num(p.sets) ?? ex?.default_sets ?? null, reps: ex?.default_reps || null, weight: ex?.default_weight || null,
           weight_unit: ex?.default_weight_unit || 'kg', notes: '',
+          duration: num(p.work), duration_unit: 'seconds',
+          rest_sec: num(p.rest),
           order_num: classExercises.length + i + 1,
         }
       })
@@ -579,6 +595,8 @@ export default function ClassDetailPage() {
           class_id: classId, student_id: homeworkStudentId,
           title: `${classData?.name} ${t('作业', 'Homework')}`,
           due_date: homeworkDueDate || null, notes: homeworkNotes || null, exercises,
+          circuit_mode: hwMode,
+          transition_rest_sec: hwTransitionRest === '' ? 30 : Number(hwTransitionRest),
         }),
       })
       if (!res.ok) {
@@ -592,6 +610,8 @@ export default function ClassDetailPage() {
       setHomeworkStudentId('')
       setHomeworkDueDate('')
       setHomeworkNotes('')
+      setHwParams({})
+      setHwBatchRest('')
       showToast(t('作业已布置！', 'Homework assigned!'))
     } catch (err: any) { showToast(err.message, 'error') }
     finally { setHomeworkSubmitting(false) }
@@ -2032,6 +2052,133 @@ export default function ClassDetailPage() {
                 ) : (
                   <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#bbb' }}>{t('未选择额外动作', 'No extra exercises selected')}</p>
                 )}
+
+                {/* 连播参数：填了时长的动作，学员就能一键连着练完 */}
+                {totalSelected > 0 && (() => {
+                  const rows: { key: string; name: string; defWork: string; defSets: string; defRest: string }[] = []
+                  Array.from(homeworkSelected).forEach(instanceId => {
+                    const ex = classData?.exercises.find(e => e.id === instanceId)
+                    if (!ex) return
+                    rows.push({
+                      key: `c:${instanceId}`,
+                      name: ex.master_exercise.name_cn || ex.master_exercise.name_en,
+                      defWork: '', defSets: ex.sets != null ? String(ex.sets) : '', defRest: '',
+                    })
+                  })
+                  Array.from(hwExtraSelected).forEach(exId => {
+                    const ex = availableExercises.find(e => e.id === exId)
+                    if (!ex) return
+                    rows.push({
+                      key: `x:${exId}`,
+                      name: ex.name_cn || ex.name_en,
+                      defWork: ex.default_duration_unit === 'seconds' && ex.default_duration ? String(ex.default_duration) : '',
+                      defSets: ex.default_sets != null ? String(ex.default_sets) : '',
+                      defRest: ex.default_rest_sec != null ? String(ex.default_rest_sec) : '',
+                    })
+                  })
+
+                  const val = (key: string, f: 'work' | 'sets' | 'rest', fallback: string) =>
+                    hwParams[key]?.[f] ?? fallback
+                  const setVal = (key: string, f: 'work' | 'sets' | 'rest', v: string, row: typeof rows[number]) =>
+                    setHwParams(prev => ({
+                      ...prev,
+                      [key]: {
+                        work: prev[key]?.work ?? row.defWork,
+                        sets: prev[key]?.sets ?? row.defSets,
+                        rest: prev[key]?.rest ?? row.defRest,
+                        [f]: v.replace(/\D/g, ''),
+                      },
+                    }))
+
+                  const cell: React.CSSProperties = {
+                    width: 46, padding: '5px 6px', border: '1px solid #ddd', borderRadius: 6,
+                    fontSize: 12, textAlign: 'center', boxSizing: 'border-box',
+                  }
+
+                  return (
+                    <div style={{ marginBottom: 16, padding: '12px 14px', background: '#faf8fd', borderRadius: 10, border: '1px solid #ece4f5' }}>
+                      <p style={{ margin: '0 0 4px', fontSize: 13, color: '#666', fontWeight: 600 }}>
+                        {t('连播设置（选填）', 'Circuit settings (optional)')}
+                      </p>
+                      <p style={{ margin: '0 0 10px', fontSize: 11, color: '#aaa', lineHeight: 1.6 }}>
+                        {t('填了时长的动作，学员可以一键连着练完，自动倒计时和休息。留空就是按次数自己做。',
+                           'Exercises with a duration can be played back-to-back with auto countdown and rest.')}
+                      </p>
+
+                      {rows.map(r => (
+                        <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                          <input type="text" inputMode="numeric" placeholder="秒" style={cell}
+                            value={val(r.key, 'work', r.defWork)}
+                            onChange={e => setVal(r.key, 'work', e.target.value, r)} />
+                          <span style={{ fontSize: 11, color: '#bbb' }}>秒 ×</span>
+                          <input type="text" inputMode="numeric" placeholder="组" style={cell}
+                            value={val(r.key, 'sets', r.defSets)}
+                            onChange={e => setVal(r.key, 'sets', e.target.value, r)} />
+                          <span style={{ fontSize: 11, color: '#bbb' }}>组 歇</span>
+                          <input type="text" inputMode="numeric" placeholder="秒" style={cell}
+                            value={val(r.key, 'rest', r.defRest)}
+                            onChange={e => setVal(r.key, 'rest', e.target.value, r)} />
+                        </div>
+                      ))}
+
+                      {/* 批量设置休息，省得一个个填 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid #ece4f5' }}>
+                        <span style={{ fontSize: 12, color: '#888' }}>{t('休息统一设为', 'Set all rest to')}</span>
+                        <input type="text" inputMode="numeric" style={cell} value={hwBatchRest}
+                          onChange={e => setHwBatchRest(e.target.value.replace(/\D/g, ''))} />
+                        <span style={{ fontSize: 12, color: '#888' }}>秒</span>
+                        <button type="button"
+                          disabled={hwBatchRest === ''}
+                          onClick={() => setHwParams(prev => {
+                            const next = { ...prev }
+                            rows.forEach(r => {
+                              next[r.key] = {
+                                work: prev[r.key]?.work ?? r.defWork,
+                                sets: prev[r.key]?.sets ?? r.defSets,
+                                rest: hwBatchRest,
+                              }
+                            })
+                            return next
+                          })}
+                          style={{
+                            padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: hwBatchRest === '' ? 'not-allowed' : 'pointer',
+                            border: '1px solid var(--c-brand)',
+                            background: hwBatchRest === '' ? 'transparent' : 'var(--c-brand)',
+                            color: hwBatchRest === '' ? '#ccc' : '#fff',
+                          }}>
+                          {t('应用', 'Apply')}
+                        </button>
+                      </div>
+
+                      {/* 练法 + 间隔休息 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12, color: '#888' }}>{t('练法', 'Mode')}</span>
+                        {([['sequential', '顺序'], ['circuit', '循环']] as const).map(([v, lbl]) => (
+                          <button key={v} type="button" onClick={() => setHwMode(v)}
+                            style={{
+                              padding: '4px 12px', borderRadius: 14, fontSize: 12, cursor: 'pointer',
+                              border: `1px solid ${hwMode === v ? 'var(--c-brand)' : '#ddd'}`,
+                              background: hwMode === v ? 'var(--c-brand)' : 'white',
+                              color: hwMode === v ? '#fff' : '#666',
+                            }}>
+                            {lbl}
+                          </button>
+                        ))}
+                        <span style={{ fontSize: 12, color: '#888', marginLeft: 4 }}>
+                          {hwMode === 'circuit' ? t('轮次间休息', 'Round rest') : t('动作间休息', 'Transition rest')}
+                        </span>
+                        <input type="text" inputMode="numeric" style={cell} value={hwTransitionRest}
+                          onChange={e => setHwTransitionRest(e.target.value.replace(/\D/g, ''))} />
+                        <span style={{ fontSize: 12, color: '#888' }}>秒</span>
+                      </div>
+                      <p style={{ margin: '6px 0 0', fontSize: 11, color: '#bbb' }}>
+                        {hwMode === 'circuit' ? '循环：动作 1→2→3 做一圈，再从头重复' : '顺序：一个动作做完全部组数，再下一个'}
+                        {t('（学员开始前还能自己调）', ' (student can adjust before starting)')}
+                      </p>
+                    </div>
+                  )
+                })()}
 
                 {/* Due date + notes */}
                 <div style={{ display: 'grid', gap: '12px' }}>

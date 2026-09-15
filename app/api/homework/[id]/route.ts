@@ -22,7 +22,7 @@ export async function GET(
         *,
         class:class_id(id, name, date, discipline),
         homework_exercise(
-          id, sets, reps, weight, weight_unit, duration, duration_unit, notes, order_num,
+          id, sets, reps, weight, weight_unit, duration, duration_unit, rest_sec, notes, order_num,
           master_exercise:exercise_id(id, name_cn, name_en, featured_image_url, description_cn, description_en, instructions_cn, instructions_en)
         )
       `)
