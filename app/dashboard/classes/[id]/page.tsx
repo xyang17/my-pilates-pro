@@ -1534,13 +1534,18 @@ export default function ClassDetailPage() {
                 }
                 const isFirst = i === 0
                 const isLast = i === classData.exercises.length - 1
+                // 两个箭头分开放在序号两边（↑ 序号 ↓），不叠成一列：
+                // 叠着的话两个按钮紧挨着，手机上很容易按错成相反方向。
+                // 尺寸也放大到 34，接近手指可靠点击的最小尺寸。
                 const arrowBtn = (disabled: boolean): React.CSSProperties => ({
-                  width: 26, height: 22, padding: 0, borderRadius: 5,
+                  width: 34, height: 34, padding: 0, borderRadius: 8,
                   border: '1px solid var(--c-border)', background: 'transparent',
                   color: disabled ? '#ddd' : 'var(--c-text-secondary)',
                   cursor: disabled ? 'not-allowed' : 'pointer',
-                  fontSize: 11, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 15, lineHeight: 1, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                 })
+                const canReorder = isTrainer && classData.exercises.length > 1
                 return (
                   <div key={ex.id}
                     data-exercise-id={ex.id}
@@ -1552,21 +1557,21 @@ export default function ClassDetailPage() {
                     }}>
                     {/* Row 1: 上下调序 + 序号 + 名称 + 删除 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      {isTrainer && classData.exercises.length > 1 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
-                          <button type="button" title="上移"
-                            onClick={() => moveExercise(ex.id, -1)}
-                            disabled={isFirst || reordering}
-                            style={arrowBtn(isFirst || reordering)}>↑</button>
-                          <button type="button" title="下移"
-                            onClick={() => moveExercise(ex.id, 1)}
-                            disabled={isLast || reordering}
-                            style={arrowBtn(isLast || reordering)}>↓</button>
-                        </div>
+                      {canReorder && (
+                        <button type="button" title="上移"
+                          onClick={() => moveExercise(ex.id, -1)}
+                          disabled={isFirst || reordering}
+                          style={arrowBtn(isFirst || reordering)}>↑</button>
                       )}
                       <div style={{ width: 22, height: 22, background: 'var(--c-lavender)', color: 'var(--c-text-primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>
                         {i + 1}
                       </div>
+                      {canReorder && (
+                        <button type="button" title="下移"
+                          onClick={() => moveExercise(ex.id, 1)}
+                          disabled={isLast || reordering}
+                          style={arrowBtn(isLast || reordering)}>↓</button>
+                      )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 1 }}>
                           <p style={{ margin: 0, fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--c-text-primary)' }}>

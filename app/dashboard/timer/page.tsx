@@ -199,9 +199,9 @@ function TimerInner() {
               onMove={move} onToggleSkip={toggleSkip}
             />
 
-            <p style={{ margin: '14px 0 10px', textAlign: 'right', fontSize: 13, color: 'var(--c-text-secondary)' }}>
-              {validCount === 0 ? '全部跳过了' : formatDuration(estimated)}
-            </p>
+            {validCount === 0 && (
+              <p style={{ margin: '14px 0 10px', textAlign: 'right', fontSize: 13, color: '#c0392b' }}>全部跳过了</p>
+            )}
 
             <button onClick={() => setStage('running')} disabled={validCount === 0}
               style={{

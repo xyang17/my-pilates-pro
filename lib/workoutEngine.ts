@@ -96,3 +96,25 @@ export function formatDuration(totalSec: number): string {
   const m = Math.round(totalSec / 60)
   return m < 1 ? '不到 1 分钟' : `约 ${m} 分钟`
 }
+
+/** 精确时长，开始前确认用——「约几分钟」不够，得知道到底多久 */
+export function formatExact(totalSec: number): string {
+  const s = Math.max(0, Math.round(totalSec))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (h > 0) return `${h} 小时 ${m} 分 ${sec} 秒`
+  if (m > 0) return `${m} 分 ${sec} 秒`
+  return `${sec} 秒`
+}
+
+/** 单条播放条目在确认页上怎么显示 */
+export function stepLabel(step: Step, plan: PlanItem[], mode: WorkoutMode): string {
+  const name = plan[step.exIdx]?.name ?? '动作'
+  switch (step.type) {
+    case 'ready': return '准备'
+    case 'work': return `${name} · 第 ${step.setNo}/${step.totalSets} 组`
+    case 'rest': return mode === 'circuit' ? '间歇' : '组间休息'
+    case 'transition': return mode === 'circuit' ? `轮次间休息（下一圈：第 ${step.roundNo} 圈）` : '换动作'
+  }
+}

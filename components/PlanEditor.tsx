@@ -1,6 +1,6 @@
 'use client'
 
-import { PlanItem, WorkoutMode } from '@/lib/workoutEngine'
+import { buildSteps, estimateSeconds, formatExact, stepLabel, PlanItem, WorkoutMode } from '@/lib/workoutEngine'
 
 // 开始练之前的确认页主体：练法切换 + 动作列表（上下调序、单个跳过）+ 间隔休息 + 播放顺序预览。
 // 课后作业连播和计时器共用，两边的确认页长一样，学员不用学两套。
@@ -16,9 +16,10 @@ export default function PlanEditor({
   onMove: (idx: number, dir: -1 | 1) => void
   onToggleSkip: (idx: number) => void
 }) {
-  // 真正会被播放的动作（跳过的、参数没填全的都不算）
-  const activeItems = plan.filter(p => !p.skipped && p.workSec > 0 && p.sets > 0)
-  const totalRounds = activeItems.length > 0 ? Math.max(...activeItems.map(p => p.sets)) : 0
+  // 展开成完整的播放时间线，确认页逐条显示（跳过的、参数没填全的不会进来）
+  const steps = buildSteps(plan, mode, transitionRest)
+  const totalSec = estimateSeconds(steps)
+  const workCount = steps.filter(s => s.type === 'work').length
 
   return (
     <>
@@ -50,7 +51,26 @@ export default function PlanEditor({
             borderBottom: i < plan.length - 1 ? '1px solid var(--c-border)' : 'none',
             opacity: p.skipped ? 0.45 : 1,
           }}>
-            <span style={{ width: 18, fontSize: 12, color: '#bbb', flexShrink: 0 }}>{i + 1}</span>
+            {/* ↑ 序号 ↓ 分开放，不叠成一列——叠着的两个小按钮在手机上太容易按反 */}
+            {plan.length > 1 && (
+              <button onClick={() => onMove(i, -1)} disabled={i === 0} title="上移"
+                style={{
+                  width: 32, height: 32, flexShrink: 0, borderRadius: 8, fontSize: 14,
+                  border: '1px solid var(--c-border)', background: 'transparent',
+                  cursor: i === 0 ? 'not-allowed' : 'pointer',
+                  color: i === 0 ? '#ddd' : 'var(--c-text-secondary)',
+                }}>↑</button>
+            )}
+            <span style={{ width: 16, textAlign: 'center', fontSize: 12, color: '#bbb', flexShrink: 0 }}>{i + 1}</span>
+            {plan.length > 1 && (
+              <button onClick={() => onMove(i, 1)} disabled={i === plan.length - 1} title="下移"
+                style={{
+                  width: 32, height: 32, flexShrink: 0, borderRadius: 8, fontSize: 14,
+                  border: '1px solid var(--c-border)', background: 'transparent',
+                  cursor: i === plan.length - 1 ? 'not-allowed' : 'pointer',
+                  color: i === plan.length - 1 ? '#ddd' : 'var(--c-text-secondary)',
+                }}>↓</button>
+            )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{
                 margin: '0 0 2px', fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)',
@@ -63,21 +83,16 @@ export default function PlanEditor({
                 {p.workSec}秒 × {p.sets}组 · 歇{p.restSec}秒
               </p>
             </div>
-            <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-              <button onClick={() => onMove(i, -1)} disabled={i === 0}
-                style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid var(--c-border)', background: 'transparent', cursor: i === 0 ? 'not-allowed' : 'pointer', color: i === 0 ? '#ddd' : 'var(--c-text-secondary)', fontSize: 12 }}>↑</button>
-              <button onClick={() => onMove(i, 1)} disabled={i === plan.length - 1}
-                style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid var(--c-border)', background: 'transparent', cursor: i === plan.length - 1 ? 'not-allowed' : 'pointer', color: i === plan.length - 1 ? '#ddd' : 'var(--c-text-secondary)', fontSize: 12 }}>↓</button>
-              <button onClick={() => onToggleSkip(i)}
-                style={{
-                  padding: '0 8px', height: 28, borderRadius: 6, fontSize: 11, cursor: 'pointer',
-                  border: `1px solid ${p.skipped ? 'var(--c-brand)' : 'var(--c-border)'}`,
-                  background: p.skipped ? 'var(--c-fill-light)' : 'transparent',
-                  color: p.skipped ? 'var(--c-brand)' : 'var(--c-text-secondary)',
-                }}>
-                {p.skipped ? '已跳过' : '跳过'}
-              </button>
-            </div>
+            {/* 跳过按钮单独放最右边，跟调序箭头拉开距离，免得手指按错 */}
+            <button onClick={() => onToggleSkip(i)}
+              style={{
+                flexShrink: 0, padding: '0 10px', height: 32, borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                border: `1px solid ${p.skipped ? 'var(--c-brand)' : 'var(--c-border)'}`,
+                background: p.skipped ? 'var(--c-fill-light)' : 'transparent',
+                color: p.skipped ? 'var(--c-brand)' : 'var(--c-text-secondary)',
+              }}>
+              {p.skipped ? '已跳过' : '跳过'}
+            </button>
           </div>
         ))}
       </div>
@@ -93,42 +108,63 @@ export default function PlanEditor({
           style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid var(--c-border)', background: 'transparent', cursor: 'pointer', fontSize: 16, color: 'var(--c-text-secondary)' }}>＋</button>
       </div>
 
-      {/* 播放顺序预览：循环练法下「到底按什么顺序走」光看列表是看不出来的，
-          尤其组数不一样时后面几圈会少动作，这里直接把结果摊开给学员看。 */}
-      {activeItems.length > 0 && (
+      {/* 播放顺序：每一组、每一段休息都单独列出来，从头到尾逐条确认。
+          按动作或按圈合并看着清爽，但没法确认「第2组之后到底歇多久」这种事。
+          条目多的时候这里可以滚动，不会把页面撑得太长。 */}
+      {steps.length > 0 && (
         <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--c-border)' }}>
-          <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--c-text-secondary)' }}>播放顺序</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--c-text-secondary)' }}>播放顺序</p>
+            <p style={{ margin: 0, fontSize: 11, color: '#bbb' }}>共 {workCount} 组训练</p>
+          </div>
 
-          {mode === 'circuit' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {Array.from({ length: totalRounds }, (_, r) => {
-                const round = r + 1
-                const inRound = activeItems.filter(p => p.sets >= round)
-                const dropped = activeItems.filter(p => p.sets < round)
-                return (
-                  <div key={round} style={{ display: 'flex', gap: 8, fontSize: 12, lineHeight: 1.6 }}>
-                    <span style={{ flexShrink: 0, color: 'var(--c-brand)', fontWeight: 600, minWidth: 38 }}>第{round}圈</span>
-                    <span style={{ color: 'var(--c-text-primary)' }}>
-                      {inRound.map(p => `${p.name} ${p.workSec}秒`).join(' → ')}
-                      {dropped.length > 0 && (
-                        <span style={{ color: '#bbb' }}>　（{dropped.map(p => p.name).join('、')}已做完）</span>
-                      )}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {activeItems.map((p, i) => (
-                <div key={p.key} style={{ fontSize: 12, color: 'var(--c-text-primary)', lineHeight: 1.6 }}>
-                  <span style={{ color: 'var(--c-brand)', fontWeight: 600, marginRight: 6 }}>{i + 1}</span>
-                  {p.name} {p.workSec}秒 × {p.sets}组
-                  <span style={{ color: '#bbb' }}>（组间歇{p.restSec}秒）</span>
+          <div style={{
+            maxHeight: 260, overflowY: 'auto',
+            border: '1px solid var(--c-border)', borderRadius: 8,
+            background: 'var(--c-fill-light)',
+          }}>
+            {steps.map((st, i) => {
+              const isWork = st.type === 'work'
+              // 训练组编号，休息不占号，一眼能数出练了几组
+              const workNo = isWork ? steps.slice(0, i + 1).filter(s => s.type === 'work').length : null
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '7px 10px',
+                  borderBottom: i < steps.length - 1 ? '1px solid var(--c-border)' : 'none',
+                  background: isWork ? 'var(--c-card-bg)' : 'transparent',
+                }}>
+                  <span style={{
+                    width: 20, flexShrink: 0, textAlign: 'center',
+                    fontSize: 11, fontWeight: 700,
+                    color: isWork ? 'var(--c-brand)' : 'transparent',
+                  }}>
+                    {workNo ?? ''}
+                  </span>
+                  <span style={{
+                    flex: 1, minWidth: 0, fontSize: 12,
+                    color: isWork ? 'var(--c-text-primary)' : '#999',
+                    fontWeight: isWork ? 600 : 400,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {stepLabel(st, plan, mode)}
+                  </span>
+                  <span style={{
+                    flexShrink: 0, fontSize: 12, fontVariantNumeric: 'tabular-nums',
+                    color: isWork ? 'var(--c-text-primary)' : '#aaa',
+                    fontWeight: isWork ? 600 : 400,
+                  }}>
+                    {st.seconds}秒
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
+              )
+            })}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 13 }}>
+            <span style={{ color: 'var(--c-text-secondary)' }}>总时长</span>
+            <span style={{ fontWeight: 700, color: 'var(--c-text-primary)' }}>{formatExact(totalSec)}</span>
+          </div>
         </div>
       )}
     </>
