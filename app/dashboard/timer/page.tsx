@@ -91,7 +91,9 @@ function TimerInner() {
   const [mode, setMode] = useState<WorkoutMode>('sequential')
   const [transitionRest, setTransitionRest] = useState(30)
 
-  const [stage, setStage] = useState<'setup' | 'running' | 'done'>('setup')
+  // setup 填动作 → confirm 确认最终播放顺序 → running 播放 → done
+  // 只有一个动作时没什么可确认的，直接开始，不给单动作场景加多余一步
+  const [stage, setStage] = useState<'setup' | 'confirm' | 'running' | 'done'>('setup')
   const [result, setResult] = useState<RunnerResult | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
@@ -176,6 +178,45 @@ function TimerInner() {
   }, [stage, isClient, saveState])
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>加载中…</div>
+
+  // ── 确认页：最终播放顺序、组数，可以用箭头调序或临时跳过 ──
+  if (stage === 'confirm') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
+        <header style={{ padding: '0 var(--sp-5)', height: 56, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => setStage('setup')}
+            style={{ background: 'none', border: 'none', color: 'var(--c-text-secondary)', fontSize: 14, cursor: 'pointer', padding: 0 }}>
+            ← 改动作
+          </button>
+          <span style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'var(--c-text-primary)' }}>开始前确认</span>
+        </header>
+
+        <main style={{ padding: 20, maxWidth: 460, margin: '0 auto' }}>
+          <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 20 }}>
+            <PlanEditor
+              plan={plan} mode={mode} transitionRest={transitionRest}
+              onMode={setMode} onTransitionRest={setTransitionRest}
+              onMove={move} onToggleSkip={toggleSkip}
+            />
+
+            <p style={{ margin: '14px 0 10px', textAlign: 'right', fontSize: 13, color: 'var(--c-text-secondary)' }}>
+              {validCount === 0 ? '全部跳过了' : formatDuration(estimated)}
+            </p>
+
+            <button onClick={() => setStage('running')} disabled={validCount === 0}
+              style={{
+                width: '100%', padding: 14, borderRadius: 10, border: 'none',
+                background: validCount === 0 ? 'var(--c-lavender)' : 'var(--c-brand)',
+                color: '#fff', fontSize: 16, fontWeight: 700,
+                cursor: validCount === 0 ? 'not-allowed' : 'pointer',
+              }}>
+              ▶ 开始练
+            </button>
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   if (stage === 'running') {
     const names = plan.filter(p => !p.skipped).map(p => p.name)
@@ -317,29 +358,21 @@ function TimerInner() {
             ＋ 再加一个动作
           </button>
 
-          {/* 多个动作时才需要选练法和间隔休息 */}
-          {items.length > 1 && (
-            <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--c-border)' }}>
-              <PlanEditorLite
-                plan={plan} mode={mode} transitionRest={transitionRest}
-                onMode={setMode} onTransitionRest={setTransitionRest}
-                onToggleSkip={toggleSkip}
-              />
-            </div>
-          )}
-
           <p style={{ margin: '14px 0 10px', textAlign: 'right', fontSize: 13, color: 'var(--c-text-secondary)' }}>
             {validCount === 0 ? '还没有可以练的动作' : formatDuration(estimated)}
           </p>
 
-          <button onClick={() => setStage('running')} disabled={validCount === 0}
+          {/* 多个动作时先过一遍确认页（看最终顺序、选练法）；单个动作没什么可确认的，直接开始 */}
+          <button
+            onClick={() => setStage(items.length > 1 ? 'confirm' : 'running')}
+            disabled={validCount === 0}
             style={{
               width: '100%', padding: 14, borderRadius: 10, border: 'none',
               background: validCount === 0 ? 'var(--c-lavender)' : 'var(--c-brand)',
               color: '#fff', fontSize: 16, fontWeight: 700,
               cursor: validCount === 0 ? 'not-allowed' : 'pointer',
             }}>
-            ▶ 开始
+            {items.length > 1 ? '下一步：确认顺序' : '▶ 开始'}
           </button>
 
           <p style={{ margin: '14px 0 0', fontSize: 12, color: '#999', lineHeight: 1.6 }}>
@@ -350,63 +383,6 @@ function TimerInner() {
         </div>
       </main>
     </div>
-  )
-}
-
-// 计时器这边动作参数是直接编辑的，所以只借用「练法 + 间隔休息 + 跳过」这部分，
-// 不重复显示一遍动作列表。
-function PlanEditorLite({
-  plan, mode, transitionRest, onMode, onTransitionRest, onToggleSkip,
-}: {
-  plan: PlanItem[]
-  mode: WorkoutMode
-  transitionRest: number
-  onMode: (m: WorkoutMode) => void
-  onTransitionRest: (v: number) => void
-  onToggleSkip: (idx: number) => void
-}) {
-  return (
-    <>
-      <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--c-text-secondary)' }}>练法</p>
-      <div style={{ display: 'flex', gap: 8 }}>
-        {([['circuit', '循环'], ['sequential', '顺序']] as const).map(([val, lbl]) => (
-          <button key={val} onClick={() => onMode(val)}
-            style={{
-              flex: 1, padding: '10px', borderRadius: 8, fontSize: 14, cursor: 'pointer',
-              border: `1.5px solid ${mode === val ? 'var(--c-brand)' : 'var(--c-border)'}`,
-              background: mode === val ? 'var(--c-brand)' : 'transparent',
-              color: mode === val ? '#fff' : 'var(--c-text-secondary)',
-              fontWeight: mode === val ? 700 : 400,
-            }}>
-            {lbl}
-          </button>
-        ))}
-      </div>
-      <p style={{ margin: '6px 0 0', fontSize: 11, color: '#aaa' }}>
-        {mode === 'circuit' ? '动作 1→2→3 做一圈，再从头重复' : '一个动作做完全部组数，再进入下一个'}
-      </p>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
-        <span style={{ flex: 1, fontSize: 13, color: 'var(--c-text-secondary)' }}>
-          {mode === 'circuit' ? '轮次间休息' : '动作间休息'}
-        </span>
-        <button onClick={() => onTransitionRest(Math.max(0, transitionRest - 5))}
-          style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid var(--c-border)', background: 'transparent', cursor: 'pointer', fontSize: 16, color: 'var(--c-text-secondary)' }}>−</button>
-        <span style={{ minWidth: 48, textAlign: 'center', fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)' }}>{transitionRest}秒</span>
-        <button onClick={() => onTransitionRest(transitionRest + 5)}
-          style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid var(--c-border)', background: 'transparent', cursor: 'pointer', fontSize: 16, color: 'var(--c-text-secondary)' }}>＋</button>
-      </div>
-
-      {plan.some(p => p.skipped) && (
-        <p style={{ margin: '10px 0 0', fontSize: 11, color: '#aaa' }}>
-          已跳过：{plan.filter(p => p.skipped).map(p => p.name).join('、')}
-          <button onClick={() => plan.forEach((p, i) => p.skipped && onToggleSkip(i))}
-            style={{ marginLeft: 8, background: 'none', border: 'none', color: 'var(--c-brand)', cursor: 'pointer', fontSize: 11, padding: 0 }}>
-            全部恢复
-          </button>
-        </p>
-      )}
-    </>
   )
 }
 

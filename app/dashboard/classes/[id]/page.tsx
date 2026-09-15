@@ -159,9 +159,7 @@ export default function ClassDetailPage() {
   const [copyForm, setCopyForm] = useState({ name: '', date: '', start_time: '', assigned_to: '', price: '', duration: '' })
   const [copying, setCopying] = useState(false)
   const [copyExercises, setCopyExercises] = useState<ClassExercise[]>([])
-  // Drag-to-reorder
-  const [draggedId, setDraggedId] = useState<string | null>(null)
-  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  // 动作顺序（改用 ↑↓ 调整，不再拖动）
   const [reordering, setReordering] = useState(false)
   // Class info inline edit
   const [editInfo, setEditInfo] = useState(false)
@@ -923,26 +921,19 @@ export default function ClassDetailPage() {
     showToast(t(`已保存全部 ${dirty.length} 个动作`, `Saved ${dirty.length} exercises ✓`))
   }
 
-  const handleDragStart = (id: string) => setDraggedId(id)
-
-  const handleDragOver = (e: React.DragEvent, id: string) => {
-    e.preventDefault()
-    if (id !== draggedId) setDragOverId(id)
-  }
-
-  const handleDrop = async (targetId: string) => {
-    if (!draggedId || draggedId === targetId || !classData) return
+  // 上下箭头调整动作顺序。原来是拖动排序，手机上很难对准、容易误触，
+  // 改成点箭头跟相邻的那个换位置，点两下就到位。
+  const moveExercise = async (id: string, dir: -1 | 1) => {
+    if (!classData || reordering) return
     const sorted = [...classData.exercises].sort((a, b) => a.order - b.order)
-    const fromIdx = sorted.findIndex(e => e.id === draggedId)
-    const toIdx   = sorted.findIndex(e => e.id === targetId)
-    if (fromIdx === -1 || toIdx === -1) return
+    const from = sorted.findIndex(e => e.id === id)
+    const to = from + dir
+    if (from === -1 || to < 0 || to >= sorted.length) return
+
     const reordered = [...sorted]
-    const [moved] = reordered.splice(fromIdx, 1)
-    reordered.splice(toIdx, 0, moved)
-    // Optimistic update
+    ;[reordered[from], reordered[to]] = [reordered[to], reordered[from]]
+    // 先动界面，再慢慢存，避免点一下要等一下
     setClassData(prev => prev ? { ...prev, exercises: reordered.map((e, i) => ({ ...e, order: i + 1 })) } : prev)
-    setDraggedId(null)
-    setDragOverId(null)
     setReordering(true)
     try {
       await Promise.all(reordered.map((ex, i) =>
@@ -956,55 +947,6 @@ export default function ClassDetailPage() {
     finally { setReordering(false) }
   }
 
-  const handleDragEnd = () => { setDraggedId(null); setDragOverId(null) }
-
-  // Touch drag-and-drop (mobile)
-  useEffect(() => {
-    if (!draggedId || !isTrainer) return
-    let currentOverId: string | null = null
-
-    const onMove = (e: TouchEvent) => {
-      e.preventDefault()
-      const touch = e.touches[0]
-      const el = document.elementFromPoint(touch.clientX, touch.clientY)
-      const row = el?.closest('[data-exercise-id]')
-      const overId = row?.getAttribute('data-exercise-id') || null
-      currentOverId = overId
-      setDragOverId(overId && overId !== draggedId ? overId : null)
-    }
-
-    const onEnd = async () => {
-      const targetId = currentOverId
-      setDraggedId(null)
-      setDragOverId(null)
-      if (!targetId || targetId === draggedId || !classData) return
-      const sorted = [...classData.exercises].sort((a, b) => a.order - b.order)
-      const fromIdx = sorted.findIndex(e => e.id === draggedId)
-      const toIdx   = sorted.findIndex(e => e.id === targetId)
-      if (fromIdx === -1 || toIdx === -1) return
-      const reordered = [...sorted]
-      const [moved] = reordered.splice(fromIdx, 1)
-      reordered.splice(toIdx, 0, moved)
-      setClassData(prev => prev ? { ...prev, exercises: reordered.map((e, i) => ({ ...e, order: i + 1 })) } : prev)
-      setReordering(true)
-      try {
-        await Promise.all(reordered.map((ex, i) =>
-          fetch(`/api/classes/${classId}/exercises/${ex.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
-            body: JSON.stringify({ order: i + 1 }),
-          })
-        ))
-      } catch { } finally { setReordering(false) }
-    }
-
-    document.addEventListener('touchmove', onMove, { passive: false })
-    document.addEventListener('touchend', onEnd)
-    return () => {
-      document.removeEventListener('touchmove', onMove)
-      document.removeEventListener('touchend', onEnd)
-    }
-  }, [draggedId, classData, classId, user?.id, isTrainer])
 
   if (authLoading || isLoading) {
     return (
@@ -1537,7 +1479,7 @@ export default function ClassDetailPage() {
                 {t('动作列表', 'Exercises')}
                 {classData.exercises.length > 0 && <span style={{ color: '#bbb', fontWeight: 'normal', marginLeft: '6px' }}>({classData.exercises.length})</span>}
                 {reordering && <span style={{ color: 'var(--c-brand)', fontWeight: 'normal', fontSize: '11px', marginLeft: '8px' }}>保存顺序…</span>}
-                {isTrainer && classData.exercises.length > 1 && !reordering && <span style={{ color: '#bbb', fontWeight: 'normal', fontSize: '11px', marginLeft: '8px' }}>拖动 ⠿ 排序</span>}
+                {isTrainer && classData.exercises.length > 1 && !reordering && <span style={{ color: '#bbb', fontWeight: 'normal', fontSize: '11px', marginLeft: '8px' }}>用 ↑↓ 调整顺序</span>}
               </span>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 {isTrainer && hasUnsaved && (
@@ -1590,32 +1532,37 @@ export default function ClassDetailPage() {
                   color: 'var(--c-text-primary)',
                   width: '100%',
                 }
-                const isDragging = draggedId === ex.id
-                const isDragOver = dragOverId === ex.id
+                const isFirst = i === 0
+                const isLast = i === classData.exercises.length - 1
+                const arrowBtn = (disabled: boolean): React.CSSProperties => ({
+                  width: 26, height: 22, padding: 0, borderRadius: 5,
+                  border: '1px solid var(--c-border)', background: 'transparent',
+                  color: disabled ? '#ddd' : 'var(--c-text-secondary)',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  fontSize: 11, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                })
                 return (
                   <div key={ex.id}
                     data-exercise-id={ex.id}
-                    onDragOver={e => handleDragOver(e, ex.id)}
-                    onDrop={() => handleDrop(ex.id)}
-                    onDragEnd={handleDragEnd}
                     style={{
                       padding: '10px 14px',
                       borderBottom: i < classData.exercises.length - 1 ? '1px solid var(--c-border)' : 'none',
-                      background: isDragOver ? 'var(--c-fill-mid)' : isSaving ? 'var(--c-fill-light)' : 'var(--c-card-bg)',
-                      opacity: isDragging ? 0.4 : 1,
-                      cursor: isTrainer ? 'grab' : 'default',
-                      transition: 'background 0.1s, opacity 0.15s',
+                      background: isSaving ? 'var(--c-fill-light)' : 'var(--c-card-bg)',
+                      transition: 'background 0.1s',
                     }}>
-                    {/* Row 1: Drag handle + Number + Name + Remove */}
+                    {/* Row 1: 上下调序 + 序号 + 名称 + 删除 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      {isTrainer && (
-                        <span
-                          draggable
-                          onDragStart={(e) => { e.stopPropagation(); handleDragStart(ex.id) }}
-                          onTouchStart={(e) => { e.stopPropagation(); setDraggedId(ex.id) }}
-                          style={{ color: 'var(--c-text-hint)', fontSize: '20px', cursor: 'grab', flexShrink: 0, userSelect: 'none', lineHeight: 1, padding: '8px 12px', touchAction: 'none' }}
-                          title="拖动排序"
-                        >⠿</span>
+                      {isTrainer && classData.exercises.length > 1 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
+                          <button type="button" title="上移"
+                            onClick={() => moveExercise(ex.id, -1)}
+                            disabled={isFirst || reordering}
+                            style={arrowBtn(isFirst || reordering)}>↑</button>
+                          <button type="button" title="下移"
+                            onClick={() => moveExercise(ex.id, 1)}
+                            disabled={isLast || reordering}
+                            style={arrowBtn(isLast || reordering)}>↓</button>
+                        </div>
                       )}
                       <div style={{ width: 22, height: 22, background: 'var(--c-lavender)', color: 'var(--c-text-primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>
                         {i + 1}

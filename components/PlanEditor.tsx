@@ -2,7 +2,7 @@
 
 import { PlanItem, WorkoutMode } from '@/lib/workoutEngine'
 
-// 开始练之前的确认页主体：练法切换 + 动作列表（上下调序、单个跳过）+ 间隔休息。
+// 开始练之前的确认页主体：练法切换 + 动作列表（上下调序、单个跳过）+ 间隔休息 + 播放顺序预览。
 // 课后作业连播和计时器共用，两边的确认页长一样，学员不用学两套。
 
 export default function PlanEditor({
@@ -16,6 +16,10 @@ export default function PlanEditor({
   onMove: (idx: number, dir: -1 | 1) => void
   onToggleSkip: (idx: number) => void
 }) {
+  // 真正会被播放的动作（跳过的、参数没填全的都不算）
+  const activeItems = plan.filter(p => !p.skipped && p.workSec > 0 && p.sets > 0)
+  const totalRounds = activeItems.length > 0 ? Math.max(...activeItems.map(p => p.sets)) : 0
+
   return (
     <>
       <div style={{ marginBottom: 16 }}>
@@ -88,6 +92,45 @@ export default function PlanEditor({
         <button onClick={() => onTransitionRest(transitionRest + 5)}
           style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid var(--c-border)', background: 'transparent', cursor: 'pointer', fontSize: 16, color: 'var(--c-text-secondary)' }}>＋</button>
       </div>
+
+      {/* 播放顺序预览：循环练法下「到底按什么顺序走」光看列表是看不出来的，
+          尤其组数不一样时后面几圈会少动作，这里直接把结果摊开给学员看。 */}
+      {activeItems.length > 0 && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--c-border)' }}>
+          <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--c-text-secondary)' }}>播放顺序</p>
+
+          {mode === 'circuit' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {Array.from({ length: totalRounds }, (_, r) => {
+                const round = r + 1
+                const inRound = activeItems.filter(p => p.sets >= round)
+                const dropped = activeItems.filter(p => p.sets < round)
+                return (
+                  <div key={round} style={{ display: 'flex', gap: 8, fontSize: 12, lineHeight: 1.6 }}>
+                    <span style={{ flexShrink: 0, color: 'var(--c-brand)', fontWeight: 600, minWidth: 38 }}>第{round}圈</span>
+                    <span style={{ color: 'var(--c-text-primary)' }}>
+                      {inRound.map(p => `${p.name} ${p.workSec}秒`).join(' → ')}
+                      {dropped.length > 0 && (
+                        <span style={{ color: '#bbb' }}>　（{dropped.map(p => p.name).join('、')}已做完）</span>
+                      )}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {activeItems.map((p, i) => (
+                <div key={p.key} style={{ fontSize: 12, color: 'var(--c-text-primary)', lineHeight: 1.6 }}>
+                  <span style={{ color: 'var(--c-brand)', fontWeight: 600, marginRight: 6 }}>{i + 1}</span>
+                  {p.name} {p.workSec}秒 × {p.sets}组
+                  <span style={{ color: '#bbb' }}>（组间歇{p.restSec}秒）</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </>
   )
 }
