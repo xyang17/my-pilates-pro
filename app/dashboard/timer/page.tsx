@@ -4,9 +4,10 @@ import { useAuth } from '@/context/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, Suspense } from 'react'
 import Link from 'next/link'
-import WorkoutRunner, { RunnerResult } from '@/components/WorkoutRunner'
+import WorkoutRunner, { RunnerResult, RunnerProgress } from '@/components/WorkoutRunner'
 import PlanEditor from '@/components/PlanEditor'
 import { buildSteps, estimateSeconds, formatDuration, PlanItem, WorkoutMode } from '@/lib/workoutEngine'
+import { loadSession, clearSession, describeProgress, timerSessionKey, SavedSession } from '@/lib/workoutSession'
 
 // 训练计时器：临时自己组一套动作来练，不需要有课后作业。
 //
@@ -98,6 +99,37 @@ function TimerInner() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
   const [savedClassId, setSavedClassId] = useState('')
+
+  // 上次没练完的存档
+  const sessionKey = timerSessionKey()
+  const [resumable, setResumable] = useState<SavedSession | null>(null)
+  const [resumeFrom, setResumeFrom] = useState<RunnerProgress | undefined>(undefined)
+
+  useEffect(() => { setResumable(loadSession(sessionKey)) }, [sessionKey])
+
+  // 继续上次：把存档里的动作反填回编辑行，这样 plan 和存档完全一致，
+  // 不用再维护一条「存档专用」的数据通路。
+  const handleResume = (s: SavedSession) => {
+    setItems(s.plan.map(p => ({
+      key: p.key,
+      name: p.name,
+      work: String(p.workSec),
+      sets: String(p.sets),
+      rest: String(p.restSec),
+      exerciseId: p.exerciseId ?? null,
+      skipped: p.skipped,
+    })))
+    setMode(s.mode)
+    setTransitionRest(s.transitionRest)
+    setResumeFrom({ stepIdx: s.stepIdx, remaining: s.remaining, doneSets: s.doneSets || {} })
+    setResumable(null)
+    setStage('running')
+  }
+
+  const handleDiscardResume = () => {
+    clearSession(sessionKey)
+    setResumable(null)
+  }
 
   const isClient = userRole === 'CLIENT'
 
@@ -203,7 +235,7 @@ function TimerInner() {
               <p style={{ margin: '14px 0 10px', textAlign: 'right', fontSize: 13, color: '#c0392b' }}>全部跳过了</p>
             )}
 
-            <button onClick={() => setStage('running')} disabled={validCount === 0}
+            <button onClick={() => { setResumeFrom(undefined); setStage('running') }} disabled={validCount === 0}
               style={{
                 width: '100%', padding: 14, borderRadius: 10, border: 'none',
                 background: validCount === 0 ? 'var(--c-lavender)' : 'var(--c-brand)',
@@ -225,6 +257,8 @@ function TimerInner() {
         plan={plan} mode={mode} transitionRest={transitionRest}
         title={names.length <= 1 ? (names[0] || '训练计时器') : '训练计时器'}
         onExit={handleExit}
+        sessionKey={sessionKey}
+        initial={resumeFrom}
       />
     )
   }
@@ -280,7 +314,7 @@ function TimerInner() {
             ) : null}
 
             <div style={{ marginTop: 22, display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button onClick={() => setStage('running')}
+              <button onClick={() => { setResumeFrom(undefined); setStage('running') }}
                 style={{ padding: '10px 22px', borderRadius: 999, border: '1.5px solid white', background: 'transparent', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                 🔁 再来一遍
               </button>
@@ -304,6 +338,32 @@ function TimerInner() {
       </header>
 
       <main style={{ padding: 20, maxWidth: 460, margin: '0 auto' }}>
+        {/* 上次练到一半退出了（返回、关页面、手机没电），进度还留着 */}
+        {resumable && (
+          <div style={{
+            background: 'var(--c-fill-light)', border: '1px solid var(--c-border-em)',
+            borderRadius: 'var(--r-lg)', padding: 16, marginBottom: 16,
+          }}>
+            <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)' }}>
+              上次还没练完
+            </p>
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--c-text-secondary)' }}>
+              {describeProgress(resumable)}
+              　·　{resumable.plan.filter(p => !p.skipped).length} 个动作
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => handleResume(resumable)}
+                style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: 'var(--c-brand)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                ▶ 继续上次
+              </button>
+              <button onClick={handleDiscardResume}
+                style={{ padding: '10px 16px', borderRadius: 8, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-text-secondary)', fontSize: 14, cursor: 'pointer' }}>
+                重新开始
+              </button>
+            </div>
+          </div>
+        )}
+
         <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 20 }}>
           <p style={{ margin: '0 0 4px', fontSize: 13, color: 'var(--c-text-secondary)' }}>练什么</p>
           <p style={{ margin: '0 0 12px', fontSize: 11, color: '#aaa' }}>
@@ -364,7 +424,7 @@ function TimerInner() {
 
           {/* 多个动作时先过一遍确认页（看最终顺序、选练法）；单个动作没什么可确认的，直接开始 */}
           <button
-            onClick={() => setStage(items.length > 1 ? 'confirm' : 'running')}
+            onClick={() => { setResumeFrom(undefined); setStage(items.length > 1 ? 'confirm' : 'running') }}
             disabled={validCount === 0}
             style={{
               width: '100%', padding: 14, borderRadius: 10, border: 'none',

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useBeeper, vibrate, useWakeLock } from '@/lib/timerKit'
 import { buildSteps, PlanItem, Step, WorkoutMode } from '@/lib/workoutEngine'
+import { saveSession, clearSession } from '@/lib/workoutSession'
 
 // 连播播放器的运行界面：准备 → 训练 → 休息 → 换动作 → 结束。
 // 课后作业连播和计时器共用这一个组件，两边只是「开始前的设置页」和「练完怎么记录」不一样。
@@ -24,27 +25,48 @@ export interface RunnerResult {
   finished: boolean                  // true = 自然跑完；false = 中途结束
 }
 
+export interface RunnerProgress {
+  stepIdx: number
+  remaining: number
+  doneSets: Record<number, number>
+}
+
 export default function WorkoutRunner({
-  plan, mode, transitionRest, title, onExit,
+  plan, mode, transitionRest, title, onExit, sessionKey, initial,
 }: {
   plan: PlanItem[]
   mode: WorkoutMode
   transitionRest: number
   title: string
   onExit: (result: RunnerResult) => void
+  /** 传了就把进度存到本地，意外退出后能接着练 */
+  sessionKey?: string
+  /** 从存档继续时的起点 */
+  initial?: RunnerProgress
 }) {
   const steps = useMemo(() => buildSteps(plan, mode, transitionRest), [plan, mode, transitionRest])
   const active = plan.filter(p => !p.skipped && p.workSec > 0 && p.sets > 0)
 
-  const [stepIdx, setStepIdx] = useState(0)
-  const [remaining, setRemaining] = useState(steps[0]?.seconds ?? 0)
-  const [paused, setPaused] = useState(false)
+  const [stepIdx, setStepIdx] = useState(initial?.stepIdx ?? 0)
+  const [remaining, setRemaining] = useState(initial?.remaining ?? steps[0]?.seconds ?? 0)
+  // 从存档继续时先停住——人刚走回手机边上，得有时间摆好姿势
+  const [paused, setPaused] = useState(!!initial)
   const [soundOn, setSoundOn] = useState(true)
-  const [doneSets, setDoneSets] = useState<Record<number, number>>({})
+  const [doneSets, setDoneSets] = useState<Record<number, number>>(initial?.doneSets ?? {})
 
   const beeper = useBeeper(soundOn)
   const lastTickRef = useRef(-1)
+  // 一旦结束就不再写存档。否则「先 clearSession 再 onExit」之后，
+  // 结束那一刻的 setDoneSets 可能再触发一次保存，把刚清掉的存档又写回去，
+  // 下次进来就会提示继续一个其实已经练完并记录过的训练。
+  const endedRef = useRef(false)
   useWakeLock(true)
+
+  const finishRun = (result: RunnerResult) => {
+    endedRef.current = true
+    if (sessionKey) clearSession(sessionKey)
+    onExit(result)
+  }
 
   const step: Step | undefined = steps[stepIdx]
   const phase: Phase = (step?.type ?? 'ready') as Phase
@@ -73,14 +95,35 @@ export default function WorkoutRunner({
     const next = steps[stepIdx + 1]
     if (!next) {
       beeper.finish(); vibrate([150, 100, 150, 100, 300])
-      onExit({ doneSets: nextDone, finished: true })
+      finishRun({ doneSets: nextDone, finished: true })
       return
     }
     if (next.type === 'work') { beeper.goWork(); vibrate(200) }
     else { beeper.goRest(); vibrate(100) }
     setStepIdx(stepIdx + 1)
     setRemaining(next.seconds)
-  }, [paused, remaining, stepIdx, steps, step, doneSets, beeper, onExit])
+  }, [paused, remaining, stepIdx, steps, step, doneSets, beeper, onExit, sessionKey])
+
+  // 每秒把进度写进本地存档。意外退出（返回、关标签页、手机没电）时不会调用 onExit，
+  // 存档就留在那儿，下次进来可以选择继续。正常练完或主动结束会清掉。
+  useEffect(() => {
+    if (!sessionKey || endedRef.current) return
+    saveSession(sessionKey, { title, plan, mode, transitionRest, stepIdx, remaining, doneSets })
+  }, [sessionKey, title, plan, mode, transitionRest, stepIdx, remaining, doneSets])
+
+  // 跳过当前这一条：正在做的那一组，或者正在走的那段休息。
+  // 跳过的组不计入完成——没做就是没做，记录里要如实反映。
+  const skipCurrent = () => {
+    const next = steps[stepIdx + 1]
+    if (!next) {
+      finishRun({ doneSets, finished: true })
+      return
+    }
+    if (next.type === 'work') { beeper.goWork(); vibrate(200) }
+    else { beeper.goRest(); vibrate(100) }
+    setStepIdx(stepIdx + 1)
+    setRemaining(next.seconds)
+  }
 
   // 准备/休息的最后 3 秒滴答提示
   useEffect(() => {
@@ -103,7 +146,8 @@ export default function WorkoutRunner({
     const anyDone = Object.values(doneSets).some(v => v > 0)
     const msg = anyDone ? '结束练习？已经完成的部分会记录下来。' : '结束练习？这次还没有完成任何一组，不会留下记录。'
     if (!window.confirm(msg)) return
-    onExit({ doneSets, finished: false })
+    // 主动结束会走到「完成」页去记录，存档留着会重复，直接清掉
+    finishRun({ doneSets, finished: false })
   }
 
   const warnPulse = (phase === 'ready' || phase === 'rest' || phase === 'transition') && remaining <= 3
@@ -197,12 +241,32 @@ export default function WorkoutRunner({
             </div>
           )}
 
-          <div style={{ marginTop: 30 }}>
+          <div style={{ marginTop: 30, display: 'flex', gap: 12, justifyContent: 'center' }}>
             <button onClick={() => setPaused(p => !p)}
-              style={{ padding: '10px 28px', borderRadius: 999, border: `1.5px solid ${colors.fg}`, background: 'transparent', color: colors.fg, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              style={{
+                padding: '12px 30px', borderRadius: 999, fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                // 暂停时把「继续」做成实心主按钮，一眼能找到怎么接着练
+                border: `1.5px solid ${colors.fg}`,
+                background: paused ? colors.fg : 'transparent',
+                color: paused ? colors.bg : colors.fg,
+              }}>
               {paused ? '▶ 继续' : '⏸ 暂停'}
             </button>
+            <button onClick={skipCurrent}
+              title={phase === 'work' ? '跳过这一组' : '跳过这段休息'}
+              style={{
+                padding: '12px 22px', borderRadius: 999, fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                border: `1.5px solid ${colors.fg}`, background: 'transparent', color: colors.fg, opacity: 0.85,
+              }}>
+              ⏭ 跳过{phase === 'work' ? '这组' : '休息'}
+            </button>
           </div>
+
+          {paused && (
+            <p style={{ margin: '14px 0 0', fontSize: 12, opacity: 0.8 }}>
+              已暂停，计时停住了
+            </p>
+          )}
         </div>
       </main>
 

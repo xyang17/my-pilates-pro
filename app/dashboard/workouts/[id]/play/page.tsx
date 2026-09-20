@@ -4,9 +4,10 @@ import { useAuth } from '@/context/AuthContext'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import WorkoutRunner, { RunnerResult } from '@/components/WorkoutRunner'
+import WorkoutRunner, { RunnerResult, RunnerProgress } from '@/components/WorkoutRunner'
 import PlanEditor from '@/components/PlanEditor'
 import { buildSteps, estimateSeconds, formatDuration, PlanItem, WorkoutMode } from '@/lib/workoutEngine'
+import { loadSession, clearSession, describeProgress, homeworkSessionKey, SavedSession } from '@/lib/workoutSession'
 
 // 课后作业「连播」：点一次从头跑到尾，自动倒计时、自动休息、自动切下一个动作。
 //
@@ -65,6 +66,11 @@ export default function WorkoutPlayerPage() {
   const [savedClassId, setSavedClassId] = useState('')
   const [hwCompleted, setHwCompleted] = useState(false)
 
+  // 上次没练完的存档（每份作业各自一个）
+  const sessionKey = homeworkSessionKey(homeworkId)
+  const [resumable, setResumable] = useState<SavedSession | null>(null)
+  const [resumeFrom, setResumeFrom] = useState<RunnerProgress | undefined>(undefined)
+
   useEffect(() => {
     if (!authLoading && !user) { router.push('/auth/login'); return }
     if (user) loadHomework()
@@ -102,6 +108,24 @@ export default function WorkoutPlayerPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  useEffect(() => { setResumable(loadSession(sessionKey)) }, [sessionKey])
+
+  // 继续上次：直接用存档里的动作顺序和参数，而不是重新拉到的作业——
+  // 万一教练中途改了作业，也不会让学员练到一半突然换内容。
+  const handleResume = (sv: SavedSession) => {
+    setPlan(sv.plan)
+    setMode(sv.mode)
+    setTransitionRest(sv.transitionRest)
+    setResumeFrom({ stepIdx: sv.stepIdx, remaining: sv.remaining, doneSets: sv.doneSets || {} })
+    setResumable(null)
+    setStage('running')
+  }
+
+  const handleDiscardResume = () => {
+    clearSession(sessionKey)
+    setResumable(null)
   }
 
   const active = plan.filter(p => !p.skipped)
@@ -181,6 +205,8 @@ export default function WorkoutPlayerPage() {
       <WorkoutRunner
         plan={plan} mode={mode} transitionRest={transitionRest}
         title={hw.title} onExit={handleExit}
+        sessionKey={sessionKey}
+        initial={resumeFrom}
       />
     )
   }
@@ -256,6 +282,31 @@ export default function WorkoutPlayerPage() {
       </header>
 
       <main style={{ padding: 20, maxWidth: 420, margin: '0 auto' }}>
+        {/* 上次练到一半退出了，进度还留着 */}
+        {resumable && (
+          <div style={{
+            background: 'var(--c-fill-light)', border: '1px solid var(--c-border-em)',
+            borderRadius: 'var(--r-lg)', padding: 16, marginBottom: 16,
+          }}>
+            <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)' }}>
+              上次还没练完
+            </p>
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--c-text-secondary)' }}>
+              {describeProgress(resumable)}
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => handleResume(resumable)}
+                style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: 'var(--c-brand)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                ▶ 继续上次
+              </button>
+              <button onClick={handleDiscardResume}
+                style={{ padding: '10px 16px', borderRadius: 8, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-text-secondary)', fontSize: 14, cursor: 'pointer' }}>
+                重新开始
+              </button>
+            </div>
+          </div>
+        )}
+
         {plan.length === 0 ? (
           <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 28, textAlign: 'center' }}>
             <p style={{ margin: '0 0 8px', fontWeight: 600 }}>这份作业没有可连播的动作</p>
@@ -278,7 +329,7 @@ export default function WorkoutPlayerPage() {
               <p style={{ margin: '14px 0 10px', textAlign: 'right', fontSize: 13, color: '#c0392b' }}>全部跳过了</p>
             )}
 
-            <button onClick={() => setStage('running')} disabled={active.length === 0}
+            <button onClick={() => { setResumeFrom(undefined); setStage('running') }} disabled={active.length === 0}
               style={{
                 width: '100%', padding: 14, borderRadius: 10, border: 'none',
                 background: active.length === 0 ? 'var(--c-lavender)' : 'var(--c-brand)',
