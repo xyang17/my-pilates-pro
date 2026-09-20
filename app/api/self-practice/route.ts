@@ -43,12 +43,18 @@ export async function POST(req: NextRequest) {
       const totalPlanned = list.filter(e => !e.skipped).length
       const allDone = list.every(e => e.skipped || Number(e.done_sets) >= Number(e.planned_sets))
 
-      // 总时长：每个动作 实际完成组数 × 单组时长，加上休息，向上取整到分钟
-      const totalSec = list.reduce((sum, e) => {
-        const sets = Number(e.done_sets) || 0
-        return sum + sets * (Number(e.work_sec) || 0) + Math.max(0, sets - 1) * (Number(e.rest_sec) || 0)
+      // 总时长按「实际练了多少秒」算：整组做完记满，中途跳过只算跳走之前那部分。
+      // done_sec 是播放器实测的，比拿组数乘时长更准。旧调用没传就退回按组数估。
+      const totalWorkSec = list.reduce((sum, e) => {
+        const measured = Number(e.done_sec)
+        if (Number.isFinite(measured) && measured > 0) return sum + measured
+        return sum + (Number(e.done_sets) || 0) * (Number(e.work_sec) || 0)
       }, 0)
-      const durationMin = Math.max(1, Math.ceil(totalSec / 60))
+      const totalRestSec = list.reduce((sum, e) => {
+        const sets = Number(e.done_sets) || 0
+        return sum + Math.max(0, sets - 1) * (Number(e.rest_sec) || 0)
+      }, 0)
+      const durationMin = Math.max(1, Math.ceil((totalWorkSec + totalRestSec) / 60))
 
       const title = (body.title || '').trim() || '课后作业'
       const parts = list.map(e => {
@@ -56,7 +62,10 @@ export async function POST(req: NextRequest) {
         const d = Number(e.done_sets) || 0
         const p = Number(e.planned_sets) || 0
         const mark = d >= p ? `${d}组` : `${d}/${p}组`
-        return `${e.name} ${e.work_sec}秒 × ${mark}`
+        // 不够一整组的零头时间单独标出来——练了 25 秒才跳走，那 25 秒也是练了
+        const sec = Number(e.done_sec) || 0
+        const extra = Math.max(0, Math.round(sec - d * (Number(e.work_sec) || 0)))
+        return `${e.name} ${e.work_sec}秒 × ${mark}` + (extra > 0 ? `（另做 ${extra}秒）` : '')
       })
       const summary = `自我练习（${body.circuit_mode === 'circuit' ? '循环' : '顺序'}）：` +
         parts.join('；') +
@@ -81,19 +90,30 @@ export async function POST(req: NextRequest) {
 
       if (clsErr) return NextResponse.json({ error: clsErr.message }, { status: 400 })
 
-      // 每个真正做了的动作写一条明细；跳过的不写，避免污染训练量统计
+      // 每个真正练到的动作写一条明细；跳过的不写，避免污染训练量统计。
+      // 只做了零头时间、一组都没凑满的也要记——练了就是练了。
       const exRows = list
-        .filter(e => e.exercise_id && !e.skipped && Number(e.done_sets) > 0)
-        .map((e, i) => ({
-          class_id: cls.id,
-          exercise_id: e.exercise_id,
-          order: i + 1,
-          sets: Number(e.planned_sets) || null,
-          actual_sets: Number(e.done_sets) || null,
-          duration: Number(e.work_sec) || null,
-          duration_unit: 'seconds',
-          post_note: Number(e.done_sets) < Number(e.planned_sets) ? '未做完' : null,
-        }))
+        .filter(e => e.exercise_id && !e.skipped && (Number(e.done_sets) > 0 || Number(e.done_sec) > 0))
+        .map((e, i) => {
+          const d = Number(e.done_sets) || 0
+          const p = Number(e.planned_sets) || 0
+          const sec = Number(e.done_sec) || 0
+          const extra = Math.max(0, Math.round(sec - d * (Number(e.work_sec) || 0)))
+          const notes = [
+            d < p ? '未做完' : null,
+            extra > 0 ? `另做 ${extra} 秒` : null,
+          ].filter(Boolean)
+          return {
+            class_id: cls.id,
+            exercise_id: e.exercise_id,
+            order: i + 1,
+            sets: p || null,
+            actual_sets: d || null,
+            duration: Number(e.work_sec) || null,
+            duration_unit: 'seconds',
+            post_note: notes.length > 0 ? notes.join('；') : null,
+          }
+        })
 
       if (exRows.length > 0) {
         const { error: exErr } = await supabaseAdmin.from('class_exercise_instance').insert(exRows)

@@ -22,6 +22,8 @@ export interface SavedSession {
   stepIdx: number
   remaining: number
   doneSets: Record<number, number>
+  /** 实际训练秒数（含被跳过那一组的零头）。老存档没有这个字段，读出来当空对象处理 */
+  doneSec?: Record<number, number>
   savedAt: number
 }
 

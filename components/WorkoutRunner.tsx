@@ -21,7 +21,8 @@ const COLORS: Record<Phase, { bg: string; fg: string }> = {
 }
 
 export interface RunnerResult {
-  doneSets: Record<number, number>   // key = plan 下标
+  doneSets: Record<number, number>   // key = plan 下标，完整做完的组数
+  doneSec: Record<number, number>    // 实际训练秒数，含被跳过那一组已经做掉的部分
   finished: boolean                  // true = 自然跑完；false = 中途结束
 }
 
@@ -29,6 +30,7 @@ export interface RunnerProgress {
   stepIdx: number
   remaining: number
   doneSets: Record<number, number>
+  doneSec?: Record<number, number>
 }
 
 export default function WorkoutRunner({
@@ -53,6 +55,9 @@ export default function WorkoutRunner({
   const [paused, setPaused] = useState(!!initial)
   const [soundOn, setSoundOn] = useState(true)
   const [doneSets, setDoneSets] = useState<Record<number, number>>(initial?.doneSets ?? {})
+  // 实际练了多少秒。整组做完记满，中途跳过/结束只记已经做掉的那部分——
+  // 练了 25 秒才跳走，这 25 秒也是练了，不该当成没做。
+  const [doneSec, setDoneSec] = useState<Record<number, number>>(initial?.doneSec ?? {})
 
   const beeper = useBeeper(soundOn)
   const lastTickRef = useRef(-1)
@@ -87,36 +92,47 @@ export default function WorkoutRunner({
 
     // 这个阶段结束：先结算，再进下一条
     let nextDone = doneSets
+    let nextSec = doneSec
     if (step.type === 'work') {
       nextDone = { ...doneSets, [step.exIdx]: (doneSets[step.exIdx] || 0) + 1 }
+      nextSec = { ...doneSec, [step.exIdx]: (doneSec[step.exIdx] || 0) + step.seconds }
       setDoneSets(nextDone)
+      setDoneSec(nextSec)
     }
 
     const next = steps[stepIdx + 1]
     if (!next) {
       beeper.finish(); vibrate([150, 100, 150, 100, 300])
-      finishRun({ doneSets: nextDone, finished: true })
+      finishRun({ doneSets: nextDone, doneSec: nextSec, finished: true })
       return
     }
     if (next.type === 'work') { beeper.goWork(); vibrate(200) }
     else { beeper.goRest(); vibrate(100) }
     setStepIdx(stepIdx + 1)
     setRemaining(next.seconds)
-  }, [paused, remaining, stepIdx, steps, step, doneSets, beeper, onExit, sessionKey])
+  }, [paused, remaining, stepIdx, steps, step, doneSets, doneSec, beeper, onExit, sessionKey])
 
   // 每秒把进度写进本地存档。意外退出（返回、关标签页、手机没电）时不会调用 onExit，
   // 存档就留在那儿，下次进来可以选择继续。正常练完或主动结束会清掉。
   useEffect(() => {
     if (!sessionKey || endedRef.current) return
-    saveSession(sessionKey, { title, plan, mode, transitionRest, stepIdx, remaining, doneSets })
-  }, [sessionKey, title, plan, mode, transitionRest, stepIdx, remaining, doneSets])
+    saveSession(sessionKey, { title, plan, mode, transitionRest, stepIdx, remaining, doneSets, doneSec })
+  }, [sessionKey, title, plan, mode, transitionRest, stepIdx, remaining, doneSets, doneSec])
 
   // 跳过当前这一条：正在做的那一组，或者正在走的那段休息。
-  // 跳过的组不计入完成——没做就是没做，记录里要如实反映。
+  // 跳过的组不算「完整一组」，但跳走之前已经做掉的秒数会记下来。
   const skipCurrent = () => {
+    let nextSec = doneSec
+    if (step?.type === 'work') {
+      const elapsed = Math.max(0, step.seconds - remaining)
+      if (elapsed > 0) {
+        nextSec = { ...doneSec, [step.exIdx]: (doneSec[step.exIdx] || 0) + elapsed }
+        setDoneSec(nextSec)
+      }
+    }
     const next = steps[stepIdx + 1]
     if (!next) {
-      finishRun({ doneSets, finished: true })
+      finishRun({ doneSets, doneSec: nextSec, finished: true })
       return
     }
     if (next.type === 'work') { beeper.goWork(); vibrate(200) }
@@ -143,11 +159,18 @@ export default function WorkoutRunner({
   }, [remaining, currentEx])
 
   const handleQuit = () => {
-    const anyDone = Object.values(doneSets).some(v => v > 0)
-    const msg = anyDone ? '结束练习？已经完成的部分会记录下来。' : '结束练习？这次还没有完成任何一组，不会留下记录。'
+    // 正在做的这一组虽然没做完，已经做掉的秒数照样算
+    let nextSec = doneSec
+    if (step?.type === 'work') {
+      const elapsed = Math.max(0, step.seconds - remaining)
+      if (elapsed > 0) nextSec = { ...doneSec, [step.exIdx]: (doneSec[step.exIdx] || 0) + elapsed }
+    }
+    // 判断「有没有东西可记」要把零头时间也算上——
+    // 只做了 25 秒就退出，doneSets 是空的，但那 25 秒不该当作没练过
+    const anyDone = Object.values(doneSets).some(v => v > 0) || Object.values(nextSec).some(v => v > 0)
+    const msg = anyDone ? '结束练习？已经完成的部分会记录下来。' : '结束练习？这次还没练到，不会留下记录。'
     if (!window.confirm(msg)) return
-    // 主动结束会走到「完成」页去记录，存档留着会重复，直接清掉
-    finishRun({ doneSets, finished: false })
+    finishRun({ doneSets, doneSec: nextSec, finished: false })
   }
 
   const warnPulse = (phase === 'ready' || phase === 'rest' || phase === 'transition') && remaining <= 3

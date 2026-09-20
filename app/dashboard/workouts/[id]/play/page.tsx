@@ -118,7 +118,7 @@ export default function WorkoutPlayerPage() {
     setPlan(sv.plan)
     setMode(sv.mode)
     setTransitionRest(sv.transitionRest)
-    setResumeFrom({ stepIdx: sv.stepIdx, remaining: sv.remaining, doneSets: sv.doneSets || {} })
+    setResumeFrom({ stepIdx: sv.stepIdx, remaining: sv.remaining, doneSets: sv.doneSets || {}, doneSec: sv.doneSec || {} })
     setResumable(null)
     setStage('running')
   }
@@ -148,7 +148,9 @@ export default function WorkoutPlayerPage() {
   }
 
   const handleExit = (r: RunnerResult) => {
+    // 零头时间也算练过，不能因为没凑满一组就丢掉
     const anyDone = Object.values(r.doneSets).some(v => v > 0)
+      || Object.values(r.doneSec || {}).some(v => v > 0)
     if (!anyDone) { setStage('setup'); return }
     setResult(r)
     setSaveState('idle'); setSaveError(''); setSavedClassId(''); setHwCompleted(false)
@@ -173,6 +175,7 @@ export default function WorkoutPlayerPage() {
             rest_sec: p.restSec,
             planned_sets: p.sets,
             done_sets: result.doneSets[idx] || 0,
+            done_sec: result.doneSec?.[idx] || 0,
             skipped: p.skipped,
           })),
         }),
@@ -227,10 +230,16 @@ export default function WorkoutPlayerPage() {
             <div style={{ margin: '16px 0 22px', textAlign: 'left', background: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: '12px 14px' }}>
               {plan.map((p, idx) => {
                 const d = result.doneSets[idx] || 0
+                const sec = result.doneSec?.[idx] || 0
+                // 跳走之前做掉的零头时间（不够一整组的那部分）也显示出来
+                const extra = Math.max(0, sec - d * p.workSec)
                 return (
                   <div key={p.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', opacity: p.skipped ? 0.6 : 1 }}>
                     <span>{p.name}</span>
-                    <span>{p.skipped ? '跳过' : d >= p.sets ? `${d} 组 ✓` : `${d}/${p.sets} 组`}</span>
+                    <span>
+                      {p.skipped ? '跳过' : d >= p.sets ? `${d} 组 ✓` : `${d}/${p.sets} 组`}
+                      {!p.skipped && extra > 0 && <span style={{ opacity: 0.8 }}> +{extra}秒</span>}
+                    </span>
                   </div>
                 )
               })}
