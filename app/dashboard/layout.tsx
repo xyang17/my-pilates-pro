@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -34,6 +34,7 @@ import {
   Clock,
   CalendarCheck,
   Timer,
+  Bell,
 } from 'lucide-react'
 
 interface NavGroup {
@@ -66,6 +67,7 @@ const trainerNav: NavGroup[] = [
       { label: '训练方案', href: '/dashboard/programs',   icon: Trophy },
       { label: '课后作业', href: '/dashboard/workouts',   icon: ClipboardList },
       { label: '计时器',   href: '/dashboard/timer',      icon: Timer },
+      { label: '消息',    href: '/dashboard/notifications', icon: Bell },
       { label: '统计',    href: '/dashboard/stats',      icon: BarChart3 },
     ],
   },
@@ -79,6 +81,7 @@ const clientNav: NavGroup[] = [
       { label: '我的课程', href: '/dashboard/classes',   icon: Dumbbell },
       { label: '课后作业', href: '/dashboard/workouts',  icon: ClipboardList },
       { label: '计时器',   href: '/dashboard/timer',     icon: Timer },
+      { label: '消息',     href: '/dashboard/notifications', icon: Bell },
       { label: '训练方案', href: '/dashboard/programs',  icon: Trophy },
       { label: '我的主页', href: '/dashboard/profile',   icon: User },
     ],
@@ -129,6 +132,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const displayName = user.user_metadata?.name || user.email || ''
   const initials = displayName.slice(0, 2).toUpperCase()
 
+  // 未读消息数，用于导航上的小红点。打开消息页会重新拉，这里只要个数字。
+  const [unread, setUnread] = useState(0)
+  useEffect(() => {
+    if (!user) return
+    let alive = true
+    const fetchUnread = () => {
+      fetch('/api/notifications?count=1', {
+        headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' },
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (alive && d) setUnread(d.unread || 0) })
+        .catch(() => {})
+    }
+    fetchUnread()
+    // 页面切回前台时刷一次，不做轮询——没必要为这个一直打接口
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchUnread() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { alive = false; document.removeEventListener('visibilitychange', onVisible) }
+  }, [user, userRole, pathname])
+
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
 
@@ -177,6 +200,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       >
                         <Icon size={15} />
                         <span>{item.label}</span>
+                        {item.href === '/dashboard/notifications' && unread > 0 && (
+                          <span style={{
+                            marginLeft: 'auto', minWidth: 18, height: 18, padding: '0 5px',
+                            borderRadius: 9, background: 'var(--c-brand)', color: '#fff',
+                            fontSize: 10, fontWeight: 700,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {unread > 99 ? '99+' : unread}
+                          </span>
+                        )}
                       </Link>
                     </SidebarMenuItem>
                   )

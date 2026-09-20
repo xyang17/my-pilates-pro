@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { projectClassForRole } from '@/lib/db'
+import { notifyClient } from '@/lib/notifications'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -82,6 +83,14 @@ export async function PUT(
     if (body.post_summary    !== undefined) updates.post_summary    = body.post_summary
     if (body.completed_at    !== undefined) updates.completed_at    = body.completed_at
 
+    // 改期提醒要跟旧值比对才知道时间是不是真的变了。
+    // 这个接口被复盘页频繁调用（存课后总结、改状态），不能一更新就发消息。
+    const { data: before } = await supabaseAdmin
+      .from('class')
+      .select('date, start_time, assigned_to, class_type, name')
+      .eq('id', id)
+      .maybeSingle()
+
     const { data, error } = await supabaseAdmin
       .from('class')
       .update(updates)
@@ -92,7 +101,30 @@ export async function PUT(
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     if (!data || data.length === 0) return NextResponse.json({ error: 'Not found or unauthorized' }, { status: 404 })
 
-    return NextResponse.json(data[0])
+    const after = data[0]
+    const timeChanged = !!before && (
+      (updates.date !== undefined && before.date !== after.date) ||
+      (updates.start_time !== undefined && before.start_time !== after.start_time)
+    )
+    if (timeChanged && after.assigned_to && after.class_type !== 'self_practice') {
+      try {
+        const hhmm = after.start_time ? ` ${String(after.start_time).slice(0, 5)}` : ''
+        await notifyClient({
+          clientId: after.assigned_to,
+          type: 'class_updated',
+          title: '课程时间有变动',
+          body: `${after.name} 改到 ${after.date}${hhmm}`,
+          link: `/dashboard/classes/${after.id}`,
+          fromTrainerId: userId,
+          // 同一节课改到同一个时间不重复提醒；真改到别的时间会是新的 key
+          dedupeKey: `class_upd:${after.id}:${after.date}:${after.start_time || ''}`,
+        })
+      } catch (e: any) {
+        console.error('[classes] update notify failed:', e?.message)
+      }
+    }
+
+    return NextResponse.json(after)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

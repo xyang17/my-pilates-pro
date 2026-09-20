@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { trainersOfClient, pushNotification } from '@/lib/notifications'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,6 +22,33 @@ const supabaseAdmin = createClient(
 // 都显式排掉了 class_type='self_practice'，不会虚增课时和收入。改这里时记得一并检查那三处。
 //
 // 权限：只能记到自己名下——不接受传别人的 user_id，教练不能代记。
+
+// 学员练完给带过他的教练发条站内消息。
+// 发消息失败绝不能影响训练记录本身——记录才是主角，消息是附带的。
+async function notifyTrainers(opts: {
+  clientId: string
+  classId: string
+  summaryLine: string
+}) {
+  try {
+    const { data: me } = await supabaseAdmin
+      .from('user').select('name, email').eq('id', opts.clientId).single()
+    const who = me?.name || me?.email || '学员'
+
+    const trainers = await trainersOfClient(opts.clientId)
+    await Promise.all(trainers.map(tid => pushNotification({
+      user_id: tid,
+      type: 'self_practice',
+      title: `${who} 完成了一次自我练习`,
+      body: opts.summaryLine,
+      link: `/dashboard/classes/${opts.classId}`,
+      related_user_id: opts.clientId,
+    })))
+  } catch (e: any) {
+    console.error('[self-practice] notify failed:', e?.message)
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const userId = req.headers.get('x-user-id')
@@ -133,6 +161,8 @@ export async function POST(req: NextRequest) {
         homeworkCompleted = !hwErr
       }
 
+      await notifyTrainers({ clientId: userId, classId: cls.id, summaryLine: summary })
+
       return NextResponse.json({ ...cls, homework_completed: homeworkCompleted }, { status: 201 })
     }
 
@@ -185,6 +215,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ...cls, warning: `动作明细未记录：${exErr.message}` }, { status: 201 })
       }
     }
+
+    await notifyTrainers({ clientId: userId, classId: cls.id, summaryLine: summary })
 
     return NextResponse.json(cls, { status: 201 })
   } catch (error: any) {

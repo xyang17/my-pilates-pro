@@ -7,7 +7,7 @@ import Link from 'next/link'
 import {
   Calendar, ChevronRight, Clock, Users, ClipboardCheck, Plus,
   Dumbbell, Activity, BookOpen, Trophy, ClipboardList, BarChart3, Ticket, User,
-  CalendarCheck, Timer,
+  CalendarCheck, Timer, Bell,
 } from 'lucide-react'
 
 interface ClassItem {
@@ -103,6 +103,7 @@ export default function DashboardPage() {
         { label: '训练方案', href: '/dashboard/programs',     icon: Trophy },
         { label: '课后作业', href: '/dashboard/workouts',     icon: ClipboardCheck },
         { label: '计时器',   href: '/dashboard/timer',        icon: Timer },
+        { label: '消息',     href: '/dashboard/notifications', icon: Bell },
         { label: '统计',     href: '/dashboard/stats',        icon: BarChart3 },
         ...(userRole === 'ADMIN'
           ? [{ label: '邀请码', href: '/dashboard/invite-codes', icon: Ticket }]
@@ -120,6 +121,7 @@ export default function DashboardPage() {
         { label: '训练方案', href: '/dashboard/programs',     icon: Trophy },
         { label: '课后作业', href: '/dashboard/workouts',     icon: ClipboardCheck },
         { label: '计时器',   href: '/dashboard/timer',        icon: Timer },
+        { label: '消息',     href: '/dashboard/notifications', icon: Bell },
         { label: '我的主页', href: '/dashboard/profile',      icon: User },
       ]
 

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { notifyClient } from '@/lib/notifications'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -128,6 +129,21 @@ export async function POST(
       if (exInsertErr) return NextResponse.json({ error: exInsertErr.message }, { status: 400 })
 
       results.push({ client_id: clientId, homework_id: hw.id })
+
+      // 通知这个学员收到新作业。发消息失败不影响作业已经分发成功
+      try {
+        await notifyClient({
+          clientId,
+          type: 'homework_assigned',
+          title: `${classData.name} 的课后作业来了`,
+          body: `共 ${exRows.length} 个动作` + (due_date ? `，截止 ${due_date}` : ''),
+          link: '/dashboard/workouts',
+          fromTrainerId: userId,
+          dedupeKey: `hw:${hw.id}`,
+        })
+      } catch (e: any) {
+        console.error('[distribute] notify failed:', e?.message)
+      }
     }
 
     const created = results.filter(r => !r.skipped).length

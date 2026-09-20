@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { projectClassListForRole } from '@/lib/db'
+import { notifyClient } from '@/lib/notifications'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -114,6 +115,26 @@ export async function POST(req: NextRequest) {
           sort_order: i,
         }))
       )
+    }
+
+    // 私教课排给了某个学员，通知他。发消息失败不影响课已经建好
+    if (data.assigned_to && data.class_type !== 'self_practice') {
+      try {
+        const { data: coach } = await supabaseAdmin
+          .from('user').select('name, email').eq('id', userId).single()
+        const who = coach?.name || coach?.email || '教练'
+        await notifyClient({
+          clientId: data.assigned_to,
+          type: 'class_scheduled',
+          title: `${who} 给你排了新课`,
+          body: `${data.name}　${data.date}` + (data.start_time ? ` ${String(data.start_time).slice(0, 5)}` : ''),
+          link: `/dashboard/classes/${data.id}`,
+          fromTrainerId: userId,
+          dedupeKey: `class_new:${data.id}`,
+        })
+      } catch (e: any) {
+        console.error('[classes] notify failed:', e?.message)
+      }
     }
 
     return NextResponse.json(data, { status: 201 })
