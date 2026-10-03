@@ -7,7 +7,7 @@ import Link from 'next/link'
 import {
   Calendar, ChevronRight, Clock, Users, ClipboardCheck, Plus,
   Dumbbell, Activity, BookOpen, Trophy, ClipboardList, BarChart3, Ticket, User,
-  CalendarCheck, Timer, Bell,
+  CalendarCheck, Timer, Bell, NotebookPen,
 } from 'lucide-react'
 
 interface ClassItem {
@@ -103,6 +103,8 @@ export default function DashboardPage() {
         { label: '训练方案', href: '/dashboard/programs',     icon: Trophy },
         { label: '课后作业', href: '/dashboard/workouts',     icon: ClipboardCheck },
         { label: '计时器',   href: '/dashboard/timer',        icon: Timer },
+        // 临时入口，导航重构时并进「我的训练」板块
+        { label: '训练记录', href: '/dashboard/my-training/records', icon: NotebookPen },
         { label: '消息',     href: '/dashboard/notifications', icon: Bell },
         { label: '统计',     href: '/dashboard/stats',        icon: BarChart3 },
         ...(userRole === 'ADMIN'

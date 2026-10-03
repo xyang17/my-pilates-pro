@@ -35,6 +35,7 @@ import {
   CalendarCheck,
   Timer,
   Bell,
+  NotebookPen,
 } from 'lucide-react'
 
 interface NavGroup {
@@ -69,6 +70,13 @@ const trainerNav: NavGroup[] = [
       { label: '计时器',   href: '/dashboard/timer',      icon: Timer },
       { label: '消息',    href: '/dashboard/notifications', icon: Bell },
       { label: '统计',    href: '/dashboard/stats',      icon: BarChart3 },
+    ],
+  },
+  // 临时入口：导航重构（底栏 4 个 + 首页宫格）做完后会改成独立的「我的训练」板块
+  {
+    label: '我的训练',
+    items: [
+      { label: '训练记录', href: '/dashboard/my-training/records', icon: NotebookPen },
     ],
   },
 ]
@@ -115,23 +123,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!loading && !user) router.replace('/auth/login')
   }, [loading, user, router])
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--c-text-secondary)' }}>
-      加载中…
-    </div>
-  )
-  if (!user) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--c-text-secondary)', fontSize: 14 }}>
-      正在跳转登录…
-    </div>
-  )
-
-  const isTrainer = userRole === 'TRAINER' || userRole === 'ADMIN'
-  const navGroups = isTrainer ? trainerNav : clientNav
-  const tabs = isTrainer ? trainerTabs : clientTabs
-  const displayName = user.user_metadata?.name || user.email || ''
-  const initials = displayName.slice(0, 2).toUpperCase()
-
   // 未读消息数，用于导航上的小红点。打开消息页会重新拉，这里只要个数字。
   const [unread, setUnread] = useState(0)
   useEffect(() => {
@@ -151,6 +142,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     document.addEventListener('visibilitychange', onVisible)
     return () => { alive = false; document.removeEventListener('visibilitychange', onVisible) }
   }, [user, userRole, pathname])
+
+  // 注意：所有 hook 必须写在下面的 if (loading) / if (!user) 提前 return 之前，
+  // 否则加载完成那一刻 hook 数量变了，React 直接报错（Rendered more hooks than during the previous render）。
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--c-text-secondary)' }}>
+      加载中…
+    </div>
+  )
+  if (!user) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--c-text-secondary)', fontSize: 14 }}>
+      正在跳转登录…
+    </div>
+  )
+
+  const isTrainer = userRole === 'TRAINER' || userRole === 'ADMIN'
+  const navGroups = isTrainer ? trainerNav : clientNav
+  const tabs = isTrainer ? trainerTabs : clientTabs
+  const displayName = user.user_metadata?.name || user.email || ''
+  const initials = displayName.slice(0, 2).toUpperCase()
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
