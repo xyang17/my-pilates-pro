@@ -20,13 +20,16 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     try {
-      // 加一个超时兜底：Supabase 客户端在某些情况下（比如多个标签页同时持有登录锁）
-      // 请求会一直不 resolve，导致按钮永远转圈却没有任何提示。
-      // 这里给 15 秒上限，超时就报错让用户重试，而不是无限等待。
+      // 超时兜底，防止请求卡住时按钮永远转圈却没有任何提示。
+      //
+      // 历史：这个超时以前经常被触发，原因不是网络，而是 AuthContext 在
+      // onAuthStateChange 回调里 await 了别的 supabase 查询，跟认证锁死锁了
+      // （详见 context/AuthContext.tsx 顶部注释）。那个问题已经修掉，
+      // 现在这里纯粹是网络异常时的保险，正常情况下不该再出现。
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(t(
-          '登录超时，请刷新页面后重试（如果开了多个标签页，建议先关掉其他标签页）',
-          'Login timed out. Please refresh and try again (if you have multiple tabs open, try closing the others first).'
+          '登录超时，可能是网络不稳定，请检查网络后重试',
+          'Login timed out — this is usually a network issue. Check your connection and try again.'
         ))), 15000)
       )
       const { error } = await Promise.race([
