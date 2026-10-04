@@ -5,6 +5,7 @@ import { useLang } from '@/context/LanguageContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { StatsDetail, ClassDetail } from '@/components/stats/StatsDetail'
 
 type PeriodType = 'week' | 'month' | 'quarter' | 'year' | 'custom'
 type Scope = 'own' | 'store'
@@ -17,6 +18,11 @@ interface Summary {
   revenue: number
   private: TypeStat
   group: TypeStat
+  notDone?: number
+  avgPrice?: number
+  minutes?: number
+  missingPrice?: number
+  activeClients?: number
 }
 interface TrendPoint { label: string; classes: number; revenue: number }
 interface TrainerStat extends Summary { trainer_id: string; name: string }
@@ -28,6 +34,8 @@ interface StatsResponse {
   trend: TrendPoint[]
   byTrainer: TrainerStat[]
   byClient: ClientStat[]
+  prev?: { completed: number; revenue: number }
+  classes?: ClassDetail[]
 }
 interface TrainerRow {
   id: string
@@ -70,6 +78,9 @@ export default function StatsPage() {
   const [data, setData] = useState<StatsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [metric, setMetric] = useState<'revenue' | 'classes'>('revenue')
+  // 课程明细的筛选（点客户排行、点「没填价格」提醒时会联动）
+  const [clientFilter, setClientFilter] = useState<string | null>(null)
+  const [detailStatus, setDetailStatus] = useState<'all' | 'completed' | 'notDone' | 'cancelled' | 'problem'>('all')
 
   const [trainerList, setTrainerList] = useState<TrainerRow[]>([])
   const [savingId, setSavingId] = useState<string | null>(null)
@@ -94,10 +105,10 @@ export default function StatsPage() {
       .catch(() => {})
   }, [user, userRole])
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (silent = false) => {
     if (!user || !userRole || userRole === 'CLIENT') return
     if (periodType === 'custom' && (!customStart || !customEnd || customStart > customEnd)) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const params = periodType === 'custom'
         ? new URLSearchParams({ type: 'custom', start: customStart, end: customEnd, scope })
@@ -116,6 +127,20 @@ export default function StatsPage() {
   }, [user, userRole, periodType, offset, scope, customStart, customEnd])
 
   useEffect(() => { fetchStats() }, [fetchStats])
+  // 换了周期/视角，明细里的「只看某学员」就不一定还有意义了，清掉
+  useEffect(() => { setClientFilter(null) }, [periodType, offset, scope, customStart, customEnd])
+
+  // 明细里改完一节课的价格：先就地更新这一行，再静默重拉一次，让上面的总数、排行跟着变
+  const handlePriceSaved = (id: string, price: number | null) => {
+    setData(prev => prev && prev.classes ? {
+      ...prev,
+      classes: prev.classes.map(c => c.id === id ? { ...c, price, flag: c.flag === 'missing' && price ? null : c.flag } : c),
+    } : prev)
+    fetchStats(true)
+  }
+  const jumpToDetail = () => {
+    setTimeout(() => document.getElementById('class-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }
 
   const changePeriodType = (pt: PeriodType) => { setPeriodType(pt); setOffset(0) }
 
@@ -234,12 +259,50 @@ export default function StatsPage() {
         </div>
 
         {/* KPI 卡片 */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 'var(--sp-4)' }}>
-          <KpiCard label={t('已完成节数', 'Classes Completed')} value={`${summary?.completed ?? 0}`} sub={t(`共排课 ${summary?.totalScheduled ?? 0} 节 · 取消 ${summary?.cancelled ?? 0} 节`, `${summary?.totalScheduled ?? 0} scheduled · ${summary?.cancelled ?? 0} cancelled`)} highlight />
-          <KpiCard label={t('总收入', 'Revenue')} value={fmtMoney(summary?.revenue || 0)} sub={t('仅统计已完成课程', 'Completed classes only')} />
-          <KpiCard label={t('私教', 'Private')} value={`${summary?.private.count ?? 0} ${t('节', '')}`} sub={fmtMoney(summary?.private.revenue || 0)} />
-          <KpiCard label={t('团课', 'Group')} value={`${summary?.group.count ?? 0} ${t('节', '')}`} sub={fmtMoney(summary?.group.revenue || 0)} />
-        </div>
+        {(() => {
+          const prev = data?.prev
+          const showPrev = periodType !== 'custom' || !!prev
+          const change = (cur: number, before: number | undefined) => {
+            if (!showPrev || before === undefined) return undefined
+            if (before === 0) return cur > 0 ? t('上期为 0', 'prev 0') : undefined
+            const pct = Math.round(((cur - before) / before) * 100)
+            return `${t('比上期', 'vs prev')} ${pct >= 0 ? '↑' : '↓'}${Math.abs(pct)}%`
+          }
+          const hours = (summary?.minutes || 0) / 60
+          const done = summary?.completed ?? 0
+          const sched = (summary?.totalScheduled ?? 0)
+          return (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <KpiCard label={t('总收入', 'Revenue')} value={fmtMoney(summary?.revenue || 0)}
+                  sub={[change(summary?.revenue || 0, prev?.revenue), t('只算已完成的课', 'Completed only')].filter(Boolean).join(' · ')} highlight />
+                <KpiCard label={t('已完成', 'Completed')} value={`${done} ${t('节', '')}`}
+                  sub={[change(done, prev?.completed), t(`共 ${hours % 1 ? hours.toFixed(1) : hours} 小时`, `${hours.toFixed(1)} h`)].filter(Boolean).join(' · ')} />
+                <KpiCard label={t('私教', 'Private')} value={`${summary?.private.count ?? 0} ${t('节', '')}`} sub={fmtMoney(summary?.private.revenue || 0)} />
+                <KpiCard label={t('团课', 'Group')} value={`${summary?.group.count ?? 0} ${t('节', '')}`} sub={fmtMoney(summary?.group.revenue || 0)} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 'var(--sp-4)' }}>
+                <MiniStat label={t('平均单价', 'Avg price')} value={summary?.avgPrice ? fmtMoney(summary.avgPrice) : '—'} />
+                <MiniStat label={t('上课学员', 'Clients')} value={`${summary?.activeClients ?? 0} ${t('人', '')}`} />
+                <MiniStat label={t('未上 / 取消', 'Pending / Cancelled')} value={`${summary?.notDone ?? 0} / ${summary?.cancelled ?? 0}`}
+                  sub={sched ? t(`完成率 ${Math.round((done / sched) * 100)}%`, `${Math.round((done / sched) * 100)}% done`) : undefined} />
+              </div>
+              {(summary?.missingPrice ?? 0) > 0 && (
+                <button onClick={() => { setClientFilter(null); setDetailStatus('problem'); jumpToDetail() }}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', marginBottom: 'var(--sp-4)',
+                    background: '#FFF4F3', border: '1px solid #EBC3C0', borderRadius: 12, color: '#A0403C', cursor: 'pointer', textAlign: 'left',
+                  }}>
+                  <span style={{ fontSize: 16 }}>⚠</span>
+                  <span style={{ flex: 1, fontSize: 13, lineHeight: 1.5 }}>
+                    <b>{summary?.missingPrice} 节已完成的课没填价格</b>，收入少算了。点这里逐个补上
+                  </span>
+                  <span>›</span>
+                </button>
+              )}
+            </>
+          )
+        })()}
 
         {/* 趋势图 */}
         <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 'var(--sp-4)', marginBottom: 'var(--sp-4)' }}>
@@ -287,14 +350,17 @@ export default function StatsPage() {
         <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', padding: 'var(--sp-4)', marginBottom: 'var(--sp-4)' }}>
           <h3 style={{ margin: '0 0 4px', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--c-text-primary)' }}>{t('客户对比', 'By Client')}</h3>
           <p style={{ margin: '0 0 10px', fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)' }}>
-            {t('按收入贡献排名；团课收入按当次报名人数平摊', 'Ranked by revenue contribution; group class revenue is split evenly among enrolled students')}
+            {t('按收入贡献排名；团课收入按当次报名人数平摊。点某个学员可以看他每一节课', 'Ranked by revenue; group revenue split among enrolled. Tap a client to see their classes')}
           </p>
           {byClient.length === 0 ? (
             <p style={{ textAlign: 'center', color: 'var(--c-text-hint)', fontSize: 'var(--text-sm)', padding: '16px 0', margin: 0 }}>
               {t('本周期暂无数据', 'No data this period')}
             </p>
           ) : byClient.map((c, i) => (
-            <div key={c.client_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--c-border)' }}>
+            <div key={c.client_id}
+              onClick={() => { setClientFilter(c.client_id); setDetailStatus('all'); jumpToDetail() }}
+              title={t('看这个学员的每一节课', 'See this client\'s classes')}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--c-border)', cursor: 'pointer' }}>
               <span style={{
                 width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
                 background: i < 3 ? 'var(--c-brand)' : 'var(--c-fill-light)',
@@ -311,6 +377,22 @@ export default function StatsPage() {
             </div>
           ))}
         </div>
+
+        {/* 课程明细：每一节课，价格可以直接改 */}
+        {data?.classes && (
+          <StatsDetail
+            classes={data.classes}
+            userId={user.id}
+            userRole={userRole || ''}
+            showTrainer={scope === 'store'}
+            clientFilter={clientFilter}
+            clientName={byClient.find(c => c.client_id === clientFilter)?.name}
+            onClearClient={() => setClientFilter(null)}
+            statusFilter={detailStatus}
+            setStatusFilter={setDetailStatus}
+            onSaved={handlePriceSaved}
+          />
+        )}
 
         {/* ADMIN 权限管理面板 */}
         {userRole === 'ADMIN' && (
@@ -353,6 +435,16 @@ function KpiCard({ label, value, sub, highlight }: { label: string; value: strin
       <p style={{ margin: 0, fontSize: 11, color: 'var(--c-text-hint)' }}>{label}</p>
       <p style={{ margin: '6px 0 2px', fontSize: 22, fontWeight: 700, color: highlight ? 'var(--c-brand)' : 'var(--c-text-primary)' }}>{value}</p>
       {sub && <p style={{ margin: 0, fontSize: 11, color: 'var(--c-text-hint)' }}>{sub}</p>}
+    </div>
+  )
+}
+
+function MiniStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 12, padding: '10px 12px' }}>
+      <p style={{ margin: 0, fontSize: 11, color: 'var(--c-text-hint)' }}>{label}</p>
+      <p style={{ margin: '4px 0 0', fontSize: 16, fontWeight: 700, color: 'var(--c-text-primary)' }}>{value}</p>
+      {sub && <p style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--c-text-hint)' }}>{sub}</p>}
     </div>
   )
 }
