@@ -37,6 +37,11 @@ export default function ClassesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   // 自我练习跟课程排在同一个列表里，用筛选按钮分开看
   const [listFilter, setListFilter] = useState<'all' | 'class' | 'self'>('all')
+  // 教练专用：只看「已完成但还没写复盘」的课。首页的「N 节课待复盘」提醒条会带 ?review=1 进来。
+  const [reviewOnly, setReviewOnly] = useState(false)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('review') === '1') setReviewOnly(true)
+  }, [])
 
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
 
@@ -83,8 +88,13 @@ export default function ClassesPage() {
   const S = (s: string) => STATUS_CONFIG[s] || STATUS_CONFIG.planned
 
   const selfCount = classes.filter(c => c.class_type === 'self_practice').length
+  // 口径跟 /api/dashboard 的 pending_review 一致：status=completed 且 post_summary 为空
+  const needsReview = (c: ClassItem) =>
+    c.class_type !== 'self_practice' && c.status === 'completed' && !(c as any).post_summary
+  const reviewCount = isTrainer ? classes.filter(needsReview).length : 0
   const visibleClasses = classes.filter(c =>
-    listFilter === 'all' ? true
+    isTrainer && reviewOnly ? needsReview(c)
+    : listFilter === 'all' ? true
       : listFilter === 'self' ? c.class_type === 'self_practice'
       : c.class_type !== 'self_practice'
   )
@@ -142,6 +152,26 @@ export default function ClassesPage() {
             marginBottom: 'var(--sp-4)',
             fontSize: 'var(--text-sm)',
           }}>{error}</div>
+        )}
+
+        {isTrainer && (reviewCount > 0 || reviewOnly) && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 'var(--sp-4)' }}>
+            {([
+              { on: false, label: `全部 (${classes.length})` },
+              { on: true,  label: `待复盘 (${reviewCount})` },
+            ]).map(f => (
+              <button key={f.label} onClick={() => setReviewOnly(f.on)}
+                style={{
+                  padding: '5px 14px', borderRadius: 'var(--r-full)', fontSize: 'var(--text-xs)', cursor: 'pointer',
+                  border: `1px solid ${reviewOnly === f.on ? 'var(--c-brand)' : 'var(--c-border)'}`,
+                  background: reviewOnly === f.on ? 'var(--c-brand)' : 'var(--c-card-bg)',
+                  color: reviewOnly === f.on ? '#fff' : 'var(--c-text-secondary)',
+                  fontWeight: reviewOnly === f.on ? 600 : 400,
+                }}>
+                {f.label}
+              </button>
+            ))}
+          </div>
         )}
 
         {selfCount > 0 && (

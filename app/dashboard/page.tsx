@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { TrainerHome } from '@/components/home/TrainerHome'
 import {
   Calendar, ChevronRight, Clock, Users, ClipboardCheck, Plus,
   Dumbbell, Activity, BookOpen, Trophy, ClipboardList, BarChart3, Ticket, User,
@@ -63,10 +64,15 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [fetching, setFetching] = useState(true)
 
+  const isTrainerRole = userRole === 'TRAINER' || userRole === 'ADMIN'
+
   useEffect(() => {
     if (!loading && !user) { router.push('/auth/login'); return }
-    if (user) fetchDashboard()
-  }, [user, loading])
+    if (!user || loading) return
+    // 教练首页（TrainerHome）自己取数据（带周视图），这里只给学员取
+    if (isTrainerRole) setFetching(false)
+    else fetchDashboard()
+  }, [user, loading, isTrainerRole])
 
   const fetchDashboard = async () => {
     try {
@@ -85,34 +91,25 @@ export default function DashboardPage() {
     </div>
   )
 
-  const isTrainer = userRole === 'TRAINER' || userRole === 'ADMIN'
+  const isTrainer = isTrainerRole
+
+  // 教练首页单独一个组件（周视图 / 待复盘提醒 / 分组功能宫格），学员首页保持下面的原样
+  if (isTrainer) {
+    return (
+      <TrainerHome
+        userId={user?.id || ''}
+        userRole={userRole || ''}
+        displayName={user?.user_metadata?.name || user?.email || ''}
+      />
+    )
+  }
 
   // ── 手机首页的功能入口 ──────────────────────────────────────
   // 学员看不到：统计与课程金额、邀请码、教案（我的计划）、学员管理。
   // 前三项服务端也有拦截（API 对 CLIENT 返回 403），这里只是不显示入口。
-  const featureEntries = isTrainer
-    ? [
-        { label: '课程日历', href: '/dashboard/calendar',     icon: Calendar },
-        { label: '约课',     href: '/dashboard/booking',      icon: CalendarCheck },
-        { label: '可约时段', href: '/dashboard/availability', icon: Clock },
-        { label: '课程训练', href: '/dashboard/classes',      icon: Dumbbell },
-        { label: '学员管理', href: '/dashboard/clients',      icon: Users },
-        { label: '身体测试', href: '/dashboard/assessments',  icon: Activity },
-        { label: '动作库',   href: '/dashboard/exercises',    icon: BookOpen },
-        { label: '我的计划', href: '/dashboard/plans',        icon: ClipboardList },
-        { label: '训练方案', href: '/dashboard/programs',     icon: Trophy },
-        { label: '课后作业', href: '/dashboard/workouts',     icon: ClipboardCheck },
-        { label: '计时器',   href: '/dashboard/timer',        icon: Timer },
-        // 临时入口，导航重构时并进「我的训练」板块
-        { label: '训练记录', href: '/dashboard/my-training/records', icon: NotebookPen },
-        { label: '消息',     href: '/dashboard/notifications', icon: Bell },
-        { label: '统计',     href: '/dashboard/stats',        icon: BarChart3 },
-        ...(userRole === 'ADMIN'
-          ? [{ label: '邀请码', href: '/dashboard/invite-codes', icon: Ticket }]
-          : []),
-        { label: '我的主页', href: '/dashboard/profile',      icon: User },
-      ]
-    : [
+  // 教练的功能入口在 components/home/TrainerHome.tsx（分组显示）
+  const featureEntries = (
+      [
         { label: '约课',     href: '/dashboard/booking',      icon: CalendarCheck },
         { label: '课程日历', href: '/dashboard/calendar',     icon: Calendar },
         { label: '我的课程', href: '/dashboard/classes',      icon: Dumbbell },
@@ -126,6 +123,7 @@ export default function DashboardPage() {
         { label: '消息',     href: '/dashboard/notifications', icon: Bell },
         { label: '我的主页', href: '/dashboard/profile',      icon: User },
       ]
+  )
 
   const now = new Date()
   const dateLabel = `${now.getMonth() + 1}月${now.getDate()}日 · ${WEEKDAY_ZH[now.getDay()]}`
@@ -167,31 +165,6 @@ export default function DashboardPage() {
             你好，{displayName.split('@')[0]} 👋
           </h1>
         </div>
-
-        {/* Stats — trainer only */}
-        {isTrainer && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 24 }}>
-            {[
-              { label: '本月课程', value: data?.month_count ?? 0,   icon: Calendar,       href: '/dashboard/calendar', highlight: false },
-              { label: '学员数',   value: data?.client_count ?? 0,  icon: Users,          href: '/dashboard/clients',  highlight: false },
-              { label: '待复盘',   value: data?.pending_review ?? 0, icon: ClipboardCheck, href: '/dashboard/classes',  highlight: (data?.pending_review ?? 0) > 0 },
-            ].map(stat => (
-              <Link key={stat.label} href={stat.href} style={{ textDecoration: 'none' }}>
-                <div style={{
-                  background: 'var(--c-card-bg)',
-                  border: `1px solid ${stat.highlight ? 'var(--c-brand)' : 'var(--c-border)'}`,
-                  borderRadius: 12, padding: '14px 16px', cursor: 'pointer',
-                }}>
-                  <stat.icon size={14} color={stat.highlight ? 'var(--c-brand)' : 'var(--c-text-hint)'} />
-                  <p style={{ fontSize: 22, fontWeight: 700, color: stat.highlight ? 'var(--c-brand)' : 'var(--c-text-primary)', margin: '6px 0 2px' }}>
-                    {stat.value}
-                  </p>
-                  <p style={{ fontSize: 11, color: 'var(--c-text-hint)', margin: 0 }}>{stat.label}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
 
         {/* Today's classes */}
         <section style={{ marginBottom: 24 }}>

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { studioToday } from '@/lib/time'
+import { studioToday, addDaysStr, weekdayOfStr } from '@/lib/time'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -93,9 +93,24 @@ export async function GET(req: NextRequest) {
       return userRole === 'ADMIN' ? base : base.eq('created_by', userId)
     }
 
+    // 首页周视图：?date=YYYY-MM-DD 看某一天的课（默认今天），并返回那一周每天的课数（周条上的小圆点）
+    const dateParam = req.nextUrl.searchParams.get('date')
+    const viewDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : dateStr
+    const weekStart = addDaysStr(viewDate, -((weekdayOfStr(viewDate) + 6) % 7))   // 周一
+    const weekEnd = addDaysStr(weekStart, 6)
+
     const { data: todayClassesRaw } = await scopeOwn(
-      supabaseAdmin.from('class').select(CLASS_FIELDS).eq('date', dateStr)
+      supabaseAdmin.from('class').select(CLASS_FIELDS).eq('date', viewDate)
     ).order('start_time', { ascending: true })
+
+    const { data: weekRows } = await scopeOwn(
+      supabaseAdmin.from('class').select('date, status').gte('date', weekStart).lte('date', weekEnd)
+    )
+    const weekCounts: Record<string, number> = {}
+    for (const r of (weekRows || []) as { date: string; status: string }[]) {
+      if (r.status === 'cancelled') continue
+      weekCounts[r.date] = (weekCounts[r.date] || 0) + 1
+    }
 
     const todayClasses = (todayClassesRaw || []) as any[]
 
@@ -163,6 +178,9 @@ export async function GET(req: NextRequest) {
       pending_review: pendingReview || 0,
       client_count: clientCount || 0,
       date: dateStr,
+      view_date: viewDate,
+      week_start: weekStart,
+      week_counts: weekCounts,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })

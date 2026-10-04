@@ -36,6 +36,7 @@ import {
   Timer,
   Bell,
   NotebookPen,
+  HeartPulse,
 } from 'lucide-react'
 
 interface NavGroup {
@@ -43,10 +44,25 @@ interface NavGroup {
   items: { label: string; href: string; icon: React.ElementType }[]
 }
 
+// 教练端导航按「用途」分组（见 docs/交接-导航重构与个人训练.md 第三节）：
+//   我的训练 —— 教练自己练（与学员数据分开）
+//   教学     —— 服务学员
+//   内容     —— 教学用的素材
+//   经营     —— 统计；邀请码（仅管理员）会自动追加在最后一组
+// 学员端 clientNav / clientTabs 不动。
 const trainerNav: NavGroup[] = [
   {
     items: [
-      { label: '今日概览', href: '/dashboard', icon: LayoutDashboard },
+      { label: '今日概览', href: '/dashboard',               icon: LayoutDashboard },
+      { label: '消息',     href: '/dashboard/notifications', icon: Bell },
+    ],
+  },
+  {
+    label: '我的训练',
+    items: [
+      { label: '我的训练', href: '/dashboard/my-training',         icon: HeartPulse },
+      { label: '训练记录', href: '/dashboard/my-training/records', icon: NotebookPen },
+      { label: '计时器',   href: '/dashboard/timer',               icon: Timer },
     ],
   },
   {
@@ -56,27 +72,23 @@ const trainerNav: NavGroup[] = [
       { label: '约课',      href: '/dashboard/booking',      icon: CalendarCheck },
       { label: '可约时段',  href: '/dashboard/availability', icon: Clock },
       { label: '课程训练',  href: '/dashboard/classes',      icon: Dumbbell },
-      { label: '学员管理',  href: '/dashboard/clients',     icon: Users },
-      { label: '身体测试',  href: '/dashboard/assessments', icon: Activity },
+      { label: '学员管理',  href: '/dashboard/clients',      icon: Users },
+      { label: '课后作业',  href: '/dashboard/workouts',     icon: ClipboardList },
+      { label: '身体测试',  href: '/dashboard/assessments',  icon: Activity },
     ],
   },
   {
     label: '内容',
     items: [
-      { label: '动作库',   href: '/dashboard/exercises',  icon: BookOpen },
-      { label: '我的计划', href: '/dashboard/plans',      icon: ClipboardList },
-      { label: '训练方案', href: '/dashboard/programs',   icon: Trophy },
-      { label: '课后作业', href: '/dashboard/workouts',   icon: ClipboardList },
-      { label: '计时器',   href: '/dashboard/timer',      icon: Timer },
-      { label: '消息',    href: '/dashboard/notifications', icon: Bell },
-      { label: '统计',    href: '/dashboard/stats',      icon: BarChart3 },
+      { label: '动作库',   href: '/dashboard/exercises', icon: BookOpen },
+      { label: '教案模板', href: '/dashboard/plans',     icon: ClipboardList },
+      { label: '训练方案', href: '/dashboard/programs',  icon: Trophy },
     ],
   },
-  // 临时入口：导航重构（底栏 4 个 + 首页宫格）做完后会改成独立的「我的训练」板块
   {
-    label: '我的训练',
+    label: '经营',
     items: [
-      { label: '训练记录', href: '/dashboard/my-training/records', icon: NotebookPen },
+      { label: '统计', href: '/dashboard/stats', icon: BarChart3 },
     ],
   },
 ]
@@ -96,12 +108,13 @@ const clientNav: NavGroup[] = [
   },
 ]
 
+// 教练底栏 4 个：最常点的首页 / 学员 / 我的，加上新的「我的训练」。
+// 课程、计划不是日常高频入口，收进首页的「全部功能」。
 const trainerTabs = [
-  { label: '首页',  href: '/dashboard',          icon: LayoutDashboard },
-  { label: '课程',  href: '/dashboard/calendar', icon: Calendar },
-  { label: '学员',  href: '/dashboard/clients',  icon: Users },
-  { label: '计划',  href: '/dashboard/plans',    icon: ClipboardList },
-  { label: '我的',  href: '/dashboard/profile',  icon: User },
+  { label: '首页',     href: '/dashboard',             icon: LayoutDashboard },
+  { label: '学员',     href: '/dashboard/clients',     icon: Users },
+  { label: '我的训练', href: '/dashboard/my-training', icon: HeartPulse },
+  { label: '我的',     href: '/dashboard/profile',     icon: User },
 ]
 
 const clientTabs = [

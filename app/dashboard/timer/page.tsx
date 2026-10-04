@@ -132,6 +132,11 @@ function TimerInner() {
   }
 
   const isClient = userRole === 'CLIENT'
+  // 教练练完也记录，但记到自己的个人训练记录（personal_workout），不进 class 表、不算课时。
+  // 同一个「练完记录」，学员走 /api/self-practice，教练走 /api/personal-workouts——
+  // 两边数据刻意分开存，见 docs/交接-导航重构与个人训练.md 第四节。
+  const isStaff = userRole === 'TRAINER' || userRole === 'ADMIN'
+  const [savedWorkoutId, setSavedWorkoutId] = useState('')
 
   // 草稿 → 引擎认识的 plan
   const plan: PlanItem[] = useMemo(() => items.map((it, i) => ({
@@ -169,17 +174,55 @@ function TimerInner() {
       || Object.values(r.doneSec || {}).some(v => v > 0)
     if (!anyDone) { setStage('setup'); return }
     setResult(r)
-    setSaveState('idle'); setSaveError(''); setSavedClassId('')
+    setSaveState('idle'); setSaveError(''); setSavedClassId(''); setSavedWorkoutId('')
     setStage('done')
   }
 
-  // 练完自动记一条自我练习（只有学员本人会记，教练账号不记）
+  // 教练：练完记进个人训练记录。只记真正练到的动作；来源标 timer，类型先记「其他」，可以去记录里改。
+  const recordPersonal = async (title: string) => {
+    if (!user || !result) return
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const d = new Date()
+    const done = plan.map((p, idx) => ({ p, sets: result.doneSets[idx] || 0, sec: result.doneSec?.[idx] || 0 }))
+      .filter(x => !x.p.skipped && (x.sets > 0 || x.sec > 0))
+    const totalSec = done.reduce((sum, x) => sum + (x.sec || x.sets * x.p.workSec) + Math.max(0, x.sets - 1) * x.p.restSec, 0)
+    const res = await fetch('/api/personal-workouts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-id': user.id, 'x-user-role': userRole || '' },
+      body: JSON.stringify({
+        date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+        type: 'other',
+        title,
+        duration_min: Math.max(1, Math.ceil(totalSec / 60)),
+        source: 'timer',
+        notes: mode === 'circuit' ? '计时器 · 循环' : '计时器 · 顺序',
+        exercises: done.map(x => ({
+          exercise_id: x.p.exerciseId || null,
+          name: x.p.name,
+          sets: x.sets || null,
+          duration_sec: x.p.workSec || null,
+          rest_sec: x.p.restSec || null,
+          notes: x.sets < x.p.sets ? `计划 ${x.p.sets} 组，做了 ${x.sets} 组` : null,
+        })),
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || '记录失败')
+    setSavedWorkoutId(data.id || '')
+  }
+
+  // 练完自动记录：学员记成自我练习（class 表）；教练记进自己的个人训练记录
   const handleRecord = async () => {
     if (!user || !result || saveState === 'saving' || saveState === 'saved') return
     setSaveState('saving'); setSaveError('')
     try {
       const names = plan.filter(p => !p.skipped).map(p => p.name)
       const title = names.length <= 1 ? (names[0] || '自我练习') : `${names[0]} 等${names.length}个动作`
+      if (isStaff) {
+        await recordPersonal(names.length <= 1 ? (names[0] || '计时器训练') : `${names[0]} 等${names.length}个动作`)
+        setSaveState('saved')
+        return
+      }
       const res = await fetch('/api/self-practice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user.id, 'x-user-role': userRole || '' },
@@ -209,8 +252,8 @@ function TimerInner() {
   }
 
   useEffect(() => {
-    if (stage === 'done' && isClient && saveState === 'idle') handleRecord()
-  }, [stage, isClient, saveState])
+    if (stage === 'done' && (isClient || isStaff) && saveState === 'idle') handleRecord()
+  }, [stage, isClient, isStaff, saveState])
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>加载中…</div>
 
@@ -307,6 +350,26 @@ function TimerInner() {
                   <Link href={savedClassId ? `/dashboard/classes/${savedClassId}` : '/dashboard/classes'}
                     style={{ display: 'inline-block', padding: '12px 24px', borderRadius: 999, background: 'white', color: '#2E7D32', textDecoration: 'none', fontSize: 14, fontWeight: 700 }}>
                     去看看这次的练习记录 →
+                  </Link>
+                </>
+              ) : saveState === 'error' ? (
+                <>
+                  <p style={{ margin: '0 0 10px', fontSize: 13, opacity: 0.95 }}>⚠️ {saveError}</p>
+                  <button onClick={handleRecord}
+                    style={{ padding: '10px 22px', borderRadius: 999, border: '1.5px solid white', background: 'rgba(255,255,255,0.15)', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                    重试记录
+                  </button>
+                </>
+              ) : (
+                <p style={{ margin: 0, fontSize: 14, opacity: 0.85 }}>记录中…</p>
+              )
+            ) : isStaff ? (
+              saveState === 'saved' ? (
+                <>
+                  <p style={{ margin: '0 0 14px', fontSize: 14, opacity: 0.95 }}>✓ 已记进我的训练记录</p>
+                  <Link href={savedWorkoutId ? `/dashboard/my-training/records/${savedWorkoutId}` : '/dashboard/my-training/records'}
+                    style={{ display: 'inline-block', padding: '12px 24px', borderRadius: 999, background: 'white', color: '#2E7D32', textDecoration: 'none', fontSize: 14, fontWeight: 700 }}>
+                    去看看 / 补充组次重量 →
                   </Link>
                 </>
               ) : saveState === 'error' ? (
