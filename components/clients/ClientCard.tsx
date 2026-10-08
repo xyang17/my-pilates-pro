@@ -14,7 +14,7 @@ export interface ClientSummary {
   last_self_practice_date: string | null
   next_class: { date: string; start_time: string | null } | null
   payment: { mode: 'package' | 'per_session'; remaining: number; granted: number; used: number; nearest_expiry: string | null }
-  loyalty: { enabled: boolean; threshold: number; bonus: number; base: number; total: number; to_next: number; pending: number }
+  loyalty: { enabled: boolean; threshold: number; bonus: number; source?: 'default' | 'custom' | 'off'; base: number; total: number; to_next: number; pending: number }
   alerts: { kind: 'bonus_due' | 'package_low' | 'package_empty' | 'package_expiring' | 'inactive'; text: string }[]
 }
 
@@ -183,7 +183,7 @@ export function ClientStatusPanel({ s, onOpenPackages }: { s: ClientSummary; onO
         <div style={box}>
           <div style={{ fontSize: 11, color: 'var(--c-text-hint)', marginBottom: 4 }}>满赠进度</div>
           {!L.enabled ? (
-            <div style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>未开启</div>
+            <div style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>{L.source === 'off' ? '不参加满赠' : '未开启'}</div>
           ) : L.pending > 0 ? (
             <>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#8A5A00' }}>🎁 {L.pending * L.bonus} 节待发</div>
@@ -195,7 +195,9 @@ export function ClientStatusPanel({ s, onOpenPackages }: { s: ClientSummary; onO
                 {inCycle} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--c-text-secondary)' }}>/ {L.threshold} 节</span>
               </div>
               <div style={{ margin: '6px 0 4px' }}><Bar value={inCycle} max={L.threshold} color="#D9A441" /></div>
-              <div style={{ fontSize: 11, color: 'var(--c-text-hint)' }}>再上 {L.to_next} 节送 {L.bonus} 节 · 累计 {L.total}</div>
+              <div style={{ fontSize: 11, color: 'var(--c-text-hint)' }}>
+                再上 {L.to_next} 节送 {L.bonus} 节 · 累计 {L.total}{L.source === 'custom' ? ' · 单独设' : ''}
+              </div>
             </>
           )}
         </div>

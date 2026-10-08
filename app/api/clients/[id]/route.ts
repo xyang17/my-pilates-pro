@@ -25,7 +25,7 @@ export async function GET(
 
     const { data: userRow, error } = await supabaseAdmin
       .from('user')
-      .select('id, name, email, photo_url, bio, created_at, role, sex, birth_date, height_cm')
+      .select('id, name, email, photo_url, bio, created_at, role, sex, birth_date, height_cm, loyalty_base_count, loyalty_mode, loyalty_threshold, loyalty_bonus')
       .eq('id', id)
       .single()
 
@@ -94,6 +94,22 @@ export async function PUT(
     if (body.birth_date !== undefined) userUpdates.birth_date = body.birth_date || null
     if (body.height_cm  !== undefined) userUpdates.height_cm  = body.height_cm === '' ? null : body.height_cm
     // 满赠起始节数：用系统之前就上过的课，教练手工认定
+    // 这个学员的满赠规则：default 跟随全店 / custom 单独设 / off 不参加（lib/loyaltyRule.ts）
+    if (body.loyalty_mode !== undefined) {
+      const m = body.loyalty_mode
+      if (m !== null && m !== 'default' && m !== 'custom' && m !== 'off') {
+        return NextResponse.json({ error: '满赠规则不对' }, { status: 400 })
+      }
+      userUpdates.loyalty_mode = m === 'default' ? null : m
+    }
+    if (body.loyalty_threshold !== undefined) {
+      const n = Math.floor(Number(body.loyalty_threshold))
+      userUpdates.loyalty_threshold = Number.isFinite(n) && n > 0 ? n : null
+    }
+    if (body.loyalty_bonus !== undefined) {
+      const n = Math.floor(Number(body.loyalty_bonus))
+      userUpdates.loyalty_bonus = Number.isFinite(n) && n > 0 ? n : null
+    }
     if (body.loyalty_base_count !== undefined) {
       userUpdates.loyalty_base_count = Math.max(0, Math.floor(Number(body.loyalty_base_count) || 0))
     }

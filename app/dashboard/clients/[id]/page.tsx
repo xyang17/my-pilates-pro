@@ -1,11 +1,13 @@
 'use client'
 
+import { DEFAULT_THRESHOLD, DEFAULT_BONUS } from '@/lib/loyaltyRule'
 import { useAuth } from '@/context/AuthContext'
 import { useLang } from '@/context/LanguageContext'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ClientStatusPanel, ClientSummary } from '@/components/clients/ClientCard'
+import { LoyaltyRuleEditor } from '@/components/clients/LoyaltyRuleEditor'
 
 interface ClientClass {
   id: string
@@ -71,6 +73,9 @@ interface Client {
   birth_date?: string | null
   height_cm?: number | null
   loyalty_base_count?: number | null
+  loyalty_mode?: 'default' | 'custom' | 'off' | null
+  loyalty_threshold?: number | null
+  loyalty_bonus?: number | null
   // 计费课时：私教 + 报名团课，不含自我练习。服务端算好（lib/classCounts.ts），前端不要自己数
   billable_completed?: number
   self_practice_completed?: number
@@ -152,8 +157,8 @@ export default function ClientDetailPage() {
           .then(r => r.ok ? r.json() : null)
           .then(d => { if (d) setBonusRule({
             enabled: String(d.loyalty_bonus_enabled ?? 'true') === 'true',
-            sessions: parseInt(d.loyalty_bonus_sessions ?? '1', 10) || 1,
-            threshold: parseInt(d.loyalty_bonus_threshold ?? '20', 10) || 20,
+            sessions: parseInt(d.loyalty_bonus_sessions ?? String(DEFAULT_BONUS), 10) || DEFAULT_BONUS,
+            threshold: parseInt(d.loyalty_bonus_threshold ?? String(DEFAULT_THRESHOLD), 10) || DEFAULT_THRESHOLD,
           }) })
           .catch(() => {})
       }
@@ -273,9 +278,14 @@ export default function ClientDetailPage() {
 
   // 一键发放赠课：建一个总价 0 的赠课包。
   // 总价 0 → 统计里这几节课收入自然是 0，不用在收入逻辑里特判赠课。
+  // 这个学员实际适用的规则（单独设的优先），由服务端摘要给出；拿不到才退回全店默认
+  const effRule = client?.summary?.loyalty
+    ? { enabled: client.summary.loyalty.enabled, sessions: client.summary.loyalty.bonus, threshold: client.summary.loyalty.threshold }
+    : bonusRule
+
   const handleGrantBonus = async () => {
-    if (!bonusRule || granting) return
-    if (!window.confirm(`给 ${client?.name || '这位学员'} 发放 ${bonusRule.sessions} 节赠课？`)) return
+    if (!effRule || granting) return
+    if (!window.confirm(`给 ${client?.name || '这位学员'} 发放 ${effRule.sessions} 节赠课？`)) return
     setGranting(true)
     try {
       const res = await fetch('/api/packages', {
@@ -284,10 +294,10 @@ export default function ClientDetailPage() {
         body: JSON.stringify({
           client_id: clientId,
           total_sessions: 0,
-          bonus_sessions: bonusRule.sessions,
+          bonus_sessions: effRule.sessions,
           price: 0,
           source: 'loyalty',
-          notes: `满 ${bonusRule.threshold} 节赠送`,
+          notes: `满 ${effRule.threshold} 节赠送`,
         }),
       })
       const data = await res.json()
@@ -299,6 +309,27 @@ export default function ClientDetailPage() {
     } finally {
       setGranting(false)
     }
+  }
+
+  // 保存满赠规则 / 历史节数（LoyaltyRuleEditor 点「保存」时调）
+  const handleSaveLoyalty = async (patch: Record<string, unknown>) => {
+    const res = await fetch(`/api/clients/${clientId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      throw new Error(d.error || '保存失败')
+    }
+    setClient(prev => prev ? {
+      ...prev,
+      ...(patch.loyalty_mode !== undefined ? { loyalty_mode: patch.loyalty_mode === 'default' ? null : patch.loyalty_mode as any } : {}),
+      ...(patch.loyalty_threshold !== undefined ? { loyalty_threshold: patch.loyalty_threshold as number | null } : {}),
+      ...(patch.loyalty_bonus !== undefined ? { loyalty_bonus: patch.loyalty_bonus as number | null } : {}),
+      ...(patch.loyalty_base_count !== undefined ? { loyalty_base_count: patch.loyalty_base_count as number } : {}),
+    } : prev)
+    await refreshSummary()
   }
 
   const handleSaveBase = async () => {
@@ -840,10 +871,10 @@ export default function ClientDetailPage() {
                 {packages.length === 0 ? '还没有课时包' : `共 ${packages.length} 个`}
               </span>
               <div style={{ display: 'flex', gap: 8 }}>
-                {bonusRule?.enabled && (
+                {effRule?.enabled && (
                   <button onClick={handleGrantBonus} disabled={granting}
                     style={{ fontSize: 13, color: '#E65100', border: '1px solid #FFB74D', borderRadius: 6, padding: '5px 14px', background: '#FFF8E1', cursor: granting ? 'wait' : 'pointer', fontWeight: 500 }}>
-                    🎁 赠 {bonusRule.sessions} 节
+                    🎁 赠 {effRule.sessions} 节
                   </button>
                 )}
                 <button onClick={() => setShowAddPkg(v => !v)}
@@ -899,26 +930,18 @@ export default function ClientDetailPage() {
               </div>
             )}
 
-            {bonusRule?.enabled && (
-              <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--c-border)', background: '#FFFBF2' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, color: '#8a6d3b' }}>用系统之前已上</span>
-                  <input type="text" inputMode="numeric" value={baseInput}
-                    onChange={e => setBaseInput(e.target.value.replace(/\D/g, ''))}
-                    onBlur={handleSaveBase}
-                    style={{ width: 52, padding: '5px 6px', border: '1px solid #E0C9A0', borderRadius: 6, fontSize: 13, textAlign: 'center', boxSizing: 'border-box' }} />
-                  <span style={{ fontSize: 12, color: '#8a6d3b' }}>节</span>
-                  <span style={{ fontSize: 12, color: '#b39866' }}>
-                    ＋ 系统内已上 {billableDone} 节 ＝ 累计 <b>{(Number(baseInput) || 0) + billableDone}</b> 节
-                  </span>
-                  {savingBase && <span style={{ fontSize: 11, color: 'var(--c-brand)' }}>保存中…</span>}
-                  {baseSaved && <span style={{ fontSize: 11, color: 'var(--c-brand)' }}>✓</span>}
-                </div>
-                <p style={{ margin: '6px 0 0', fontSize: 11, color: '#b39866' }}>
-                  满 {bonusRule.threshold} 节提醒赠课。只算私教和团课，自我练习不计入{(client.self_practice_completed ?? 0) > 0 ? `（另有 ${client.self_practice_completed} 节自我练习，没算进去）` : ''}。老学员之前上过的课在这里认，不用把历史课补录进系统。
-                </p>
-              </div>
-            )}
+            {/* 累计满赠：规则（跟随默认 / 单独设 / 不参加）+ 系统外历史节数 */}
+            <LoyaltyRuleEditor
+              key={`${client.loyalty_mode ?? 'default'}-${client.loyalty_threshold ?? ''}-${client.loyalty_bonus ?? ''}-${client.loyalty_base_count ?? 0}`}
+              mode={(client.loyalty_mode as any) || 'default'}
+              threshold={client.loyalty_threshold ?? null}
+              bonus={client.loyalty_bonus ?? null}
+              studioDefault={{ enabled: bonusRule?.enabled ?? true, threshold: bonusRule?.threshold ?? DEFAULT_THRESHOLD, bonus: bonusRule?.sessions ?? DEFAULT_BONUS }}
+              base={client.loyalty_base_count ?? 0}
+              billableDone={billableDone}
+              selfPractice={client.self_practice_completed ?? 0}
+              onSave={handleSaveLoyalty}
+            />
 
             {pkgLoading ? (
               <p style={{ padding: 40, textAlign: 'center', color: '#bbb', margin: 0 }}>加载中…</p>

@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/db'
 import { studioToday } from '@/lib/time'
+import { resolveLoyaltyRule, LoyaltyRule, LoyaltySource } from '@/lib/loyaltyRule'
 
 // 学员卡片上要显示的摘要（学员列表、学员详情页顶部共用）。
 // 一次批量算一批学员，避免列表页每个学员发一串请求。
@@ -28,6 +29,7 @@ export interface ClientSummary {
     enabled: boolean
     threshold: number
     bonus: number
+    source: LoyaltySource              // default 跟随全店 / custom 单独设 / off 不参加
     base: number                       // 教练认的系统外历史节数
     total: number                      // base + 计费课时
     to_next: number                    // 再上几节到下一次赠课
@@ -50,7 +52,7 @@ export async function summarizeClients(clientIds: string[]): Promise<Record<stri
 
   // ── 一次性批量查 ─────────────────────────────────────────
   const [usersRes, ownClassesRes, enrRes, pkgRes, loyaltyPkgRes, settingsRes] = await Promise.all([
-    supabaseAdmin.from('user').select('id, loyalty_base_count').in('id', clientIds),
+    supabaseAdmin.from('user').select('id, loyalty_base_count, loyalty_mode, loyalty_threshold, loyalty_bonus').in('id', clientIds),
     supabaseAdmin.from('class')
       .select('assigned_to, date, start_time, status, class_type')
       .in('assigned_to', clientIds)
@@ -66,9 +68,7 @@ export async function summarizeClients(clientIds: string[]): Promise<Record<stri
 
   const cfg: Record<string, string> = {}
   ;(settingsRes.data || []).forEach((r: any) => { cfg[r.key] = String(r.value) })
-  const enabled = (cfg.loyalty_bonus_enabled ?? 'true') === 'true'
-  const threshold = Math.max(1, parseInt(cfg.loyalty_bonus_threshold ?? '20', 10) || 20)
-  const bonus = Math.max(1, parseInt(cfg.loyalty_bonus_sessions ?? '1', 10) || 1)
+  // 规则按学员各自算（全店默认 / 单独设 / 不参加），见 lib/loyaltyRule.ts
 
   // 团课：报名表 → 课
   const enr = (enrRes.data || []) as { class_id: string; student_id: string }[]
@@ -93,7 +93,11 @@ export async function summarizeClients(clientIds: string[]): Promise<Record<stri
   })
 
   const baseBy: Record<string, number> = {}
-  ;(usersRes.data || []).forEach((u: any) => { baseBy[u.id] = Number(u.loyalty_base_count) || 0 })
+  const ruleBy: Record<string, LoyaltyRule> = {}
+  ;(usersRes.data || []).forEach((u: any) => {
+    baseBy[u.id] = Number(u.loyalty_base_count) || 0
+    ruleBy[u.id] = resolveLoyaltyRule(cfg, u)
+  })
 
   const issuedBy: Record<string, number> = {}
   ;(loyaltyPkgRes.data || []).forEach((p: any) => { issuedBy[p.client_id] = (issuedBy[p.client_id] || 0) + 1 })
@@ -120,6 +124,8 @@ export async function summarizeClients(clientIds: string[]): Promise<Record<stri
     const expiries = usable.map(p => p.expires_at).filter(Boolean).sort() as string[]
 
     const base = baseBy[id] || 0
+    const rule = ruleBy[id] || resolveLoyaltyRule(cfg, null)
+    const { enabled, threshold, bonus } = rule
     const total = base + billableDone.length
     const earned = Math.floor(total / threshold)
     const pending = enabled ? Math.max(0, earned - (issuedBy[id] || 0)) : 0
@@ -149,7 +155,7 @@ export async function summarizeClients(clientIds: string[]): Promise<Record<stri
         remaining, granted, used,
         nearest_expiry: expiries[0] || null,
       },
-      loyalty: { enabled, threshold, bonus, base, total, to_next: toNext, pending },
+      loyalty: { enabled, threshold, bonus, source: rule.source, base, total, to_next: toNext, pending },
       alerts,
     }
   }

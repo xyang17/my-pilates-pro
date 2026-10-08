@@ -1,5 +1,6 @@
 'use client'
 
+import { DEFAULT_THRESHOLD, DEFAULT_BONUS } from '@/lib/loyaltyRule'
 import { useAuth } from '@/context/AuthContext'
 import { useLang, FontSize } from '@/context/LanguageContext'
 import { useRouter } from 'next/navigation'
@@ -57,8 +58,8 @@ export default function ProfilePage() {
     fetch('/api/settings', { headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' } })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setSettings({
-        threshold: String(d.loyalty_bonus_threshold ?? '20'),
-        bonus: String(d.loyalty_bonus_sessions ?? '1'),
+        threshold: String(d.loyalty_bonus_threshold ?? DEFAULT_THRESHOLD),
+        bonus: String(d.loyalty_bonus_sessions ?? DEFAULT_BONUS),
         enabled: String(d.loyalty_bonus_enabled ?? 'true') === 'true',
       }) })
       .catch(() => {})
@@ -72,8 +73,8 @@ export default function ProfilePage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user.id, 'x-user-role': userRole || '' },
         body: JSON.stringify({
-          loyalty_bonus_threshold: next.threshold === '' ? '20' : next.threshold,
-          loyalty_bonus_sessions: next.bonus === '' ? '1' : next.bonus,
+          loyalty_bonus_threshold: next.threshold === '' ? String(DEFAULT_THRESHOLD) : next.threshold,
+          loyalty_bonus_sessions: next.bonus === '' ? String(DEFAULT_BONUS) : next.bonus,
           loyalty_bonus_enabled: next.enabled ? 'true' : 'false',
         }),
       })
@@ -540,7 +541,9 @@ export default function ProfilePage() {
                     <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>节</span>
                   </div>
                   <p style={{ margin: '8px 0 0', fontSize: 11, color: '#bbb', lineHeight: 1.7 }}>
-                    按学员<b>累计完成</b>的课数算，跨课时包累加。到了就给你发条消息提醒，
+                    这是<b>默认规则</b>，个别学员可以在学员页「课时包」里单独设（比如每满 10 送 1），或者设成不参加。
+                    「买 N 送 M」在建课时包时填「赠送」。<br />
+                    按学员<b>累计完成</b>的课数算（私教 + 团课，自我练习不算），跨课时包累加。到了就给你发条消息提醒，
                     赠课要你确认后才发放，不会自动加。
                   </p>
                 </>

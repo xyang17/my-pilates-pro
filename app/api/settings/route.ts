@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { DEFAULT_THRESHOLD, DEFAULT_BONUS } from '@/lib/loyaltyRule'
 import { NextRequest, NextResponse } from 'next/server'
 import { isStaff } from '@/lib/db'
 
@@ -11,8 +12,8 @@ const supabaseAdmin = createClient(
 //
 // 目前只有赠课规则：每满 N 节赠 M 节。两个数都由教练自己定。
 export const SETTING_DEFAULTS: Record<string, string> = {
-  loyalty_bonus_threshold: '20',   // 每满多少节
-  loyalty_bonus_sessions: '1',     // 赠几节
+  loyalty_bonus_threshold: String(DEFAULT_THRESHOLD),   // 每满多少节（默认值，教练可改）
+  loyalty_bonus_sessions: String(DEFAULT_BONUS),       // 赠几节
   loyalty_bonus_enabled: 'true',   // 关掉就不再提醒
 }
 

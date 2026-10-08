@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { countBillableCompleted } from '@/lib/classCounts'
+import { resolveLoyaltyRule } from '@/lib/loyaltyRule'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -282,24 +283,17 @@ export async function checkLoyaltyBonus(clientId: string) {
   const cfg: Record<string, string> = {}
   ;(rows || []).forEach((r: any) => { cfg[r.key] = String(r.value) })
 
-  if ((cfg.loyalty_bonus_enabled ?? 'true') !== 'true') return
-
-  const threshold = parseInt(cfg.loyalty_bonus_threshold ?? '20', 10)
-  const bonus = parseInt(cfg.loyalty_bonus_sessions ?? '1', 10)
-  if (!Number.isFinite(threshold) || threshold <= 0) return
-  if (!Number.isFinite(bonus) || bonus <= 0) return
+  // 这个学员适用的规则：全店默认 / 单独设 / 不参加（lib/loyaltyRule.ts）
+  const { data: u } = await supabaseAdmin
+    .from('user').select('loyalty_base_count, loyalty_mode, loyalty_threshold, loyalty_bonus').eq('id', clientId).single()
+  const rule = resolveLoyaltyRule(cfg, u as any)
+  if (!rule.enabled) return
+  const { threshold, bonus } = rule
 
   // 计费课时（私教 + 报名的团课，不含自我练习），算法统一在 lib/classCounts.ts
   const counts = await countBillableCompleted(clientId)
-
-  // 老学员在用这个系统之前上过的课，由教练手工认一个起始节数。
-  // 字段可能还没加（迁移 SQL 要手动跑），读不到就按 0 处理，不影响其余逻辑。
-  let base = 0
-  try {
-    const { data: u, error } = await supabaseAdmin
-      .from('user').select('loyalty_base_count').eq('id', clientId).single()
-    if (!error && u) base = Number((u as any).loyalty_base_count) || 0
-  } catch { /* 列还没加，按 0 算 */ }
+  // 老学员在用这个系统之前上过的课，由教练手工认一个起始节数
+  const base = Number((u as any)?.loyalty_base_count) || 0
 
   const total = base + counts.total
   if (total < threshold) return
@@ -317,7 +311,7 @@ export async function checkLoyaltyBonus(clientId: string) {
     user_id: tid,
     type: 'loyalty_bonus',
     title: `${name} 已累计完成 ${total} 节课`,
-    body: `按「每满 ${threshold} 节赠 ${bonus} 节」的规则，可以发放 ${bonus} 节赠课了。到学员页的「课时包」里一键发放。`,
+    body: `按「每满 ${threshold} 节赠 ${bonus} 节」${rule.source === 'custom' ? '（这个学员单独设的）' : ''}的规则，可以发放 ${bonus} 节赠课了。到学员页的「课时包」里一键发放。`,
     link: `/dashboard/clients/${clientId}`,
     related_user_id: clientId,
     dedupe_key: `loyalty:${clientId}:${milestone}`,
