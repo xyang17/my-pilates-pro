@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { projectClassForRole } from '@/lib/db'
-import { notifyClient } from '@/lib/notifications'
+import { notifyClient, checkLoyaltyBonus } from '@/lib/notifications'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -150,6 +150,11 @@ export async function PUT(
     let linkedPackageId: string | null = after.package_id ?? null
     if (before && before.status !== 'completed' && after.status === 'completed') {
       linkedPackageId = await autoLinkPackage(after)
+      // 满课赠送只提醒不自动发，失败也不该影响「课已完成」这件事
+      if (after.assigned_to) {
+        try { await checkLoyaltyBonus(after.assigned_to) }
+        catch (e: any) { console.error('[class] 满赠检测失败:', e?.message) }
+      }
     }
 
     const timeChanged = !!before && (

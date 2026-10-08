@@ -69,6 +69,7 @@ interface Client {
   sex?: 'MALE' | 'FEMALE' | 'OTHER' | 'UNDISCLOSED' | null
   birth_date?: string | null
   height_cm?: number | null
+  loyalty_base_count?: number | null
   created_at: string
   classes: ClientClass[]
 }
@@ -109,6 +110,13 @@ export default function ClientDetailPage() {
   const [showAddPkg, setShowAddPkg] = useState(false)
   const [pkgForm, setPkgForm] = useState({ total: '', bonus: '', price: '', expires: '', notes: '' })
   const [savingPkg, setSavingPkg] = useState(false)
+  // 满课赠送规则，用来决定「一键赠课」按钮送几节
+  const [bonusRule, setBonusRule] = useState<{ enabled: boolean; sessions: number; threshold: number } | null>(null)
+  const [granting, setGranting] = useState(false)
+  // 满赠起始节数（用系统之前就上过的课）
+  const [baseInput, setBaseInput] = useState('')
+  const [savingBase, setSavingBase] = useState(false)
+  const [baseSaved, setBaseSaved] = useState(false)
   const [expandedHw, setExpandedHw] = useState<Set<string>>(new Set())
   const [deletingHwId, setDeletingHwId] = useState<string | null>(null)
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
@@ -131,7 +139,19 @@ export default function ClientDetailPage() {
 
   useEffect(() => {
     if (!authLoading && !user) { router.push('/auth/login'); return }
-    if (user) { fetchClient(); fetchPackages() }
+    if (user) {
+      fetchClient(); fetchPackages()
+      if (isTrainer) {
+        fetch('/api/settings', { headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' } })
+          .then(r => r.ok ? r.json() : null)
+          .then(d => { if (d) setBonusRule({
+            enabled: String(d.loyalty_bonus_enabled ?? 'true') === 'true',
+            sessions: parseInt(d.loyalty_bonus_sessions ?? '1', 10) || 1,
+            threshold: parseInt(d.loyalty_bonus_threshold ?? '20', 10) || 20,
+          }) })
+          .catch(() => {})
+      }
+    }
   }, [user, authLoading])
 
   useEffect(() => {
@@ -145,7 +165,11 @@ export default function ClientDetailPage() {
       const res = await fetch(`/api/clients/${clientId}`, {
         headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
       })
-      if (res.ok) setClient(await res.json())
+      if (res.ok) {
+        const c = await res.json()
+        setClient(c)
+        setBaseInput(c.loyalty_base_count != null ? String(c.loyalty_base_count) : '0')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -224,6 +248,55 @@ export default function ClientDetailPage() {
       alert(err.message)
     } finally {
       setSavingPkg(false)
+    }
+  }
+
+  // 一键发放赠课：建一个总价 0 的赠课包。
+  // 总价 0 → 统计里这几节课收入自然是 0，不用在收入逻辑里特判赠课。
+  const handleGrantBonus = async () => {
+    if (!bonusRule || granting) return
+    if (!window.confirm(`给 ${client?.name || '这位学员'} 发放 ${bonusRule.sessions} 节赠课？`)) return
+    setGranting(true)
+    try {
+      const res = await fetch('/api/packages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({
+          client_id: clientId,
+          total_sessions: 0,
+          bonus_sessions: bonusRule.sessions,
+          price: 0,
+          source: 'loyalty',
+          notes: `满 ${bonusRule.threshold} 节赠送`,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '发放失败')
+      setPackages(prev => [data, ...prev])
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setGranting(false)
+    }
+  }
+
+  const handleSaveBase = async () => {
+    if (savingBase) return
+    setSavingBase(true)
+    try {
+      const res = await fetch(`/api/clients/${clientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({ loyalty_base_count: baseInput === '' ? 0 : Number(baseInput) }),
+      })
+      if (!res.ok) throw new Error('保存失败（可能是数据库字段还没加，见 docs/待执行SQL-满赠起始节数.sql）')
+      setClient(prev => prev ? { ...prev, loyalty_base_count: Number(baseInput) || 0 } : prev)
+      setBaseSaved(true)
+      setTimeout(() => setBaseSaved(false), 1500)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setSavingBase(false)
     }
   }
 
@@ -736,10 +809,18 @@ export default function ClientDetailPage() {
               <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>
                 {packages.length === 0 ? '还没有课时包' : `共 ${packages.length} 个`}
               </span>
-              <button onClick={() => setShowAddPkg(v => !v)}
-                style={{ fontSize: 13, color: 'var(--c-brand)', border: '1px solid var(--c-brand)', borderRadius: 6, padding: '5px 14px', background: 'none', cursor: 'pointer', fontWeight: 500 }}>
-                {showAddPkg ? '取消' : '＋ 新建课时包'}
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {bonusRule?.enabled && (
+                  <button onClick={handleGrantBonus} disabled={granting}
+                    style={{ fontSize: 13, color: '#E65100', border: '1px solid #FFB74D', borderRadius: 6, padding: '5px 14px', background: '#FFF8E1', cursor: granting ? 'wait' : 'pointer', fontWeight: 500 }}>
+                    🎁 赠 {bonusRule.sessions} 节
+                  </button>
+                )}
+                <button onClick={() => setShowAddPkg(v => !v)}
+                  style={{ fontSize: 13, color: 'var(--c-brand)', border: '1px solid var(--c-brand)', borderRadius: 6, padding: '5px 14px', background: 'none', cursor: 'pointer', fontWeight: 500 }}>
+                  {showAddPkg ? '取消' : '＋ 新建课时包'}
+                </button>
+              </div>
             </div>
 
             {showAddPkg && (
@@ -785,6 +866,27 @@ export default function ClientDetailPage() {
                   style={{ padding: '8px 20px', background: savingPkg ? 'var(--c-lavender)' : 'var(--c-brand)', color: '#fff', border: 'none', borderRadius: 6, cursor: savingPkg ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600 }}>
                   {savingPkg ? '保存中…' : '保存'}
                 </button>
+              </div>
+            )}
+
+            {bonusRule?.enabled && (
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--c-border)', background: '#FFFBF2' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: '#8a6d3b' }}>用系统之前已上</span>
+                  <input type="text" inputMode="numeric" value={baseInput}
+                    onChange={e => setBaseInput(e.target.value.replace(/\D/g, ''))}
+                    onBlur={handleSaveBase}
+                    style={{ width: 52, padding: '5px 6px', border: '1px solid #E0C9A0', borderRadius: 6, fontSize: 13, textAlign: 'center', boxSizing: 'border-box' }} />
+                  <span style={{ fontSize: 12, color: '#8a6d3b' }}>节</span>
+                  <span style={{ fontSize: 12, color: '#b39866' }}>
+                    ＋ 系统内已完成 {past.length} 节 ＝ 累计 <b>{(Number(baseInput) || 0) + past.length}</b> 节
+                  </span>
+                  {savingBase && <span style={{ fontSize: 11, color: 'var(--c-brand)' }}>保存中…</span>}
+                  {baseSaved && <span style={{ fontSize: 11, color: 'var(--c-brand)' }}>✓</span>}
+                </div>
+                <p style={{ margin: '6px 0 0', fontSize: 11, color: '#b39866' }}>
+                  满 {bonusRule.threshold} 节提醒赠课。老学员之前上过的课在这里认，不用把历史课补录进系统。
+                </p>
               </div>
             )}
 

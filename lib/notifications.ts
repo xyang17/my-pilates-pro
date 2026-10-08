@@ -59,6 +59,7 @@ export const NOTICE_TYPES: Record<string, { audience: NoticeAudience; label: str
   // → 教练
   self_practice:     { audience: 'trainer', label: '学员自主练习' },
   period_forecast:   { audience: 'trainer', label: '生理期预测' },
+  loyalty_bonus:     { audience: 'trainer', label: '满课赠送' },
   // → 学员
   homework_assigned: { audience: 'client',  label: '新作业' },
   class_scheduled:   { audience: 'client',  label: '新课程' },
@@ -264,4 +265,81 @@ export async function generatePeriodForecasts(trainerId: string) {
       dedupe_key: `period:${f.id}:${toDateStr(fc.nextStart)}`,
     })
   }
+}
+
+
+// ─── 满课赠送 ──────────────────────────────────────────────
+//
+// 规则由教练在「我的 → 经营设置」里定：每满 N 节赠 M 节，可关闭。
+// 按学员**累计完成**的课数算，跨课时包累加（私教 + 已报名的团课，自我练习不算）。
+//
+// 只提醒、不自动发放——赠课是钱，该由教练点头。
+// 同一个里程碑只提醒一次，靠 dedupe_key（20 节一条、40 节一条）。
+export async function checkLoyaltyBonus(clientId: string) {
+  const { data: rows } = await supabaseAdmin
+    .from('studio_setting').select('key, value')
+  const cfg: Record<string, string> = {}
+  ;(rows || []).forEach((r: any) => { cfg[r.key] = String(r.value) })
+
+  if ((cfg.loyalty_bonus_enabled ?? 'true') !== 'true') return
+
+  const threshold = parseInt(cfg.loyalty_bonus_threshold ?? '20', 10)
+  const bonus = parseInt(cfg.loyalty_bonus_sessions ?? '1', 10)
+  if (!Number.isFinite(threshold) || threshold <= 0) return
+  if (!Number.isFinite(bonus) || bonus <= 0) return
+
+  // 私教：直接指派给这个学员的
+  const { count: privateCount } = await supabaseAdmin
+    .from('class')
+    .select('id', { count: 'exact', head: true })
+    .eq('assigned_to', clientId)
+    .eq('status', 'completed')
+    .neq('class_type', 'self_practice')
+
+  // 团课：通过报名表找。限定 class_type='group'，避免跟上面重复计数
+  const { data: enr } = await supabaseAdmin
+    .from('class_enrollment').select('class_id').eq('student_id', clientId)
+  const enrolledIds = (enr || []).map((e: any) => e.class_id).filter(Boolean)
+
+  let groupCount = 0
+  if (enrolledIds.length > 0) {
+    const { count } = await supabaseAdmin
+      .from('class')
+      .select('id', { count: 'exact', head: true })
+      .in('id', enrolledIds)
+      .eq('status', 'completed')
+      .eq('class_type', 'group')
+    groupCount = count || 0
+  }
+
+  // 老学员在用这个系统之前上过的课，由教练手工认一个起始节数。
+  // 字段可能还没加（迁移 SQL 要手动跑），读不到就按 0 处理，不影响其余逻辑。
+  let base = 0
+  try {
+    const { data: u, error } = await supabaseAdmin
+      .from('user').select('loyalty_base_count').eq('id', clientId).single()
+    if (!error && u) base = Number((u as any).loyalty_base_count) || 0
+  } catch { /* 列还没加，按 0 算 */ }
+
+  const total = base + (privateCount || 0) + groupCount
+  if (total < threshold) return
+
+  // 落在哪个里程碑上（20/40/60…）。没到整数倍就不提醒
+  const milestone = Math.floor(total / threshold) * threshold
+  if (total !== milestone) return
+
+  const { data: who } = await supabaseAdmin
+    .from('user').select('name, email').eq('id', clientId).single()
+  const name = who?.name || who?.email || '学员'
+
+  const trainers = await trainersOfClient(clientId)
+  await Promise.all(trainers.map(tid => pushNotification({
+    user_id: tid,
+    type: 'loyalty_bonus',
+    title: `${name} 已累计完成 ${total} 节课`,
+    body: `按「每满 ${threshold} 节赠 ${bonus} 节」的规则，可以给她发放 ${bonus} 节赠课了。到学员页的「课时包」里一键发放。`,
+    link: `/dashboard/clients/${clientId}`,
+    related_user_id: clientId,
+    dedupe_key: `loyalty:${clientId}:${milestone}`,
+  })))
 }

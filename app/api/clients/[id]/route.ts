@@ -78,6 +78,10 @@ export async function PUT(
     if (body.sex        !== undefined) userUpdates.sex        = body.sex || null
     if (body.birth_date !== undefined) userUpdates.birth_date = body.birth_date || null
     if (body.height_cm  !== undefined) userUpdates.height_cm  = body.height_cm === '' ? null : body.height_cm
+    // 满赠起始节数：用系统之前就上过的课，教练手工认定
+    if (body.loyalty_base_count !== undefined) {
+      userUpdates.loyalty_base_count = Math.max(0, Math.floor(Number(body.loyalty_base_count) || 0))
+    }
     if (Object.keys(userUpdates).length > 0) {
       userUpdates.updated_at = new Date().toISOString()
       const { error: userErr } = await supabaseAdmin.from('user').update(userUpdates).eq('id', id)

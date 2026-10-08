@@ -30,6 +30,12 @@ export default function ProfilePage() {
   const { lang, setLang, fontSize, setFontSize, t } = useLang()
   const router = useRouter()
 
+  // 经营设置（只有教练看得到；学员端这个页面完全不受影响）
+  const isTrainerAcct = userRole === 'ADMIN' || userRole === 'TRAINER'
+  const [settings, setSettings] = useState<{ threshold: string; bonus: string; enabled: boolean } | null>(null)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [settingsSaved, setSettingsSaved] = useState(false)
+
   const [basic, setBasic] = useState<BasicProfile>({})
   const [editBasic, setEditBasic] = useState(false)
   const [basicForm, setBasicForm] = useState({ sex: '', birth_date: '', height_cm: '' })
@@ -45,6 +51,41 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login')
   }, [user, loading])
+
+  useEffect(() => {
+    if (!user || !isTrainerAcct) return
+    fetch('/api/settings', { headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setSettings({
+        threshold: String(d.loyalty_bonus_threshold ?? '20'),
+        bonus: String(d.loyalty_bonus_sessions ?? '1'),
+        enabled: String(d.loyalty_bonus_enabled ?? 'true') === 'true',
+      }) })
+      .catch(() => {})
+  }, [user, userRole, isTrainerAcct])
+
+  const saveSettings = async (next: { threshold: string; bonus: string; enabled: boolean }) => {
+    if (!user || savingSettings) return
+    setSavingSettings(true)
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user.id, 'x-user-role': userRole || '' },
+        body: JSON.stringify({
+          loyalty_bonus_threshold: next.threshold === '' ? '20' : next.threshold,
+          loyalty_bonus_sessions: next.bonus === '' ? '1' : next.bonus,
+          loyalty_bonus_enabled: next.enabled ? 'true' : 'false',
+        }),
+      })
+      if (!res.ok) throw new Error('保存失败')
+      setSettingsSaved(true)
+      setTimeout(() => setSettingsSaved(false), 1500)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setSavingSettings(false)
+    }
+  }
 
   useEffect(() => {
     if (!user) return
@@ -446,6 +487,65 @@ export default function ProfilePage() {
                 </div>
               ))
             )}
+          </div>
+        )}
+
+        {/* 经营设置 —— 只有教练/管理员看得到，学员端这块完全不渲染 */}
+        {isTrainerAcct && settings && (
+          <div style={{
+            background: 'var(--c-card-bg)', border: '1px solid var(--c-border)',
+            borderRadius: 'var(--r-lg)', padding: '0 var(--sp-5)', marginBottom: 'var(--sp-4)',
+          }}>
+            <p style={{ margin: 0, padding: 'var(--sp-4) 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              经营设置
+              {savingSettings && <span style={{ color: 'var(--c-brand)', marginLeft: 8, textTransform: 'none' }}>保存中…</span>}
+              {settingsSaved && <span style={{ color: 'var(--c-brand)', marginLeft: 8, textTransform: 'none' }}>✓ 已保存</span>}
+            </p>
+
+            <div style={{ padding: 'var(--sp-4) 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)' }}>满课赠送</span>
+                <button
+                  onClick={() => {
+                    const next = { ...settings, enabled: !settings.enabled }
+                    setSettings(next); saveSettings(next)
+                  }}
+                  style={{
+                    padding: '4px 14px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
+                    border: `1px solid ${settings.enabled ? 'var(--c-brand)' : 'var(--c-border)'}`,
+                    background: settings.enabled ? 'var(--c-brand)' : 'transparent',
+                    color: settings.enabled ? '#fff' : 'var(--c-text-secondary)',
+                  }}>
+                  {settings.enabled ? '已开启' : '已关闭'}
+                </button>
+              </div>
+
+              {settings.enabled && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>每满</span>
+                    <input
+                      type="text" inputMode="numeric" value={settings.threshold}
+                      onChange={e => setSettings({ ...settings, threshold: e.target.value.replace(/\D/g, '') })}
+                      onBlur={() => saveSettings(settings)}
+                      style={{ width: 56, padding: '7px 6px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, textAlign: 'center', boxSizing: 'border-box' }}
+                    />
+                    <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>节课，赠送</span>
+                    <input
+                      type="text" inputMode="numeric" value={settings.bonus}
+                      onChange={e => setSettings({ ...settings, bonus: e.target.value.replace(/\D/g, '') })}
+                      onBlur={() => saveSettings(settings)}
+                      style={{ width: 56, padding: '7px 6px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, textAlign: 'center', boxSizing: 'border-box' }}
+                    />
+                    <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>节</span>
+                  </div>
+                  <p style={{ margin: '8px 0 0', fontSize: 11, color: '#bbb', lineHeight: 1.7 }}>
+                    按学员<b>累计完成</b>的课数算，跨课时包累加。到了就给你发条消息提醒，
+                    赠课要你确认后才发放，不会自动加。
+                  </p>
+                </>
+              )}
+            </div>
           </div>
         )}
 
