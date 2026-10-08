@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { TrainerHome } from '@/components/home/TrainerHome'
+import { MySessionsCard } from '@/components/clients/MySessionsCard'
 import {
   Calendar, ChevronRight, Clock, Users, ClipboardCheck, Plus,
   Dumbbell, Activity, BookOpen, Trophy, ClipboardList, BarChart3, Ticket, User,
@@ -165,6 +166,9 @@ export default function DashboardPage() {
             你好，{displayName.split('@')[0]} 👋
           </h1>
         </div>
+
+        {/* 我的课时：有课时包 / 参加了满赠才显示，两样都没有就不出现 */}
+        <MySessionsCard userId={user?.id || ''} userRole={userRole || ''} />
 
         {/* Today's classes */}
         <section style={{ marginBottom: 24 }}>
