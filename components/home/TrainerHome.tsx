@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
-  Bell, ChevronLeft, ChevronRight, Clock, Plus, Calendar, AlertCircle,
+  Bell, ChevronLeft, ChevronRight, Clock, Plus, Calendar,
   CalendarCheck, Dumbbell, ClipboardCheck, Activity, BookOpen, ClipboardList, Trophy,
   BarChart3, Ticket,
 } from 'lucide-react'
@@ -13,7 +13,7 @@ import {
 // 布局见 docs/交接-导航重构与个人训练.md 3.2：
 //   日期 + 消息铃铛
 //   周视图横条（有课的日子标点，默认选中今天；整月去「月历 ›」）
-//   待复盘提醒条（有积压才出现）
+//   （原来的「N 节课待复盘」提醒条已按用户要求去掉；单节课上的「待复盘」小标签保留）
 //   选中那天的课
 //   全部功能（教学 / 内容 / 经营）
 //
@@ -132,7 +132,6 @@ export function TrainerHome({ userId, userRole, displayName }: {
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   const weekCounts = data?.week_counts || {}
   const classes = data && (data.view_date ?? data.date) === selected ? data.today_classes : []
-  const pending = data?.pending_review ?? 0
 
   // 换周：保持同一个星期几；回到本周时直接选今天
   const shiftWeek = (n: -1 | 1) => {
@@ -240,20 +239,6 @@ export function TrainerHome({ userId, userRole, displayName }: {
             })}
           </div>
         </div>
-
-        {/* 待复盘：有积压才出现 */}
-        {pending > 0 && (
-          <Link href="/dashboard/classes?review=1" style={{ textDecoration: 'none' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', marginBottom: 12,
-              background: '#FFF8E8', border: '1px solid #F0D9A8', borderRadius: 12, color: '#8A6A2A',
-            }}>
-              <AlertCircle size={16} />
-              <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{pending} 节课待复盘</span>
-              <ChevronRight size={16} />
-            </div>
-          </Link>
-        )}
 
         {/* 选中那天的课 */}
         <section style={{ marginBottom: 22 }}>
