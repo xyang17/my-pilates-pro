@@ -49,6 +49,46 @@ export async function GET(
   }
 }
 
+// 课时包自动扣课。
+//
+// 只在「从未完成 → 已完成」那一刻挂包，理由：
+//   1. 用户定的规则就是「上了才算」，排了课没上不该占名额
+//   2. 重复保存（复盘页存总结会频繁调这个接口）不会重复扣
+//
+// 取消完成不用退——package_balance 视图是数 status='completed' 的课，
+// 课一旦退回未完成，剩余自动涨回去，不需要手动清 package_id。
+//
+// 没有有效包的学员保持 package_id = null，就是按次收费，走 class.price。
+// 团课扣不了包：package_id 在课程表上，一节团课对应多个学员，装不下。
+async function autoLinkPackage(cls: any): Promise<string | null> {
+  if (cls.package_id) return cls.package_id          // 已经挂过了，不动
+  if (cls.class_type !== 'private') return null       // 团课/自我练习不走课时包
+  if (!cls.assigned_to) return null                   // 代课没有学员
+
+  const { data: pkgs } = await supabaseAdmin
+    .from('package_balance')
+    .select('id, remaining_sessions, expires_at, purchased_at')
+    .eq('client_id', cls.assigned_to)
+    .eq('status', 'active')
+    .eq('is_expired', false)
+    .gt('remaining_sessions', 0)
+    // 先用快过期的，没有有效期的排后面；同等情况下先买的先用
+    .order('expires_at', { ascending: true, nullsFirst: false })
+    .order('purchased_at', { ascending: true })
+    .limit(1)
+
+  const pick = pkgs?.[0]
+  if (!pick) return null
+
+  const { error } = await supabaseAdmin
+    .from('class').update({ package_id: pick.id }).eq('id', cls.id)
+  if (error) {
+    console.error('[class] 挂课时包失败:', error.message)
+    return null
+  }
+  return pick.id
+}
+
 // PUT /api/classes/[id]
 export async function PUT(
   req: NextRequest,
@@ -73,6 +113,9 @@ export async function PUT(
     if (body.description     !== undefined) updates.description     = body.description
     if (body.max_capacity    !== undefined) updates.max_capacity    = body.max_capacity
     if (body.price           !== undefined) updates.price           = body.price
+    // 结算方式：传包 id = 从该包扣；显式传 null = 改回按次收费。
+    // 用 !== undefined 判断，才能区分「没传」和「传了 null」
+    if (body.package_id      !== undefined) updates.package_id      = body.package_id || null
     if (body.color           !== undefined) updates.color           = body.color
     if (body.cover_image_url !== undefined) updates.cover_image_url = body.cover_image_url
     if (body.trainer_id      !== undefined) updates.trainer_id      = body.trainer_id
@@ -87,7 +130,7 @@ export async function PUT(
     // 这个接口被复盘页频繁调用（存课后总结、改状态），不能一更新就发消息。
     const { data: before } = await supabaseAdmin
       .from('class')
-      .select('date, start_time, assigned_to, class_type, name')
+      .select('date, start_time, assigned_to, class_type, name, status, package_id')
       .eq('id', id)
       .maybeSingle()
 
@@ -102,6 +145,13 @@ export async function PUT(
     if (!data || data.length === 0) return NextResponse.json({ error: 'Not found or unauthorized' }, { status: 404 })
 
     const after = data[0]
+
+    // 刚刚被标记为完成 → 尝试从课时包里扣一节
+    let linkedPackageId: string | null = after.package_id ?? null
+    if (before && before.status !== 'completed' && after.status === 'completed') {
+      linkedPackageId = await autoLinkPackage(after)
+    }
+
     const timeChanged = !!before && (
       (updates.date !== undefined && before.date !== after.date) ||
       (updates.start_time !== undefined && before.start_time !== after.start_time)
@@ -124,7 +174,7 @@ export async function PUT(
       }
     }
 
-    return NextResponse.json(after)
+    return NextResponse.json({ ...after, package_id: linkedPackageId })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

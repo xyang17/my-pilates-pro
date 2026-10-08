@@ -66,6 +66,7 @@ interface ClassData {
   description?: string
   max_capacity?: number
   price?: number
+  package_id?: string | null
   color?: string
   cover_image_url?: string
   trainer_id?: string
@@ -185,6 +186,11 @@ export default function ClassDetailPage() {
   // 类别/形式/难度这些课程属性对它没意义，动作列表也不需要编辑，只留一个备注
   const isSelfPractice = classData?.class_type === 'self_practice'
 
+  // 结算方式：这节私教课是从某个课时包里扣，还是按次单独收费。
+  // 包列表只在私教课且有指定学员时才需要拉。
+  const [clientPackages, setClientPackages] = useState<any[]>([])
+  const [savingBilling, setSavingBilling] = useState(false)
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth/login')
@@ -195,6 +201,42 @@ export default function ClassDetailPage() {
       if (isTrainer) { fetchAvailableExercises(); fetchRecentExercises() }
     }
   }, [user, authLoading])
+
+  useEffect(() => {
+    if (!isTrainer || !user) return
+    if (classData?.class_type !== 'private' || !classData?.assigned_to) return
+    fetch(`/api/packages?clientId=${classData.assigned_to}`, {
+      headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' },
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setClientPackages(Array.isArray(d) ? d : []))
+      .catch(() => {})
+  }, [classData?.assigned_to, classData?.class_type, isTrainer, user, userRole])
+
+  const handleChangeBilling = async (packageId: string | null) => {
+    if (!classData || savingBilling) return
+    setSavingBilling(true)
+    try {
+      const res = await fetch(`/api/classes/${classId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({ package_id: packageId }),
+      })
+      if (!res.ok) throw new Error('保存失败')
+      setClassData(prev => prev ? { ...prev, package_id: packageId } : prev)
+      // 剩余节数变了，重新拉一次
+      if (classData.assigned_to) {
+        const r = await fetch(`/api/packages?clientId=${classData.assigned_to}`, {
+          headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        })
+        if (r.ok) setClientPackages(await r.json())
+      }
+    } catch (err: any) {
+      showToast(err.message || '保存失败', 'error')
+    } finally {
+      setSavingBilling(false)
+    }
+  }
 
   useEffect(() => {
     if (classData?.class_type === 'group' && isTrainer && user) {
@@ -1193,10 +1235,64 @@ export default function ClassDetailPage() {
                 )}
                 {/* 价格属于经营数据，只给教练与管理员看。
                     接口层也会对会员剥掉这个字段，此处是第二道防线。 */}
-                {isTrainer && classData.price != null && (
+                {isTrainer && classData.price != null && !classData.package_id && (
                   <div>
                     <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>价格 Price</p>
                     <p style={{ margin: 0, fontWeight: 'bold' }}>¥{classData.price}</p>
+                  </div>
+                )}
+
+                {/* 结算方式：按次收费 or 从某个课时包里扣。
+                    有的学员就是按次收费的，所以「按次」永远是可选项；
+                    有包的学员偶尔上一节单独收费的课，也能切回来。 */}
+                {isTrainer && !isSelfPractice && classData.class_type === 'private' && classData.assigned_to && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <p style={{ margin: '0 0 6px 0', color: '#999', fontSize: '11px' }}>
+                      结算方式{savingBilling && <span style={{ color: 'var(--c-brand)', marginLeft: 6 }}>保存中…</span>}
+                    </p>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => handleChangeBilling(null)}
+                        disabled={savingBilling}
+                        style={{
+                          padding: '6px 14px', borderRadius: 16, fontSize: 12, cursor: 'pointer',
+                          border: `1px solid ${!classData.package_id ? 'var(--c-brand)' : 'var(--c-border)'}`,
+                          background: !classData.package_id ? 'var(--c-brand)' : 'transparent',
+                          color: !classData.package_id ? '#fff' : 'var(--c-text-secondary)',
+                          fontWeight: !classData.package_id ? 600 : 400,
+                        }}>
+                        按次收费
+                      </button>
+                      {clientPackages
+                        .filter(p => p.id === classData.package_id || (p.status === 'active' && !p.is_expired && !p.is_used_up))
+                        .map(p => {
+                          const on = classData.package_id === p.id
+                          return (
+                            <button key={p.id}
+                              onClick={() => handleChangeBilling(p.id)}
+                              disabled={savingBilling}
+                              style={{
+                                padding: '6px 14px', borderRadius: 16, fontSize: 12, cursor: 'pointer',
+                                border: `1px solid ${on ? 'var(--c-brand)' : 'var(--c-border)'}`,
+                                background: on ? 'var(--c-brand)' : 'transparent',
+                                color: on ? '#fff' : 'var(--c-text-secondary)',
+                                fontWeight: on ? 600 : 400,
+                              }}>
+                              课时包 · 剩 {p.remaining_sessions}/{p.granted_sessions}
+                              {p.expires_at ? ` · ${p.expires_at} 到期` : ''}
+                            </button>
+                          )
+                        })}
+                    </div>
+                    <p style={{ margin: '6px 0 0', fontSize: 11, color: '#bbb' }}>
+                      {classData.package_id
+                        ? (classData.status === 'completed'
+                            ? '这节课已从该课时包扣除 1 节'
+                            : '标记完成后会从该课时包扣 1 节')
+                        : clientPackages.some(p => p.status === 'active' && !p.is_expired && !p.is_used_up)
+                          ? '这节课单独收费，不占用课时包'
+                          : '这个学员目前没有可用的课时包'}
+                    </p>
                   </div>
                 )}
                 {classData.class_type === 'group' && classData.max_capacity && (

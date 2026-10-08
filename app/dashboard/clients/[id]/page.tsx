@@ -41,6 +41,23 @@ interface Homework {
   homework_exercise: HomeworkExercise[]
 }
 
+interface PackageBalance {
+  id: string
+  total_sessions: number
+  bonus_sessions: number
+  granted_sessions: number
+  used_sessions: number
+  remaining_sessions: number
+  price: number | null
+  source: 'purchase' | 'loyalty'
+  purchased_at: string
+  expires_at: string | null
+  status: string
+  notes: string | null
+  is_expired: boolean
+  is_used_up: boolean
+}
+
 interface Client {
   id: string
   name: string
@@ -84,7 +101,14 @@ export default function ClientDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [hwLoading, setHwLoading] = useState(false)
   const [aLoading, setALoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'classes' | 'homework' | 'assessments' | 'cycle'>('classes')
+  const [activeTab, setActiveTab] = useState<'classes' | 'homework' | 'assessments' | 'cycle' | 'packages'>('classes')
+  // 课时包。剩余节数一律从接口读（后端 package_balance 视图算的），前端不自己算，
+  // 不然删课改课之后两边数字会对不上。
+  const [packages, setPackages] = useState<PackageBalance[]>([])
+  const [pkgLoading, setPkgLoading] = useState(false)
+  const [showAddPkg, setShowAddPkg] = useState(false)
+  const [pkgForm, setPkgForm] = useState({ total: '', bonus: '', price: '', expires: '', notes: '' })
+  const [savingPkg, setSavingPkg] = useState(false)
   const [expandedHw, setExpandedHw] = useState<Set<string>>(new Set())
   const [deletingHwId, setDeletingHwId] = useState<string | null>(null)
   const isTrainer = userRole === 'ADMIN' || userRole === 'TRAINER'
@@ -107,7 +131,7 @@ export default function ClientDetailPage() {
 
   useEffect(() => {
     if (!authLoading && !user) { router.push('/auth/login'); return }
-    if (user) fetchClient()
+    if (user) { fetchClient(); fetchPackages() }
   }, [user, authLoading])
 
   useEffect(() => {
@@ -158,6 +182,62 @@ export default function ClientDetailPage() {
     } finally {
       setSavingNotes(false)
     }
+  }
+
+  const fetchPackages = async () => {
+    setPkgLoading(true)
+    try {
+      const res = await fetch(`/api/packages?clientId=${clientId}`, {
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (res.ok) setPackages(await res.json())
+    } finally {
+      setPkgLoading(false)
+    }
+  }
+
+  const handleAddPackage = async () => {
+    if (savingPkg) return
+    const total = Number(pkgForm.total) || 0
+    const bonus = Number(pkgForm.bonus) || 0
+    if (total + bonus <= 0) { alert('节数至少要有 1 节'); return }
+    setSavingPkg(true)
+    try {
+      const res = await fetch('/api/packages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({
+          client_id: clientId,
+          total_sessions: total,
+          bonus_sessions: bonus,
+          price: pkgForm.price === '' ? null : Number(pkgForm.price),
+          expires_at: pkgForm.expires || null,
+          notes: pkgForm.notes || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '新建失败')
+      setPackages(prev => [data, ...prev])
+      setPkgForm({ total: '', bonus: '', price: '', expires: '', notes: '' })
+      setShowAddPkg(false)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setSavingPkg(false)
+    }
+  }
+
+  const handleDeletePackage = async (pkg: PackageBalance) => {
+    const warn = pkg.used_sessions > 0
+      ? `这个包已经消耗了 ${pkg.used_sessions} 节课。删除后这些课会退回「单次付费」，确定？`
+      : '确定删除这个课时包？'
+    if (!window.confirm(warn)) return
+    const res = await fetch(`/api/packages/${pkg.id}`, {
+      method: 'DELETE',
+      headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+    })
+    if (res.ok) setPackages(prev => prev.filter(p => p.id !== pkg.id))
+    else alert('删除失败')
   }
 
   const fetchCycleLogs = async () => {
@@ -262,6 +342,11 @@ export default function ClientDetailPage() {
   )
 
   // 自我练习（学员自己用计时器练完记的）跟正常课排在同一条时间线上，用筛选按钮分开看
+  // 还能用的包才算进「剩余课时」：过期的、用完的、退款作废的都不算
+  const activeRemaining = packages
+    .filter(p => p.status === 'active' && !p.is_expired && !p.is_used_up)
+    .reduce((sum, p) => sum + p.remaining_sessions, 0)
+
   const visibleClasses = client.classes.filter(c =>
     classFilter === 'all' ? true
       : classFilter === 'self' ? c.class_type === 'self_practice'
@@ -308,7 +393,7 @@ export default function ClientDetailPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
             {[
               { label: '总课程', val: client.classes.length },
-              { label: '即将上课', val: upcoming.length },
+              { label: '剩余课时', val: pkgLoading ? '…' : (packages.length === 0 ? '—' : activeRemaining) },
               { label: '已完成课', val: past.length },
               { label: '作业完成', val: hwDone },
             ].map(s => (
@@ -413,11 +498,12 @@ export default function ClientDetailPage() {
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '2px', borderBottom: '2px solid #eee', marginBottom: '0' }}>
           {(() => {
-            const tabs: { key: 'classes' | 'homework' | 'assessments' | 'cycle'; label: string }[] = [
+            const tabs: { key: 'classes' | 'homework' | 'assessments' | 'cycle' | 'packages'; label: string }[] = [
               { key: 'classes', label: `课程记录 (${client.classes.length})` },
               { key: 'homework', label: `作业 (${homework.length || '…'})` },
               { key: 'assessments', label: `测试记录 (${assessments.length || '…'})` },
             ]
+            tabs.push({ key: 'packages', label: '课时包' })
             if (client.sex === 'FEMALE') tabs.push({ key: 'cycle', label: `生理周期 (${cycleLogs.length || '…'})` })
             return tabs
           })().map(tab => (
@@ -637,6 +723,120 @@ export default function ClientDetailPage() {
                     </div>
                     <span style={{ color: 'var(--c-text-hint)', fontSize: 18 }}>›</span>
                   </Link>
+                )
+              })
+            )}
+          </div>
+        )}
+
+        {/* 课时包 tab */}
+        {activeTab === 'packages' && (
+          <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--c-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>
+                {packages.length === 0 ? '还没有课时包' : `共 ${packages.length} 个`}
+              </span>
+              <button onClick={() => setShowAddPkg(v => !v)}
+                style={{ fontSize: 13, color: 'var(--c-brand)', border: '1px solid var(--c-brand)', borderRadius: 6, padding: '5px 14px', background: 'none', cursor: 'pointer', fontWeight: 500 }}>
+                {showAddPkg ? '取消' : '＋ 新建课时包'}
+              </button>
+            </div>
+
+            {showAddPkg && (
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--c-border)', background: 'var(--c-fill-light)' }}>
+                <p style={{ margin: '0 0 12px', fontSize: 12, color: '#999', lineHeight: 1.7 }}>
+                  学员如果之前已经上过课，这里直接填<b>还剩多少节</b>就行，不用回头把历史课一节节挂进来。
+                  从今往后完成的课会自动从这个包里扣。
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>节数 *</label>
+                    <input type="text" inputMode="numeric" value={pkgForm.total}
+                      onChange={e => setPkgForm(f => ({ ...f, total: e.target.value.replace(/\D/g, '') }))}
+                      placeholder="10"
+                      style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>赠送（买N送M）</label>
+                    <input type="text" inputMode="numeric" value={pkgForm.bonus}
+                      onChange={e => setPkgForm(f => ({ ...f, bonus: e.target.value.replace(/\D/g, '') }))}
+                      placeholder="0"
+                      style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>实付金额</label>
+                    <input type="text" inputMode="numeric" value={pkgForm.price}
+                      onChange={e => setPkgForm(f => ({ ...f, price: e.target.value.replace(/[^\d.]/g, '') }))}
+                      placeholder="2000"
+                      style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>有效期（选填）</label>
+                    <input type="date" value={pkgForm.expires}
+                      onChange={e => setPkgForm(f => ({ ...f, expires: e.target.value }))}
+                      style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+                <input type="text" value={pkgForm.notes}
+                  onChange={e => setPkgForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="备注（选填）"
+                  style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', marginBottom: 10 }} />
+                <button onClick={handleAddPackage} disabled={savingPkg}
+                  style={{ padding: '8px 20px', background: savingPkg ? 'var(--c-lavender)' : 'var(--c-brand)', color: '#fff', border: 'none', borderRadius: 6, cursor: savingPkg ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  {savingPkg ? '保存中…' : '保存'}
+                </button>
+              </div>
+            )}
+
+            {pkgLoading ? (
+              <p style={{ padding: 40, textAlign: 'center', color: '#bbb', margin: 0 }}>加载中…</p>
+            ) : packages.length === 0 ? (
+              <p style={{ padding: 40, textAlign: 'center', color: '#bbb', margin: 0, fontSize: 13, lineHeight: 1.8 }}>
+                这个学员是单次付费<br />
+                <span style={{ fontSize: 12 }}>买了课时包之后，完成的课会自动从包里扣</span>
+              </p>
+            ) : (
+              packages.map((pkg, i) => {
+                const dead = pkg.is_used_up || pkg.is_expired || pkg.status !== 'active'
+                const pct = pkg.granted_sessions > 0
+                  ? Math.min(100, Math.round((pkg.used_sessions / pkg.granted_sessions) * 100))
+                  : 0
+                return (
+                  <div key={pkg.id} style={{
+                    padding: '14px 20px',
+                    borderBottom: i < packages.length - 1 ? '1px solid var(--c-border)' : 'none',
+                    opacity: dead ? 0.55 : 1,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 20, fontWeight: 800, color: dead ? '#999' : 'var(--c-brand)' }}>
+                        {pkg.remaining_sessions}
+                      </span>
+                      <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>
+                        / {pkg.granted_sessions} 节剩余
+                      </span>
+                      {pkg.source === 'loyalty' && (
+                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 8, background: '#FFF3E0', color: '#E65100' }}>满赠</span>
+                      )}
+                      {pkg.is_used_up && <span style={{ fontSize: 11, color: '#999' }}>已用完</span>}
+                      {pkg.is_expired && <span style={{ fontSize: 11, color: '#c0392b' }}>已过期</span>}
+                      {pkg.status === 'refunded' && <span style={{ fontSize: 11, color: '#999' }}>已退款</span>}
+                      <button onClick={() => handleDeletePackage(pkg)}
+                        style={{ marginLeft: 'auto', border: 'none', background: 'transparent', color: '#ccc', cursor: 'pointer', fontSize: 13 }}>✕</button>
+                    </div>
+
+                    <div style={{ height: 5, borderRadius: 3, background: 'var(--c-fill-mid)', marginBottom: 8, overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: dead ? '#ccc' : 'var(--c-brand)' }} />
+                    </div>
+
+                    <p style={{ margin: 0, fontSize: 12, color: '#999' }}>
+                      {pkg.purchased_at} 购买
+                      {pkg.total_sessions > 0 && pkg.bonus_sessions > 0 && ` · 买${pkg.total_sessions}送${pkg.bonus_sessions}`}
+                      {pkg.price != null && ` · ¥${pkg.price}`}
+                      {pkg.expires_at && ` · ${pkg.expires_at} 到期`}
+                      {pkg.used_sessions > 0 && ` · 已上 ${pkg.used_sessions} 节`}
+                    </p>
+                    {pkg.notes && <p style={{ margin: '4px 0 0', fontSize: 12, color: '#bbb' }}>{pkg.notes}</p>}
+                  </div>
                 )
               })
             )}

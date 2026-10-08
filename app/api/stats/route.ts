@@ -70,12 +70,17 @@ interface ClassRow {
   class_type: string
   created_by: string
   assigned_to: string | null
+  package_id: string | null
+  /** 这节课实际算多少钱。挂了课时包的按包的单节均价，没挂的按 class.price。
+   *  收入一律用这个字段，不要再直接读 price —— 直接读会让挂包的课算成 0。 */
+  rev: number
 }
 
 interface Bucket { label: string; classes: number; revenue: number }
 
 const num = (v: unknown) => (v === null || v === undefined ? 0 : Number(v) || 0)
-const hasPrice = (r: ClassRow) => r.price !== null && r.price !== undefined && Number(r.price) > 0
+// 「有没有定价」要看实际收入：挂了课时包的课 price 是空的，但它不是「漏填价格」
+const hasPrice = (r: ClassRow) => r.rev > 0
 
 function buildTrend(rows: ClassRow[], granularity: Granularity, start: Date, end: Date, weekdayLabels: boolean): Bucket[] {
   const completed = rows.filter(r => r.status === 'completed')
@@ -89,7 +94,7 @@ function buildTrend(rows: ClassRow[], granularity: Granularity, start: Date, end
       buckets.push({
         label: weekdayLabels ? ['日', '一', '二', '三', '四', '五', '六'][cursor.getDay()] : `${cursor.getMonth() + 1}/${cursor.getDate()}`,
         classes: dayRows.length,
-        revenue: dayRows.reduce((s, r) => s + num(r.price), 0),
+        revenue: dayRows.reduce((s, r) => s + r.rev, 0),
       })
       cursor.setDate(cursor.getDate() + 1)
     }
@@ -112,7 +117,7 @@ function buildTrend(rows: ClassRow[], granularity: Granularity, start: Date, end
       buckets.push({
         label: `${cursor.getMonth() + 1}/${cursor.getDate()}`,
         classes: weekRows.length,
-        revenue: weekRows.reduce((s, r) => s + num(r.price), 0),
+        revenue: weekRows.reduce((s, r) => s + r.rev, 0),
       })
       cursor.setDate(cursor.getDate() + 7)
     }
@@ -129,7 +134,7 @@ function buildTrend(rows: ClassRow[], granularity: Granularity, start: Date, end
     buckets.push({
       label: crossesYear ? `${y}/${m + 1}` : `${m + 1}月`,
       classes: monthRows.length,
-      revenue: monthRows.reduce((s, r) => s + num(r.price), 0),
+      revenue: monthRows.reduce((s, r) => s + r.rev, 0),
     })
     cursor.setMonth(cursor.getMonth() + 1)
   }
@@ -139,12 +144,12 @@ function buildTrend(rows: ClassRow[], granularity: Granularity, start: Date, end
 function summarize(rows: ClassRow[]) {
   const completed = rows.filter(r => r.status === 'completed')
   const cancelled = rows.filter(r => r.status === 'cancelled')
-  const revenue = completed.reduce((s, r) => s + num(r.price), 0)
+  const revenue = completed.reduce((s, r) => s + r.rev, 0)
   const priced = completed.filter(hasPrice)
 
   const byType = (type: string) => {
     const t = completed.filter(r => r.class_type === type)
-    return { count: t.length, revenue: t.reduce((s, r) => s + num(r.price), 0) }
+    return { count: t.length, revenue: t.reduce((s, r) => s + r.rev, 0) }
   }
 
   return {
@@ -231,14 +236,14 @@ export async function GET(req: NextRequest) {
       scoped(
         supabaseAdmin
           .from('class')
-          .select('id, name, date, start_time, price, duration, status, class_type, created_by, assigned_to')
+          .select('id, name, date, start_time, price, duration, status, class_type, created_by, assigned_to, package_id')
           .gte('date', startStr)
           .lte('date', endStr)
       ),
       scoped(
         supabaseAdmin
           .from('class')
-          .select('price, status')
+          .select('price, status, package_id')
           .gte('date', toDateStr(prevStart))
           .lte('date', toDateStr(prevEnd))
           .eq('status', 'completed')
@@ -246,11 +251,35 @@ export async function GET(req: NextRequest) {
     ])
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-    const rows = (data || []) as ClassRow[]
+    // ── 课时包：把「这节课实际算多少钱」算出来 ──────────────────
+    //
+    // 挂了课时包的课，class.price 是空的，钱在包里。按消耗分摊的口径下，
+    // 每节课算包的单节均价（包总价 ÷ 总节数，含赠送）。
+    // 赠课包总价为 0，所以免费课收入自然是 0，不用特判。
+    //
+    // 没挂包的课就是按次收费，照旧用 class.price。
+    const rawRows = (data || []) as any[]
+    const pkgIds = [...new Set([
+      ...rawRows.map(r => r.package_id),
+      ...((prevData || []) as any[]).map(r => r.package_id),
+    ].filter(Boolean))] as string[]
+
+    const perSession: Record<string, number> = {}
+    if (pkgIds.length > 0) {
+      const { data: pkgs } = await supabaseAdmin
+        .from('package_balance')
+        .select('id, price_per_session')
+        .in('id', pkgIds)
+      ;(pkgs || []).forEach((p: any) => { perSession[p.id] = num(p.price_per_session) })
+    }
+
+    const revenueOf = (r: any) => r.package_id ? (perSession[r.package_id] ?? 0) : num(r.price)
+
+    const rows = rawRows.map(r => ({ ...r, rev: revenueOf(r) })) as ClassRow[]
     const summary = summarize(rows)
     const prev = {
       completed: (prevData || []).length,
-      revenue: (prevData || []).reduce((s: number, r: any) => s + num(r.price), 0),
+      revenue: ((prevData || []) as any[]).reduce((s: number, r: any) => s + revenueOf(r), 0),
     }
 
     const granularity: Granularity =
@@ -302,11 +331,11 @@ export async function GET(req: NextRequest) {
       clientAgg[clientId].revenue += revenue
     }
     completedRows.filter(r => r.class_type === 'private' && r.assigned_to)
-      .forEach(r => addToClient(r.assigned_to as string, 1, num(r.price)))
+      .forEach(r => addToClient(r.assigned_to as string, 1, r.rev))
     completedRows.filter(r => r.class_type === 'group').forEach(r => {
       const students = enrolledByClass[r.id] || []
       if (students.length === 0) return
-      const share = num(r.price) / students.length
+      const share = r.rev / students.length
       students.forEach(sid => addToClient(sid, 1, share))
     })
     const byClient = Object.keys(clientAgg)
