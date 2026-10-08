@@ -150,10 +150,20 @@ export async function PUT(
     let linkedPackageId: string | null = after.package_id ?? null
     if (before && before.status !== 'completed' && after.status === 'completed') {
       linkedPackageId = await autoLinkPackage(after)
-      // 满课赠送只提醒不自动发，失败也不该影响「课已完成」这件事
-      if (after.assigned_to) {
-        try { await checkLoyaltyBonus(after.assigned_to) }
-        catch (e: any) { console.error('[class] 满赠检测失败:', e?.message) }
+      // 满课赠送只提醒不自动发，失败也不该影响「课已完成」这件事。
+      // 自我练习不是计费课，不触发；私教查 assigned_to，团课查每个报名的学员。
+      try {
+        let studentIds: string[] = []
+        if (after.class_type === 'private' && after.assigned_to) {
+          studentIds = [after.assigned_to]
+        } else if (after.class_type === 'group') {
+          const { data: enr } = await supabaseAdmin
+            .from('class_enrollment').select('student_id').eq('class_id', after.id)
+          studentIds = Array.from(new Set((enr || []).map((e: any) => e.student_id).filter(Boolean)))
+        }
+        for (const sid of studentIds) await checkLoyaltyBonus(sid)
+      } catch (e: any) {
+        console.error('[class] 满赠检测失败:', e?.message)
       }
     }
 

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { countBillableCompleted } from '@/lib/classCounts'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -288,29 +289,8 @@ export async function checkLoyaltyBonus(clientId: string) {
   if (!Number.isFinite(threshold) || threshold <= 0) return
   if (!Number.isFinite(bonus) || bonus <= 0) return
 
-  // 私教：直接指派给这个学员的
-  const { count: privateCount } = await supabaseAdmin
-    .from('class')
-    .select('id', { count: 'exact', head: true })
-    .eq('assigned_to', clientId)
-    .eq('status', 'completed')
-    .neq('class_type', 'self_practice')
-
-  // 团课：通过报名表找。限定 class_type='group'，避免跟上面重复计数
-  const { data: enr } = await supabaseAdmin
-    .from('class_enrollment').select('class_id').eq('student_id', clientId)
-  const enrolledIds = (enr || []).map((e: any) => e.class_id).filter(Boolean)
-
-  let groupCount = 0
-  if (enrolledIds.length > 0) {
-    const { count } = await supabaseAdmin
-      .from('class')
-      .select('id', { count: 'exact', head: true })
-      .in('id', enrolledIds)
-      .eq('status', 'completed')
-      .eq('class_type', 'group')
-    groupCount = count || 0
-  }
+  // 计费课时（私教 + 报名的团课，不含自我练习），算法统一在 lib/classCounts.ts
+  const counts = await countBillableCompleted(clientId)
 
   // 老学员在用这个系统之前上过的课，由教练手工认一个起始节数。
   // 字段可能还没加（迁移 SQL 要手动跑），读不到就按 0 处理，不影响其余逻辑。
@@ -321,7 +301,7 @@ export async function checkLoyaltyBonus(clientId: string) {
     if (!error && u) base = Number((u as any).loyalty_base_count) || 0
   } catch { /* 列还没加，按 0 算 */ }
 
-  const total = base + (privateCount || 0) + groupCount
+  const total = base + counts.total
   if (total < threshold) return
 
   // 落在哪个里程碑上（20/40/60…）。没到整数倍就不提醒
@@ -337,7 +317,7 @@ export async function checkLoyaltyBonus(clientId: string) {
     user_id: tid,
     type: 'loyalty_bonus',
     title: `${name} 已累计完成 ${total} 节课`,
-    body: `按「每满 ${threshold} 节赠 ${bonus} 节」的规则，可以给她发放 ${bonus} 节赠课了。到学员页的「课时包」里一键发放。`,
+    body: `按「每满 ${threshold} 节赠 ${bonus} 节」的规则，可以发放 ${bonus} 节赠课了。到学员页的「课时包」里一键发放。`,
     link: `/dashboard/clients/${clientId}`,
     related_user_id: clientId,
     dedupe_key: `loyalty:${clientId}:${milestone}`,

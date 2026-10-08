@@ -70,6 +70,9 @@ interface Client {
   birth_date?: string | null
   height_cm?: number | null
   loyalty_base_count?: number | null
+  // 计费课时：私教 + 报名团课，不含自我练习。服务端算好（lib/classCounts.ts），前端不要自己数
+  billable_completed?: number
+  self_practice_completed?: number
   created_at: string
   classes: ClientClass[]
 }
@@ -428,6 +431,9 @@ export default function ClientDetailPage() {
   const selfPracticeCount = client.classes.filter(c => c.class_type === 'self_practice').length
   const upcoming = visibleClasses.filter(c => c.status !== 'completed')
   const past = visibleClasses.filter(c => c.status === 'completed')
+  // 计费课时以服务端为准；接口没返回（旧版本）时才退回前端数，而且排除自我练习
+  const billableDone = client.billable_completed
+    ?? client.classes.filter(c => c.status === 'completed' && c.class_type !== 'self_practice').length
   const hwDone = homework.filter(h => h.status === 'completed').length
 
   return (
@@ -465,9 +471,10 @@ export default function ClientDetailPage() {
           {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
             {[
-              { label: '总课程', val: client.classes.length },
+              // 课程数都不含自我练习——那是学员自己练的，不是计费上课
+              { label: '已上课', val: billableDone },
               { label: '剩余课时', val: pkgLoading ? '…' : (packages.length === 0 ? '—' : activeRemaining) },
-              { label: '已完成课', val: past.length },
+              { label: '自我练习', val: client.self_practice_completed ?? selfPracticeCount },
               { label: '作业完成', val: hwDone },
             ].map(s => (
               <div key={s.label} style={{ textAlign: 'center', padding: '10px 4px', backgroundColor: '#f9f6fc', borderRadius: '8px' }}>
@@ -879,13 +886,13 @@ export default function ClientDetailPage() {
                     style={{ width: 52, padding: '5px 6px', border: '1px solid #E0C9A0', borderRadius: 6, fontSize: 13, textAlign: 'center', boxSizing: 'border-box' }} />
                   <span style={{ fontSize: 12, color: '#8a6d3b' }}>节</span>
                   <span style={{ fontSize: 12, color: '#b39866' }}>
-                    ＋ 系统内已完成 {past.length} 节 ＝ 累计 <b>{(Number(baseInput) || 0) + past.length}</b> 节
+                    ＋ 系统内已上 {billableDone} 节 ＝ 累计 <b>{(Number(baseInput) || 0) + billableDone}</b> 节
                   </span>
                   {savingBase && <span style={{ fontSize: 11, color: 'var(--c-brand)' }}>保存中…</span>}
                   {baseSaved && <span style={{ fontSize: 11, color: 'var(--c-brand)' }}>✓</span>}
                 </div>
                 <p style={{ margin: '6px 0 0', fontSize: 11, color: '#b39866' }}>
-                  满 {bonusRule.threshold} 节提醒赠课。老学员之前上过的课在这里认，不用把历史课补录进系统。
+                  满 {bonusRule.threshold} 节提醒赠课。只算私教和团课，自我练习不计入{(client.self_practice_completed ?? 0) > 0 ? `（另有 ${client.self_practice_completed} 节自我练习，没算进去）` : ''}。老学员之前上过的课在这里认，不用把历史课补录进系统。
                 </p>
               </div>
             )}
