@@ -5,6 +5,7 @@ import { useLang } from '@/context/LanguageContext'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { ClientStatusPanel, ClientSummary } from '@/components/clients/ClientCard'
 
 interface ClientClass {
   id: string
@@ -73,6 +74,8 @@ interface Client {
   // 计费课时：私教 + 报名团课，不含自我练习。服务端算好（lib/classCounts.ts），前端不要自己数
   billable_completed?: number
   self_practice_completed?: number
+  // 卡片摘要：付费方式 / 课时包 / 满赠 / 最近与下次上课 / 提醒（lib/clientSummary.ts）
+  summary?: ClientSummary | null
   created_at: string
   classes: ClientClass[]
 }
@@ -211,6 +214,19 @@ export default function ClientDetailPage() {
     }
   }
 
+  // 课时包有变动（建包、发赠课、作废）或改了历史节数后，顶部卡片的摘要要跟着刷新
+  const refreshSummary = async () => {
+    try {
+      const res = await fetch(`/api/clients/${clientId}`, {
+        headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+      })
+      if (res.ok) {
+        const c = await res.json()
+        setClient(prev => prev ? { ...prev, summary: c.summary, billable_completed: c.billable_completed } : prev)
+      }
+    } catch { /* 刷不到就保持原样 */ }
+  }
+
   const fetchPackages = async () => {
     setPkgLoading(true)
     try {
@@ -245,6 +261,7 @@ export default function ClientDetailPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '新建失败')
       setPackages(prev => [data, ...prev])
+      refreshSummary()
       setPkgForm({ total: '', bonus: '', price: '', expires: '', notes: '' })
       setShowAddPkg(false)
     } catch (err: any) {
@@ -276,6 +293,7 @@ export default function ClientDetailPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '发放失败')
       setPackages(prev => [data, ...prev])
+      refreshSummary()
     } catch (err: any) {
       alert(err.message)
     } finally {
@@ -294,6 +312,7 @@ export default function ClientDetailPage() {
       })
       if (!res.ok) throw new Error('保存失败（可能是数据库字段还没加，见 docs/待执行SQL-满赠起始节数.sql）')
       setClient(prev => prev ? { ...prev, loyalty_base_count: Number(baseInput) || 0 } : prev)
+      refreshSummary()
       setBaseSaved(true)
       setTimeout(() => setBaseSaved(false), 1500)
     } catch (err: any) {
@@ -312,7 +331,7 @@ export default function ClientDetailPage() {
       method: 'DELETE',
       headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
     })
-    if (res.ok) setPackages(prev => prev.filter(p => p.id !== pkg.id))
+    if (res.ok) { setPackages(prev => prev.filter(p => p.id !== pkg.id)); refreshSummary() }
     else alert('删除失败')
   }
 
@@ -468,7 +487,10 @@ export default function ClientDetailPage() {
             </div>
           </div>
 
-          {/* Stats */}
+          {/* 学员卡片：付费方式 / 课时包 / 满赠 / 上课情况（lib/clientSummary.ts 算好） */}
+          {client.summary ? (
+            <ClientStatusPanel s={client.summary} onOpenPackages={() => setActiveTab('packages')} />
+          ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
             {[
               // 课程数都不含自我练习——那是学员自己练的，不是计费上课
@@ -483,6 +505,7 @@ export default function ClientDetailPage() {
               </div>
             ))}
           </div>
+          )}
 
           {client.bio && (
             <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eee' }}>

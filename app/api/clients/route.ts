@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { summarizeClients } from '@/lib/clientSummary'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,7 +24,10 @@ export async function GET(req: NextRequest) {
       .order('name')
 
     if (error) throw error
-    return NextResponse.json(data || [])
+    // 卡片摘要：付费方式、课时包剩余、满赠进度、最近/下次上课、提醒。批量算，见 lib/clientSummary.ts
+    const rows = data || []
+    const summaries = await summarizeClients(rows.map(r => r.id))
+    return NextResponse.json(rows.map(r => ({ ...r, summary: summaries[r.id] || null })))
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

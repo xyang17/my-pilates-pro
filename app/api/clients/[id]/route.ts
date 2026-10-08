@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { countBillableCompleted } from '@/lib/classCounts'
+import { summarizeClients } from '@/lib/clientSummary'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -48,6 +49,10 @@ export async function GET(
     // 计费课时（私教 + 报名团课，不含自我练习），跟满赠提醒用同一个算法。
     // 前端不要自己拿 classes 数：classes 只有最近 50 条，而且里面混着自我练习。
     const counts = await countBillableCompleted(id)
+    // 卡片摘要只给教练/管理员（里面有课时包、满赠等经营信息）
+    const summary = (userRole === 'ADMIN' || userRole === 'TRAINER')
+      ? (await summarizeClients([id]))[id] || null
+      : null
 
     return NextResponse.json({
       ...userRow,
@@ -55,6 +60,7 @@ export async function GET(
       billable_private: counts.private,
       billable_group: counts.group,
       self_practice_completed: counts.selfPractice,
+      summary,
       injury_notes: clientRow?.injury_notes || null,
       goals: clientRow?.goals || null,
       emergency_contact: clientRow?.emergency_contact || null,

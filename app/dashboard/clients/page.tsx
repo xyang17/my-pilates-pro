@@ -5,6 +5,7 @@ import { useLang } from '@/context/LanguageContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { ClientRowCard, ClientSummary } from '@/components/clients/ClientCard'
 
 interface Client {
   id: string
@@ -12,7 +13,10 @@ interface Client {
   email: string
   photo_url?: string
   created_at: string
+  summary?: ClientSummary | null
 }
+
+type ListFilter = 'all' | 'todo' | 'package' | 'per_session' | 'inactive'
 
 interface NewClientForm {
   name: string
@@ -35,6 +39,7 @@ export default function ClientListPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [listFilter, setListFilter] = useState<ListFilter>('all')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<NewClientForm>({ name: '', email: '', password: '', phone: '' })
   const [submitting, setSubmitting] = useState(false)
@@ -84,10 +89,29 @@ export default function ClientListPage() {
     }
   }
 
-  const filtered = clients.filter(c =>
-    c.name?.toLowerCase().includes(search.toLowerCase()) ||
-    c.email?.toLowerCase().includes(search.toLowerCase())
-  )
+  // 「需要处理」= 有提醒但不只是「很久没来」：赠课待发、课时包快用完/用完/快到期
+  const needsAction = (c: Client) => (c.summary?.alerts || []).some(a => a.kind !== 'inactive')
+  const matchFilter = (c: Client) =>
+    listFilter === 'all' ? true
+    : listFilter === 'todo' ? needsAction(c)
+    : listFilter === 'package' ? c.summary?.payment.mode === 'package'
+    : listFilter === 'per_session' ? c.summary?.payment.mode === 'per_session'
+    : (c.summary?.alerts || []).some(a => a.kind === 'inactive')
+  const filtered = clients
+    .filter(c =>
+      c.name?.toLowerCase().includes(search.toLowerCase()) ||
+      c.email?.toLowerCase().includes(search.toLowerCase())
+    )
+    .filter(matchFilter)
+    // 需要处理的排前面，其余保持按名字排
+    .sort((a, b) => Number(needsAction(b)) - Number(needsAction(a)))
+  const filterCounts: Record<ListFilter, number> = {
+    all: clients.length,
+    todo: clients.filter(needsAction).length,
+    package: clients.filter(c => c.summary?.payment.mode === 'package').length,
+    per_session: clients.filter(c => c.summary?.payment.mode === 'per_session').length,
+    inactive: clients.filter(c => (c.summary?.alerts || []).some(a => a.kind === 'inactive')).length,
+  }
 
   if (authLoading || isLoading) return (
     <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -146,6 +170,26 @@ export default function ClientListPage() {
           />
         </div>
 
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 'var(--sp-4)' }}>
+          {([
+            ['all', '全部'], ['todo', '⚠ 需要处理'], ['package', '课时包'], ['per_session', '单次付费'], ['inactive', '很久没来'],
+          ] as [ListFilter, string][]).filter(([k]) => k === 'all' || filterCounts[k] > 0).map(([k, label]) => {
+            const on = listFilter === k
+            const warn = k === 'todo'
+            return (
+              <button key={k} onClick={() => setListFilter(k)}
+                style={{
+                  padding: '5px 12px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  border: `1px solid ${on ? (warn ? '#C0504D' : 'var(--c-brand)') : warn ? '#EBC3C0' : 'var(--c-border)'}`,
+                  background: on ? (warn ? '#C0504D' : 'var(--c-brand)') : 'var(--c-card-bg)',
+                  color: on ? '#fff' : warn ? '#C0504D' : 'var(--c-text-secondary)', fontWeight: on ? 600 : 400,
+                }}>
+                {label} {filterCounts[k]}
+              </button>
+            )
+          })}
+        </div>
+
         {filtered.length === 0 ? (
           <div style={{
             background: 'var(--c-card-bg)',
@@ -156,7 +200,7 @@ export default function ClientListPage() {
             color: 'var(--c-text-hint)',
             fontSize: 'var(--text-base)',
           }}>
-            {search ? '未找到匹配学员' : '暂无学员，点击右上角新建'}
+            {search ? '未找到匹配学员' : listFilter !== 'all' ? '这一类里没有学员' : '暂无学员，点击右上角新建'}
           </div>
         ) : (
           <div style={{
@@ -166,54 +210,9 @@ export default function ClientListPage() {
             overflow: 'hidden',
           }}>
             {filtered.map((client, idx) => (
-              <Link key={client.id} href={`/dashboard/clients/${client.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--sp-4)',
-                    padding: 'var(--sp-4) var(--sp-5)',
-                    borderBottom: idx < filtered.length - 1 ? '1px solid var(--c-border)' : 'none',
-                    transition: 'background 0.12s',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--c-fill-light)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  {/* 头像 */}
-                  {client.photo_url ? (
-                    <img src={client.photo_url} alt={client.name}
-                      style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                  ) : (
-                    <div style={{
-                      width: 44, height: 44, borderRadius: '50%',
-                      background: 'var(--c-fill-light)',
-                      border: '1.5px solid var(--c-pink-mist)',
-                      color: 'var(--c-brand)',
-                      flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 'var(--text-lg)', fontWeight: 600,
-                    }}>
-                      {client.name?.[0] || '?'}
-                    </div>
-                  )}
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: '0 0 2px', fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--c-text-primary)' }}>
-                      {client.name}
-                    </p>
-                    <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {client.email}
-                    </p>
-                  </div>
-
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <p style={{ margin: '0 0 2px', fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)' }}>
-                      加入 {new Date(client.created_at).toLocaleDateString('zh-CN', { month: 'short', year: 'numeric' })}
-                    </p>
-                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-hint)' }}>›</span>
-                  </div>
-                </div>
-              </Link>
+              <ClientRowCard key={client.id}
+                id={client.id} name={client.name} email={client.email} photo={client.photo_url}
+                s={client.summary || undefined} last={idx === filtered.length - 1} />
             ))}
           </div>
         )}
