@@ -324,7 +324,7 @@ export default function ClientDetailPage() {
     }
     setClient(prev => prev ? {
       ...prev,
-      ...(patch.loyalty_mode !== undefined ? { loyalty_mode: patch.loyalty_mode === 'default' ? null : patch.loyalty_mode as any } : {}),
+      ...(patch.loyalty_mode !== undefined ? { loyalty_mode: patch.loyalty_mode === 'off' ? null : patch.loyalty_mode as any } : {}),
       ...(patch.loyalty_threshold !== undefined ? { loyalty_threshold: patch.loyalty_threshold as number | null } : {}),
       ...(patch.loyalty_bonus !== undefined ? { loyalty_bonus: patch.loyalty_bonus as number | null } : {}),
       ...(patch.loyalty_base_count !== undefined ? { loyalty_base_count: patch.loyalty_base_count as number } : {}),
@@ -932,8 +932,8 @@ export default function ClientDetailPage() {
 
             {/* 累计满赠：规则（跟随默认 / 单独设 / 不参加）+ 系统外历史节数 */}
             <LoyaltyRuleEditor
-              key={`${client.loyalty_mode ?? 'default'}-${client.loyalty_threshold ?? ''}-${client.loyalty_bonus ?? ''}-${client.loyalty_base_count ?? 0}`}
-              mode={(client.loyalty_mode as any) || 'default'}
+              key={`${client.loyalty_mode ?? 'off'}-${client.loyalty_threshold ?? ''}-${client.loyalty_bonus ?? ''}-${client.loyalty_base_count ?? 0}`}
+              mode={(client.loyalty_mode as any) || 'off'}
               threshold={client.loyalty_threshold ?? null}
               bonus={client.loyalty_bonus ?? null}
               studioDefault={{ enabled: bonusRule?.enabled ?? true, threshold: bonusRule?.threshold ?? DEFAULT_THRESHOLD, bonus: bonusRule?.sessions ?? DEFAULT_BONUS }}

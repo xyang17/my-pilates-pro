@@ -67,11 +67,11 @@ export function LoyaltyRuleEditor({
       <div style={{ fontSize: 13, fontWeight: 600, color: '#8a6d3b', marginBottom: 8 }}>累计满赠</div>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+        <button style={radio(m === 'off')} onClick={() => setM('off')}>不参加</button>
         <button style={radio(m === 'default')} onClick={() => setM('default')}>
-          跟随默认{studioDefault.enabled ? `（每满 ${studioDefault.threshold} 送 ${studioDefault.bonus}）` : '（默认已关闭）'}
+          按默认规则{studioDefault.enabled ? `（每满 ${studioDefault.threshold} 送 ${studioDefault.bonus}）` : '（默认规则已关闭）'}
         </button>
         <button style={radio(m === 'custom')} onClick={() => setM('custom')}>单独设</button>
-        <button style={radio(m === 'off')} onClick={() => setM('off')}>不参加</button>
       </div>
 
       {m === 'custom' && (
@@ -95,10 +95,10 @@ export function LoyaltyRuleEditor({
 
       <p style={{ margin: '6px 0 0', fontSize: 11, color: '#b39866', lineHeight: 1.6 }}>
         {m === 'off'
-          ? '这个学员不参加累计满赠，不会收到提醒。买包送的节数在建课时包时填「赠送」。'
+          ? '学员默认不参加累计满赠，不会收到提醒。要参加就选「按默认规则」或「单独设」。买包送的节数在建课时包时填「赠送」。'
           : effEnabled && effThreshold > 0
             ? `每满 ${effThreshold} 节送 ${effBonus} 节${total > 0 ? `，再上 ${effThreshold - (total % effThreshold)} 节到下一次` : ''}。`
-            : '默认规则已关闭，这个学员不会收到满赠提醒；要单独给这个学员开，选「单独设」。'}
+            : '默认规则在「经营设置」里关掉了，选「按默认规则」也不会提醒；要给这个学员开，选「单独设」。'}
         只算私教和团课，自我练习不计入{selfPractice > 0 ? `（另有 ${selfPractice} 节自我练习，没算进去）` : ''}。
       </p>
 

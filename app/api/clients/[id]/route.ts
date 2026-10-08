@@ -94,13 +94,13 @@ export async function PUT(
     if (body.birth_date !== undefined) userUpdates.birth_date = body.birth_date || null
     if (body.height_cm  !== undefined) userUpdates.height_cm  = body.height_cm === '' ? null : body.height_cm
     // 满赠起始节数：用系统之前就上过的课，教练手工认定
-    // 这个学员的满赠规则：default 跟随全店 / custom 单独设 / off 不参加（lib/loyaltyRule.ts）
+    // 这个学员的满赠规则：off 不参加（默认）/ default 按全店默认规则 / custom 单独设（lib/loyaltyRule.ts）
     if (body.loyalty_mode !== undefined) {
       const m = body.loyalty_mode
       if (m !== null && m !== 'default' && m !== 'custom' && m !== 'off') {
         return NextResponse.json({ error: '满赠规则不对' }, { status: 400 })
       }
-      userUpdates.loyalty_mode = m === 'default' ? null : m
+      userUpdates.loyalty_mode = m === 'off' ? null : m   // null = 不参加（默认）
     }
     if (body.loyalty_threshold !== undefined) {
       const n = Math.floor(Number(body.loyalty_threshold))

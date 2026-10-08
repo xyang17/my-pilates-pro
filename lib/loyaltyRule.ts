@@ -2,10 +2,10 @@
 //
 //   全店默认：studio_setting 里的 loyalty_bonus_enabled / loyalty_bonus_threshold / loyalty_bonus_sessions
 //            （「我的 → 经营设置」里改；都没设时才用 DEFAULT_THRESHOLD / DEFAULT_BONUS 兜底）
-//   学员单独：user.loyalty_mode
-//     null / 'default' → 跟随全店默认
-//     'custom'         → 用 user.loyalty_threshold / user.loyalty_bonus（比如这个学员每满 10 送 1）
-//     'off'            → 不参加累计满赠（比如已经是「买包送节」的学员，不再叠加）
+//   学员单独：user.loyalty_mode —— 【默认不参加】，教练在学员页选了才参加
+//     null / 'off'     → 不参加累计满赠（没设过的学员一律不参加，不会收到提醒）
+//     'default'        → 参加，按全店默认的「每满 N 送 M」
+//     'custom'         → 参加，用 user.loyalty_threshold / user.loyalty_bonus（比如这个学员每满 10 送 1）
 //
 // 「买 N 送 M」是另一回事：写在课时包的 bonus_sessions 上，建包时就定了，不走这里。
 //
@@ -44,7 +44,8 @@ export function resolveLoyaltyRule(
 ): LoyaltyRule {
   const d = studioDefaultRule(cfg)
   const mode = user?.loyalty_mode
-  if (mode === 'off') return { ...d, enabled: false, source: 'off' }
+  // 没设过（null）跟 'off' 一样：默认不参加
+  if (!mode || mode === 'off') return { ...d, enabled: false, source: 'off' }
   if (mode === 'custom') {
     const threshold = posInt(user?.loyalty_threshold)
     const bonus = posInt(user?.loyalty_bonus)

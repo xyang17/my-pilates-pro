@@ -541,7 +541,8 @@ export default function ProfilePage() {
                     <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>节</span>
                   </div>
                   <p style={{ margin: '8px 0 0', fontSize: 11, color: '#bbb', lineHeight: 1.7 }}>
-                    这是<b>默认规则</b>，个别学员可以在学员页「课时包」里单独设（比如每满 10 送 1），或者设成不参加。
+                    学员<b>默认不参加</b>满赠。要参加的学员，在学员页「课时包」里选「按默认规则」（就是这里设的数），
+                    或者「单独设」（比如每满 10 送 1）。
                     「买 N 送 M」在建课时包时填「赠送」。<br />
                     按学员<b>累计完成</b>的课数算（私教 + 团课，自我练习不算），跨课时包累加。到了就给你发条消息提醒，
                     赠课要你确认后才发放，不会自动加。
