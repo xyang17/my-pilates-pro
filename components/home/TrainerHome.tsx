@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
-  Bell, ChevronLeft, ChevronRight, Clock, Plus, Calendar,
+  Bell, ChevronLeft, ChevronRight, Clock, Plus, Calendar, FileDown,
   CalendarCheck, Dumbbell, ClipboardCheck, Activity, BookOpen, ClipboardList, Trophy,
   BarChart3, Ticket,
 } from 'lucide-react'
@@ -151,6 +151,7 @@ export function TrainerHome({ userId, userRole, displayName }: {
     { label: '课后作业', href: '/dashboard/workouts',     icon: ClipboardCheck },
     // 身体测试在这里也留入口：有时候做体测本身就是一节课的内容（学员详情页里也能进）
     { label: '身体测试', href: '/dashboard/assessments',  icon: Activity },
+    { label: '导出训练记录', href: '/dashboard/export',    icon: FileDown },
   ]
   const content = [
     { label: '动作库',   href: '/dashboard/exercises', icon: BookOpen },

@@ -6,6 +6,7 @@ import { useLang } from '@/context/LanguageContext'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { CycleLogList } from '@/components/cycle/CycleLogList'
 import { ClientStatusPanel, ClientSummary } from '@/components/clients/ClientCard'
 import { LoyaltyRuleEditor } from '@/components/clients/LoyaltyRuleEditor'
 
@@ -656,6 +657,14 @@ export default function ClientDetailPage() {
         {/* Classes tab */}
         {activeTab === 'classes' && (
           <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
+            {/* 导出这个学员一段时间的训练内容（选时间段 → 生成 PDF） */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderBottom: '1px solid var(--c-border)', background: '#FAF8FD' }}>
+              <span style={{ flex: 1, fontSize: 12, color: 'var(--c-text-secondary)' }}>按时间段导出训练内容</span>
+              <Link href={`/dashboard/export?client=${clientId}`}
+                style={{ fontSize: 13, color: 'var(--c-brand)', border: '1px solid var(--c-brand)', borderRadius: 6, padding: '5px 12px', textDecoration: 'none', fontWeight: 600 }}>
+                ⬇ 导出 PDF
+              </Link>
+            </div>
             {selfPracticeCount > 0 && (
               <div style={{ display: 'flex', gap: 6, padding: '12px 20px', borderBottom: '1px solid var(--c-border)' }}>
                 {([
@@ -1065,37 +1074,12 @@ export default function ClientDetailPage() {
             ) : cycleLogs.length === 0 ? (
               <p style={{ padding: '40px', textAlign: 'center', color: '#bbb', margin: 0 }}>暂无周期记录</p>
             ) : (
-              cycleLogs.map((c, i) => (
-                <div key={c.id} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 20px',
-                  borderBottom: i < cycleLogs.length - 1 ? '1px solid var(--c-border)' : 'none',
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', marginBottom: 4 }}>
-                      {c.start_date}{c.end_date && ` → ${c.end_date}`}
-                    </div>
-                    {(c.flow_level || c.pain_level) && (
-                      <div style={{ fontSize: 12, color: '#aaa' }}>
-                        {[c.flow_level && FLOW_LABELS[c.flow_level], c.pain_level && PAIN_LABELS[c.pain_level]].filter(Boolean).join(' · ')}
-                      </div>
-                    )}
-                    {c.notes && <div style={{ fontSize: 12, color: '#bbb', marginTop: 2 }}>💬 {c.notes}</div>}
-                  </div>
-                  <button
-                    onClick={() => handleDeleteCycle(c.id)}
-                    disabled={deletingCycleId === c.id}
-                    title="删除记录"
-                    style={{
-                      width: 26, height: 26, border: 'none', borderRadius: '50%',
-                      background: 'transparent', color: '#ccc', fontSize: 13,
-                      cursor: deletingCycleId === c.id ? 'not-allowed' : 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}
-                  >
-                    {deletingCycleId === c.id ? '…' : '✕'}
-                  </button>
-                </div>
-              ))
+              // 列表：查看 / 就地修改 / 删除（components/cycle/CycleLogList.tsx，三处共用）
+              <div style={{ padding: '4px 20px' }}>
+                <CycleLogList logs={cycleLogs}
+                  headers={{ 'x-user-id': user?.id || '', 'x-user-role': userRole || '' }}
+                  onChange={setCycleLogs} />
+              </div>
             )}
           </div>
         )}

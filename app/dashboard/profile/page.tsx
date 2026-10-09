@@ -6,6 +6,7 @@ import { useLang, FontSize } from '@/context/LanguageContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { CycleLogList } from '@/components/cycle/CycleLogList'
 
 const SEX_LABELS: Record<string, string> = { MALE: '男', FEMALE: '女', OTHER: '其他', UNDISCLOSED: '不便告知' }
 const FLOW_LABELS: Record<string, string> = { LIGHT: '量少', MEDIUM: '量中', HEAVY: '量多' }
@@ -456,37 +457,10 @@ export default function ProfilePage() {
             ) : cycleLogs.length === 0 ? (
               <p style={{ textAlign: 'center', color: '#bbb', fontSize: 13, margin: '20px 0' }}>{t('暂无周期记录', 'No entries yet')}</p>
             ) : (
-              cycleLogs.map((c, i) => (
-                <div key={c.id} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0',
-                  borderTop: i > 0 ? '1px solid var(--c-border)' : 'none',
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', marginBottom: 4 }}>
-                      {c.start_date}{c.end_date && ` → ${c.end_date}`}
-                    </div>
-                    {(c.flow_level || c.pain_level) && (
-                      <div style={{ fontSize: 12, color: '#aaa' }}>
-                        {[c.flow_level && FLOW_LABELS[c.flow_level], c.pain_level && PAIN_LABELS[c.pain_level]].filter(Boolean).join(' · ')}
-                      </div>
-                    )}
-                    {c.notes && <div style={{ fontSize: 12, color: '#bbb', marginTop: 2 }}>💬 {c.notes}</div>}
-                  </div>
-                  <button
-                    onClick={() => handleDeleteCycle(c.id)}
-                    disabled={deletingCycleId === c.id}
-                    title={t('删除记录', 'Delete')}
-                    style={{
-                      width: 24, height: 24, border: 'none', borderRadius: '50%',
-                      background: 'transparent', color: '#ccc', fontSize: 12,
-                      cursor: deletingCycleId === c.id ? 'not-allowed' : 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}
-                  >
-                    {deletingCycleId === c.id ? '…' : '✕'}
-                  </button>
-                </div>
-              ))
+              // 列表：查看 / 就地修改 / 删除（components/cycle/CycleLogList.tsx，三处共用）
+              <CycleLogList logs={cycleLogs} t={t}
+                headers={{ 'x-user-id': user?.id || '', 'x-user-role': userRole || '' }}
+                onChange={setCycleLogs} />
             )}
           </div>
         )}

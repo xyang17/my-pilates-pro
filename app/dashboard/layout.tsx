@@ -37,6 +37,7 @@ import {
   Bell,
   NotebookPen,
   HeartPulse,
+  FileDown,
 } from 'lucide-react'
 
 interface NavGroup {
@@ -75,6 +76,7 @@ const trainerNav: NavGroup[] = [
       { label: '学员管理',  href: '/dashboard/clients',      icon: Users },
       { label: '课后作业',  href: '/dashboard/workouts',     icon: ClipboardList },
       { label: '身体测试',  href: '/dashboard/assessments',  icon: Activity },
+      { label: '导出训练记录', href: '/dashboard/export',     icon: FileDown },
     ],
   },
   {

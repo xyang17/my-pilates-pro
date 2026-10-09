@@ -3,6 +3,7 @@
 import { useAuth } from '@/context/AuthContext'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { CycleLogList } from '@/components/cycle/CycleLogList'
 
 // 教练自己的生理周期记录。
 // 「我的主页」里那份是教练和学员共用的页面，保持不动；这里是教练端新增的入口，
@@ -171,30 +172,9 @@ export default function MyCyclePage() {
             {logs.length === 0 ? (
               <div style={{ ...card, padding: 32, textAlign: 'center', color: 'var(--c-text-hint)', fontSize: 13 }}>还没有记录</div>
             ) : (
-              <div style={{ ...card, overflow: 'hidden' }}>
-                {logs.map((l, i) => (
-                  <div key={l.id} style={{ padding: '12px 14px', borderBottom: i < logs.length - 1 ? '1px solid var(--c-border)' : 'none' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)' }}>
-                        {l.start_date.slice(5).replace('-', '/')}
-                        {l.end_date ? ` – ${l.end_date.slice(5).replace('-', '/')}（${daysBetween(l.start_date, l.end_date) + 1} 天）` : ''}
-                      </span>
-                      {confirmId === l.id ? (
-                        <>
-                          <button onClick={() => setConfirmId(null)} style={{ border: 'none', background: 'none', color: 'var(--c-text-secondary)', fontSize: 12, cursor: 'pointer' }}>取消</button>
-                          <button onClick={() => handleDelete(l.id)} style={{ border: 'none', background: 'none', color: '#B07A7A', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>确认删除</button>
-                        </>
-                      ) : (
-                        <button onClick={() => setConfirmId(l.id)} aria-label="删除" style={{ border: 'none', background: 'none', color: '#ccc', fontSize: 13, cursor: 'pointer' }}>✕</button>
-                      )}
-                    </div>
-                    {(l.flow_level || l.pain_level || l.notes) && (
-                      <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--c-text-secondary)' }}>
-                        {[l.flow_level && FLOW[l.flow_level], l.pain_level && `痛感${PAIN[l.pain_level]}`, l.notes].filter(Boolean).join(' · ')}
-                      </p>
-                    )}
-                  </div>
-                ))}
+              <div style={{ ...card, padding: '2px 14px' }}>
+                {/* 查看 / 就地修改 / 删除（components/cycle/CycleLogList.tsx，三处共用） */}
+                <CycleLogList logs={logs} headers={headers} onChange={setLogs} />
               </div>
             )}
           </>
