@@ -60,8 +60,13 @@ export async function GET(
 //
 // 没有有效包的学员保持 package_id = null，就是按次收费，走 class.price。
 // 团课扣不了包：package_id 在课程表上，一节团课对应多个学员，装不下。
+//
+// 两条硬规则（Taru 补录的课被扣进了后来才买的包）：
+//   - 教练明确选了「按次收费」（pay_per_class）就绝不自动扣包
+//   - 只从「课程日期当天或之前买的」包里扣；补录以前的课不会占用后来买的包
 async function autoLinkPackage(cls: any): Promise<string | null> {
   if (cls.package_id) return cls.package_id          // 已经挂过了，不动
+  if (cls.pay_per_class) return null                  // 明确按次收费
   if (cls.class_type !== 'private') return null       // 团课/自我练习不走课时包
   if (!cls.assigned_to) return null                   // 代课没有学员
 
@@ -72,6 +77,7 @@ async function autoLinkPackage(cls: any): Promise<string | null> {
     .eq('status', 'active')
     .eq('is_expired', false)
     .gt('remaining_sessions', 0)
+    .lte('purchased_at', cls.date)
     // 先用快过期的，没有有效期的排后面；同等情况下先买的先用
     .order('expires_at', { ascending: true, nullsFirst: false })
     .order('purchased_at', { ascending: true })
@@ -115,7 +121,12 @@ export async function PUT(
     if (body.price           !== undefined) updates.price           = body.price
     // 结算方式：传包 id = 从该包扣；显式传 null = 改回按次收费。
     // 用 !== undefined 判断，才能区分「没传」和「传了 null」
-    if (body.package_id      !== undefined) updates.package_id      = body.package_id || null
+    if (body.package_id      !== undefined) {
+      updates.package_id    = body.package_id || null
+      // 选包 = 不再是按次；显式传 null = 教练选了按次收费，记下来，完成时不会再被自动扣包
+      updates.pay_per_class = !body.package_id
+    }
+    if (body.pay_per_class   !== undefined) updates.pay_per_class   = !!body.pay_per_class
     if (body.color           !== undefined) updates.color           = body.color
     if (body.cover_image_url !== undefined) updates.cover_image_url = body.cover_image_url
     if (body.trainer_id      !== undefined) updates.trainer_id      = body.trainer_id

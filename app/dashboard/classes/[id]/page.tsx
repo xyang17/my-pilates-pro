@@ -67,6 +67,7 @@ interface ClassData {
   max_capacity?: number
   price?: number
   package_id?: string | null
+  pay_per_class?: boolean
   color?: string
   cover_image_url?: string
   trainer_id?: string
@@ -253,8 +254,8 @@ export default function ClassDetailPage() {
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
         body: JSON.stringify({ package_id: packageId }),
       })
-      if (!res.ok) throw new Error('保存失败')
-      setClassData(prev => prev ? { ...prev, package_id: packageId } : prev)
+      if (!res.ok) throw new Error(t('保存失败', 'Save failed'))
+      setClassData(prev => prev ? { ...prev, package_id: packageId, pay_per_class: !packageId } : prev)
       // 剩余节数变了，重新拉一次
       if (classData.assigned_to) {
         const r = await fetch(`/api/packages?clientId=${classData.assigned_to}`, {
@@ -1278,56 +1279,54 @@ export default function ClassDetailPage() {
                 {/* 结算方式：按次收费 or 从某个课时包里扣。
                     有的学员就是按次收费的，所以「按次」永远是可选项；
                     有包的学员偶尔上一节单独收费的课，也能切回来。 */}
-                {isTrainer && !isSelfPractice && classData.class_type === 'private' && classData.assigned_to && (
+                {isTrainer && !isSelfPractice && classData.class_type === 'private' && classData.assigned_to && (() => {
+                  // 只列课程日期当天或之前买的包（补录以前的课不会挂到后来才买的包上），已挂的那个总是显示
+                  const usable = clientPackages.filter(p =>
+                    p.id === classData.package_id ||
+                    (p.status === 'active' && !p.is_expired && !p.is_used_up && (!p.purchased_at || !classData.date || p.purchased_at <= classData.date)))
+                  const hasUsable = usable.some(p => p.id !== classData.package_id)
+                  // 按次：明确选过，或者根本没有可用的包。没选过又有包 = 「待定」，完成时会自动扣包
+                  const perClassOn = !classData.package_id && (!!classData.pay_per_class || !hasUsable)
+                  const undecided = !classData.package_id && !classData.pay_per_class && hasUsable
+                  const chip = (on: boolean): React.CSSProperties => ({
+                    padding: '6px 14px', borderRadius: 16, fontSize: 12, cursor: 'pointer',
+                    border: `1px solid ${on ? 'var(--c-brand)' : 'var(--c-border)'}`,
+                    background: on ? 'var(--c-brand)' : 'transparent',
+                    color: on ? '#fff' : 'var(--c-text-secondary)',
+                    fontWeight: on ? 600 : 400,
+                  })
+                  return (
                   <div style={{ gridColumn: '1 / -1' }}>
                     <p style={{ margin: '0 0 6px 0', color: '#999', fontSize: '11px' }}>
-                      结算方式{savingBilling && <span style={{ color: 'var(--c-brand)', marginLeft: 6 }}>保存中…</span>}
+                      {t('结算方式', 'Billing')}{savingBilling && <span style={{ color: 'var(--c-brand)', marginLeft: 6 }}>{t('保存中…', 'Saving…')}</span>}
                     </p>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <button
-                        onClick={() => handleChangeBilling(null)}
-                        disabled={savingBilling}
-                        style={{
-                          padding: '6px 14px', borderRadius: 16, fontSize: 12, cursor: 'pointer',
-                          border: `1px solid ${!classData.package_id ? 'var(--c-brand)' : 'var(--c-border)'}`,
-                          background: !classData.package_id ? 'var(--c-brand)' : 'transparent',
-                          color: !classData.package_id ? '#fff' : 'var(--c-text-secondary)',
-                          fontWeight: !classData.package_id ? 600 : 400,
-                        }}>
-                        按次收费
+                      <button onClick={() => handleChangeBilling(null)} disabled={savingBilling} style={chip(perClassOn)}>
+                        {t('按次收费', 'Pay per class')}
                       </button>
-                      {clientPackages
-                        .filter(p => p.id === classData.package_id || (p.status === 'active' && !p.is_expired && !p.is_used_up))
-                        .map(p => {
-                          const on = classData.package_id === p.id
-                          return (
-                            <button key={p.id}
-                              onClick={() => handleChangeBilling(p.id)}
-                              disabled={savingBilling}
-                              style={{
-                                padding: '6px 14px', borderRadius: 16, fontSize: 12, cursor: 'pointer',
-                                border: `1px solid ${on ? 'var(--c-brand)' : 'var(--c-border)'}`,
-                                background: on ? 'var(--c-brand)' : 'transparent',
-                                color: on ? '#fff' : 'var(--c-text-secondary)',
-                                fontWeight: on ? 600 : 400,
-                              }}>
-                              课时包 · 剩 {p.remaining_sessions}/{p.granted_sessions}
-                              {p.expires_at ? ` · ${p.expires_at} 到期` : ''}
-                            </button>
-                          )
-                        })}
+                      {usable.map(p => (
+                        <button key={p.id} onClick={() => handleChangeBilling(p.id)} disabled={savingBilling}
+                          style={chip(classData.package_id === p.id)}>
+                          {t('课时包', 'Package')} · {t(`剩 ${p.remaining_sessions}/${p.granted_sessions}`, `${p.remaining_sessions}/${p.granted_sessions} left`)}
+                          {p.expires_at ? t(` · ${p.expires_at} 到期`, ` · exp. ${p.expires_at}`) : ''}
+                        </button>
+                      ))}
                     </div>
-                    <p style={{ margin: '6px 0 0', fontSize: 11, color: '#bbb' }}>
+                    <p style={{ margin: '6px 0 0', fontSize: 11, color: undecided ? '#C99A3E' : '#bbb' }}>
                       {classData.package_id
                         ? (classData.status === 'completed'
-                            ? '这节课已从该课时包扣除 1 节'
-                            : '标记完成后会从该课时包扣 1 节')
-                        : clientPackages.some(p => p.status === 'active' && !p.is_expired && !p.is_used_up)
-                          ? '这节课单独收费，不占用课时包'
-                          : '这个学员目前没有可用的课时包'}
+                            ? t('这节课已从该课时包扣除 1 节', '1 session was deducted from this package')
+                            : t('标记完成后会从该课时包扣 1 节', '1 session will be deducted when marked complete'))
+                        : undecided
+                          ? t('还没选：标记完成时会自动从课时包扣 1 节。这节单独收费的话请点「按次收费」。',
+                              'Not chosen yet: completing this class will deduct 1 package session. Tap "Pay per class" if it is billed separately.')
+                          : hasUsable
+                            ? t('这节课单独收费，不占用课时包', 'Billed separately, does not use a package')
+                            : t('这个学员目前没有可用的课时包', 'No usable package for this client')}
                     </p>
                   </div>
-                )}
+                  )
+                })()}
                 {classData.class_type === 'group' && classData.max_capacity && (
                   <div>
                     <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '11px' }}>人数上限</p>
