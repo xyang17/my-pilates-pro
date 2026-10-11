@@ -45,7 +45,7 @@ export default function RecordDetailPage() {
     setDeleting(true)
     try {
       const r = await fetch(`/api/personal-workouts/${id}`, { method: 'DELETE', headers })
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || '删除失败')
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || t('删除失败', 'Delete failed'))
       showToast(t('已删除', 'Deleted'), 'success')
       router.replace('/dashboard/my-training/records')
     } catch (e: any) {

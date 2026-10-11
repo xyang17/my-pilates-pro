@@ -68,8 +68,8 @@ export default function ClientListPage() {
 
   const handleCreate = async () => {
     setFormError('')
-    if (!form.name || !form.email || !form.password) { setFormError('姓名、邮箱、密码为必填项'); return }
-    if (form.password.length < 6) { setFormError('密码至少 6 位'); return }
+    if (!form.name || !form.email || !form.password) { setFormError(t('姓名、邮箱、密码为必填项', 'Name, email and password are required')); return }
+    if (form.password.length < 6) { setFormError(t('密码至少 6 位', 'Password must be at least 6 characters')); return }
     setSubmitting(true)
     try {
       const res = await fetch('/api/auth/signup', {
@@ -78,12 +78,12 @@ export default function ClientListPage() {
         body: JSON.stringify({ name: form.name, email: form.email, password: form.password, phone: form.phone ? `${countryCode}${form.phone}` : undefined }),
       })
       const data = await res.json()
-      if (!res.ok) { setFormError(data.error || '创建失败'); return }
+      if (!res.ok) { setFormError(data.error || t('创建失败', 'Failed to create')); return }
       setShowModal(false)
       setForm({ name: '', email: '', password: '', phone: '' })
       await fetchClients()
     } catch {
-      setFormError('网络错误，请重试')
+      setFormError(t('网络错误，请重试', 'Network error, please retry'))
     } finally {
       setSubmitting(false)
     }
@@ -115,7 +115,7 @@ export default function ClientListPage() {
 
   if (authLoading || isLoading) return (
     <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>加载中…</span>
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>{t('加载中…', 'Loading…')}</span>
     </div>
   )
 
@@ -134,11 +134,11 @@ export default function ClientListPage() {
         top: 0,
         zIndex: 10,
       }}>
-        <Link href="/dashboard" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>← 返回</Link>
+        <Link href="/dashboard" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>← {t('返回', 'Back')}</Link>
         <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', flex: 1 }}>
-          学员管理
+          {t('学员管理', 'Clients')}
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 400, color: 'var(--c-text-hint)', marginLeft: 'var(--sp-2)' }}>
-            {clients.length} 人
+            {clients.length} {t('人', '')}
           </span>
         </h1>
         <button
@@ -154,7 +154,7 @@ export default function ClientListPage() {
             cursor: 'pointer',
           }}
         >
-          + 新建学员
+          {t('+ 新建学员', '+ New client')}
         </button>
       </header>
 
@@ -163,7 +163,7 @@ export default function ClientListPage() {
         <div style={{ marginBottom: 'var(--sp-4)' }}>
           <input
             type="text"
-            placeholder="搜索学员姓名或邮箱…"
+            placeholder={t('搜索学员姓名或邮箱…', 'Search name or email…')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ width: '100%', padding: '11px var(--sp-4)', fontSize: 'var(--text-base)', boxSizing: 'border-box' }}
@@ -172,7 +172,7 @@ export default function ClientListPage() {
 
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 'var(--sp-4)' }}>
           {([
-            ['all', '全部'], ['todo', '⚠ 需要处理'], ['package', '课时包'], ['per_session', '单次付费'], ['inactive', '很久没来'],
+            ['all', t('全部', 'All')], ['todo', t('⚠ 需要处理', '⚠ Action needed')], ['package', t('课时包', 'Package')], ['per_session', t('单次付费', 'Pay per class')], ['inactive', t('很久没来', 'Inactive')],
           ] as [ListFilter, string][]).filter(([k]) => k === 'all' || filterCounts[k] > 0).map(([k, label]) => {
             const on = listFilter === k
             const warn = k === 'todo'
@@ -200,7 +200,7 @@ export default function ClientListPage() {
             color: 'var(--c-text-hint)',
             fontSize: 'var(--text-base)',
           }}>
-            {search ? '未找到匹配学员' : listFilter !== 'all' ? '这一类里没有学员' : '暂无学员，点击右上角新建'}
+            {search ? t('未找到匹配学员', 'No matching clients') : listFilter !== 'all' ? t('这一类里没有学员', 'No clients in this group') : t('暂无学员，点击右上角新建', 'No clients yet — tap “New client”')}
           </div>
         ) : (
           <div style={{
@@ -234,7 +234,7 @@ export default function ClientListPage() {
             boxShadow: 'var(--shadow-md)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-6)' }}>
-              <h2 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--c-text-primary)' }}>新建学员</h2>
+              <h2 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--c-text-primary)' }}>{t('新建学员', 'New client')}</h2>
               <button
                 onClick={() => { setShowModal(false); setShowPassword(false) }}
                 style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--c-text-hint)', lineHeight: 1 }}
@@ -244,9 +244,9 @@ export default function ClientListPage() {
             {/* 姓名 */}
             <div style={{ marginBottom: 'var(--sp-4)' }}>
               <label style={{ display: 'block', marginBottom: 'var(--sp-2)', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)' }}>
-                姓名 <span style={{ color: 'var(--c-error)' }}>*</span>
+                {t('姓名', 'Name')} <span style={{ color: 'var(--c-error)' }}>*</span>
               </label>
-              <input type="text" placeholder="学员姓名" value={form.name}
+              <input type="text" placeholder={t('学员姓名', 'Client name')} value={form.name}
                 onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                 style={FIELD_STYLE} />
             </div>
@@ -254,7 +254,7 @@ export default function ClientListPage() {
             {/* 邮箱 */}
             <div style={{ marginBottom: 'var(--sp-4)' }}>
               <label style={{ display: 'block', marginBottom: 'var(--sp-2)', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)' }}>
-                邮箱 <span style={{ color: 'var(--c-error)' }}>*</span>
+                {t('邮箱', 'Email')} <span style={{ color: 'var(--c-error)' }}>*</span>
               </label>
               <input type="email" placeholder="example@email.com" value={form.email}
                 onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
@@ -265,16 +265,16 @@ export default function ClientListPage() {
             <div style={{ marginBottom: 'var(--sp-4)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-2)' }}>
                 <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)' }}>
-                  密码 <span style={{ color: 'var(--c-error)' }}>*</span>
+                  {t('密码', 'Password')} <span style={{ color: 'var(--c-error)' }}>*</span>
                 </label>
                 <button type="button" onClick={() => setShowPassword(v => !v)}
                   style={{ background: 'none', border: 'none', color: 'var(--c-brand)', cursor: 'pointer', fontSize: 'var(--text-sm)', padding: 0 }}>
-                  {showPassword ? '隐藏' : '显示'}
+                  {showPassword ? t('隐藏', 'Hide') : t('显示', 'Show')}
                 </button>
               </div>
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder="至少 6 位"
+                placeholder={t('至少 6 位', 'At least 6 characters')}
                 value={form.password}
                 onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
                 style={FIELD_STYLE}
@@ -284,7 +284,7 @@ export default function ClientListPage() {
             {/* 手机号 */}
             <div style={{ marginBottom: 'var(--sp-4)' }}>
               <label style={{ display: 'block', marginBottom: 'var(--sp-2)', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--c-text-primary)' }}>
-                手机号 <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)', fontWeight: 400 }}>选填</span>
+                {t('手机号', 'Phone')} <span style={{ fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)', fontWeight: 400 }}>{t('选填', 'optional')}</span>
               </label>
               <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
                 <select value={countryCode} onChange={e => setCountryCode(e.target.value)}
@@ -300,7 +300,7 @@ export default function ClientListPage() {
                   <option value="+886">🇹🇼 +886</option>
                   <option value="+60">🇲🇾 +60</option>
                 </select>
-                <input type="tel" placeholder="手机号码" value={form.phone}
+                <input type="tel" placeholder={t('手机号码', 'Phone number')} value={form.phone}
                   onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
                   style={{ flex: 1, padding: '11px var(--sp-4)', fontSize: 'var(--text-base)' }} />
               </div>
@@ -331,7 +331,7 @@ export default function ClientListPage() {
                 fontSize: 'var(--text-base)',
                 fontWeight: 500,
               }}>
-                取消
+                {t('取消', 'Cancel')}
               </button>
               <button onClick={handleCreate} disabled={submitting} style={{
                 flex: 2, padding: '12px',
@@ -343,7 +343,7 @@ export default function ClientListPage() {
                 fontSize: 'var(--text-base)',
                 fontWeight: 500,
               }}>
-                {submitting ? '创建中…' : '创建账号'}
+                {submitting ? t('创建中…', 'Creating…') : t('创建账号', 'Create account')}
               </button>
             </div>
           </div>

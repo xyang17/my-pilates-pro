@@ -3,6 +3,7 @@
 import { useAuth } from '@/context/AuthContext'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useLang } from '@/context/LanguageContext'
 import { Play, NotebookPen, Activity, Moon, ChevronRight, Plus } from 'lucide-react'
 import { PersonalWorkout, TYPE_META, WorkoutType, localToday } from '@/components/personal-workout/types'
 
@@ -26,14 +27,15 @@ function countByType(list: PersonalWorkout[]) {
 }
 
 function Breakdown({ list }: { list: PersonalWorkout[] }) {
+  const { lang, t } = useLang()
   const c = countByType(list)
   const parts = (Object.keys(TYPE_META) as WorkoutType[]).filter(k => c[k] > 0)
-  if (parts.length === 0) return <span style={{ color: 'var(--c-text-hint)' }}>还没练</span>
+  if (parts.length === 0) return <span style={{ color: 'var(--c-text-hint)' }}>{t('还没练', 'None yet')}</span>
   return (
     <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
       {parts.map(k => (
         <span key={k} style={{ fontSize: 12, padding: '1px 8px', borderRadius: 8, background: TYPE_META[k].bg, color: TYPE_META[k].color, fontWeight: 600 }}>
-          {TYPE_META[k].zh} {c[k]}
+          {lang === 'zh' ? TYPE_META[k].zh : TYPE_META[k].en} {c[k]}
         </span>
       ))}
     </span>
@@ -58,6 +60,7 @@ function Row({ href, icon: Icon, label, hint, last }: {
 
 export default function MyTrainingPage() {
   const { user, userRole } = useAuth()
+  const { t } = useLang()
   const [list, setList] = useState<PersonalWorkout[] | null>(null)
 
   const today = useMemo(localToday, [])
@@ -82,8 +85,8 @@ export default function MyTrainingPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
       <main style={{ padding: '20px 16px 24px', maxWidth: 640, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--c-text-primary)', margin: '0 0 4px' }}>我的训练</h1>
-        <p style={{ fontSize: 12, color: 'var(--c-text-hint)', margin: '0 0 16px' }}>只有你自己能看到，不算进课时统计</p>
+        <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--c-text-primary)', margin: '0 0 4px' }}>{t('我的训练', 'My Training')}</h1>
+        <p style={{ fontSize: 12, color: 'var(--c-text-hint)', margin: '0 0 16px' }}>{t('只有你自己能看到，不算进课时统计', 'Only you can see this; it never counts toward class stats')}</p>
 
         {/* 开始练 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 10, marginBottom: 12 }}>
@@ -91,30 +94,30 @@ export default function MyTrainingPage() {
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '18px 12px',
             borderRadius: 14, background: 'var(--c-brand)', color: '#fff', textDecoration: 'none', fontSize: 16, fontWeight: 700,
           }}>
-            <Play size={18} fill="#fff" /> 开始练
+            <Play size={18} fill="#fff" /> {t('开始练', 'Start')}
           </Link>
           <Link href="/dashboard/my-training/records/new" style={{
             ...card, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '18px 12px',
             color: 'var(--c-brand)', textDecoration: 'none', fontSize: 15, fontWeight: 600,
           }}>
-            <Plus size={16} /> 补记一次
+            <Plus size={16} /> {t('补记一次', 'Log one')}
           </Link>
         </div>
 
         {/* 频次 */}
         <div style={{ ...card, padding: '14px 16px', marginBottom: 12 }}>
           {list === null ? (
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--c-text-hint)' }}>加载中…</p>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--c-text-hint)' }}>{t('加载中…', 'Loading…')}</p>
           ) : (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <span style={{ fontSize: 13, color: 'var(--c-text-secondary)', width: 34 }}>本周</span>
-                <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--c-text-primary)', width: 56 }}>{week.length}<span style={{ fontSize: 12, fontWeight: 400, marginLeft: 2 }}>次</span></span>
+                <span style={{ fontSize: 13, color: 'var(--c-text-secondary)', width: 44 }}>{t('本周', 'Week')}</span>
+                <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--c-text-primary)', width: 56 }}>{week.length}<span style={{ fontSize: 12, fontWeight: 400, marginLeft: 2 }}>{t('次', 'x')}</span></span>
                 <Breakdown list={week} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 13, color: 'var(--c-text-secondary)', width: 34 }}>本月</span>
-                <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--c-text-primary)', width: 56 }}>{month.length}<span style={{ fontSize: 12, fontWeight: 400, marginLeft: 2 }}>次</span></span>
+                <span style={{ fontSize: 13, color: 'var(--c-text-secondary)', width: 44 }}>{t('本月', 'Month')}</span>
+                <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--c-text-primary)', width: 56 }}>{month.length}<span style={{ fontSize: 12, fontWeight: 400, marginLeft: 2 }}>{t('次', 'x')}</span></span>
                 <Breakdown list={month} />
               </div>
             </>
@@ -122,10 +125,10 @@ export default function MyTrainingPage() {
         </div>
 
         <div style={{ ...card, overflow: 'hidden' }}>
-          <Row href="/dashboard/my-training/records" icon={NotebookPen} label="训练记录"
-            hint={last ? `上次 ${Number(last.date.slice(5, 7))}/${Number(last.date.slice(8, 10))}` : undefined} />
-          <Row href={user ? `/dashboard/assessments/${user.id}` : '/dashboard'} icon={Activity} label="身体数据" />
-          <Row href="/dashboard/my-training/cycle" icon={Moon} label="生理周期" last />
+          <Row href="/dashboard/my-training/records" icon={NotebookPen} label={t('训练记录', 'Workout log')}
+            hint={last ? `${t('上次', 'Last')} ${Number(last.date.slice(5, 7))}/${Number(last.date.slice(8, 10))}` : undefined} />
+          <Row href={user ? `/dashboard/assessments/${user.id}` : '/dashboard'} icon={Activity} label={t('身体数据', 'Body data')} />
+          <Row href="/dashboard/my-training/cycle" icon={Moon} label={t('生理周期', 'Cycle')} last />
         </div>
       </main>
     </div>

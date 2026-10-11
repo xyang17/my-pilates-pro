@@ -3,14 +3,17 @@
 import { useAuth } from '@/context/AuthContext'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useLang } from '@/context/LanguageContext'
 import { CycleLogList } from '@/components/cycle/CycleLogList'
 
 // 教练自己的生理周期记录。
 // 「我的主页」里那份是教练和学员共用的页面，保持不动；这里是教练端新增的入口，
 // 读写的是同一张表（menstrual_cycle_log）、同一个接口（/api/cycle-logs），两边数据一致。
 
-const FLOW: Record<string, string> = { LIGHT: '量少', MEDIUM: '量中', HEAVY: '量多' }
-const PAIN: Record<string, string> = { NONE: '无痛感', MILD: '轻微', MODERATE: '中等', SEVERE: '严重' }
+const FLOW_ZH: Record<string, string> = { LIGHT: '量少', MEDIUM: '量中', HEAVY: '量多' }
+const FLOW_EN: Record<string, string> = { LIGHT: 'Light', MEDIUM: 'Medium', HEAVY: 'Heavy' }
+const PAIN_ZH: Record<string, string> = { NONE: '无痛感', MILD: '轻微', MODERATE: '中等', SEVERE: '严重' }
+const PAIN_EN: Record<string, string> = { NONE: 'None', MILD: 'Mild', MODERATE: 'Moderate', SEVERE: 'Severe' }
 
 interface CycleLog {
   id: string
@@ -28,6 +31,9 @@ const daysBetween = (a: string, b: string) =>
 
 export default function MyCyclePage() {
   const { user, userRole } = useAuth()
+  const { lang, t } = useLang()
+  const FLOW = lang === 'zh' ? FLOW_ZH : FLOW_EN
+  const PAIN = lang === 'zh' ? PAIN_ZH : PAIN_EN
   const [sex, setSex] = useState<string | null | undefined>(undefined)
   const [logs, setLogs] = useState<CycleLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -61,7 +67,7 @@ export default function MyCyclePage() {
         body: JSON.stringify({ user_id: user.id, ...form }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || '保存失败')
+      if (!res.ok) throw new Error(data.error || t('保存失败', 'Save failed'))
       setLogs(prev => [data, ...prev].sort((a, b) => b.start_date.localeCompare(a.start_date)))
       setForm(EMPTY); setAdding(false)
     } catch (e: any) {
@@ -74,7 +80,7 @@ export default function MyCyclePage() {
   const handleDelete = async (id: string) => {
     const res = await fetch(`/api/cycle-logs/${id}`, { method: 'DELETE', headers })
     if (res.ok) setLogs(prev => prev.filter(c => c.id !== id))
-    else setError('删除失败，请重试')
+    else setError(t('删除失败，请重试', 'Delete failed, please retry'))
     setConfirmId(null)
   }
 
@@ -96,25 +102,25 @@ export default function MyCyclePage() {
         background: 'var(--c-card-bg)', borderBottom: '1px solid var(--c-border)', padding: '0 var(--sp-5)', height: 56,
         display: 'flex', alignItems: 'center', gap: 12, position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <Link href="/dashboard/my-training" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 14 }}>← 我的训练</Link>
-        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', flex: 1 }}>生理周期</h1>
+        <Link href="/dashboard/my-training" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 14 }}>← {t('我的训练', 'My Training')}</Link>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', flex: 1 }}>{t('生理周期', 'Cycle')}</h1>
         {sex === 'FEMALE' && !adding && (
           <button onClick={() => setAdding(true)}
             style={{ background: 'var(--c-brand)', color: 'white', border: 'none', padding: '7px 14px', borderRadius: 18, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            ＋ 记一次
+            {t('＋ 记一次', '＋ Log')}
           </button>
         )}
       </header>
 
       <main style={{ padding: 'var(--sp-5)', maxWidth: 640, margin: '0 auto' }}>
         {loading ? (
-          <p style={{ textAlign: 'center', color: 'var(--c-text-secondary)', padding: 40 }}>加载中…</p>
+          <p style={{ textAlign: 'center', color: 'var(--c-text-secondary)', padding: 40 }}>{t('加载中…', 'Loading…')}</p>
         ) : sex !== 'FEMALE' ? (
           <div style={{ ...card, padding: 28, textAlign: 'center' }}>
             <p style={{ margin: '0 0 12px', color: 'var(--c-text-secondary)', fontSize: 14, lineHeight: 1.7 }}>
-              生理周期只对设置为「女」的账号开放。<br />请先到「我的主页」把性别设为女。
+              {t('生理周期只对设置为「女」的账号开放。', 'Cycle tracking is only available for accounts set to Female.')}<br />{t('请先到「我的主页」把性别设为女。', 'Set your sex to Female in My Profile first.')}
             </p>
-            <Link href="/dashboard/profile" style={{ color: 'var(--c-brand)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>去我的主页 ›</Link>
+            <Link href="/dashboard/profile" style={{ color: 'var(--c-brand)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>{t('去我的主页 ›', 'Go to My Profile ›')}</Link>
           </div>
         ) : (
           <>
@@ -126,38 +132,38 @@ export default function MyCyclePage() {
               <div style={{ ...card, padding: 14, marginBottom: 14 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                   <div>
-                    <label style={label}>开始日期 *</label>
+                    <label style={label}>{t('开始日期 *', 'Start date *')}</label>
                     <input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} style={input} />
                   </div>
                   <div>
-                    <label style={label}>结束日期</label>
+                    <label style={label}>{t('结束日期', 'End date')}</label>
                     <input type="date" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} style={input} />
                   </div>
                   <div>
-                    <label style={label}>经量</label>
+                    <label style={label}>{t('经量', 'Flow')}</label>
                     <select value={form.flow_level} onChange={e => setForm(f => ({ ...f, flow_level: e.target.value }))} style={input}>
-                      <option value="">不记录</option>
+                      <option value="">{t('不记录', 'Skip')}</option>
                       {Object.entries(FLOW).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label style={label}>痛感</label>
+                    <label style={label}>{t('痛感', 'Pain')}</label>
                     <select value={form.pain_level} onChange={e => setForm(f => ({ ...f, pain_level: e.target.value }))} style={input}>
-                      <option value="">不记录</option>
+                      <option value="">{t('不记录', 'Skip')}</option>
                       {Object.entries(PAIN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                   </div>
                 </div>
-                <label style={label}>备注</label>
-                <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="选填" style={{ ...input, marginBottom: 12 }} />
+                <label style={label}>{t('备注', 'Notes')}</label>
+                <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder={t('选填', 'Optional')} style={{ ...input, marginBottom: 12 }} />
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button onClick={() => { setAdding(false); setForm(EMPTY) }}
                     style={{ flex: 1, padding: 11, borderRadius: 10, border: '1px solid var(--c-border)', background: 'var(--c-card-bg)', color: 'var(--c-text-secondary)', fontSize: 14, cursor: 'pointer' }}>
-                    取消
+                    {t('取消', 'Cancel')}
                   </button>
                   <button onClick={handleAdd} disabled={!form.start_date || saving}
                     style={{ flex: 2, padding: 11, borderRadius: 10, border: 'none', background: !form.start_date || saving ? 'var(--c-lavender)' : 'var(--c-brand)', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                    {saving ? '保存中…' : '保存'}
+                    {saving ? t('保存中…', 'Saving…') : t('保存', 'Save')}
                   </button>
                 </div>
               </div>
@@ -165,12 +171,12 @@ export default function MyCyclePage() {
 
             {avg && (
               <p style={{ fontSize: 13, color: 'var(--c-text-secondary)', margin: '0 0 10px 4px' }}>
-                近几次平均周期约 <b style={{ color: 'var(--c-text-primary)' }}>{avg}</b> 天
+                {t('近几次平均周期约', 'Average cycle')} <b style={{ color: 'var(--c-text-primary)' }}>{avg}</b> {t('天', 'days')}
               </p>
             )}
 
             {logs.length === 0 ? (
-              <div style={{ ...card, padding: 32, textAlign: 'center', color: 'var(--c-text-hint)', fontSize: 13 }}>还没有记录</div>
+              <div style={{ ...card, padding: 32, textAlign: 'center', color: 'var(--c-text-hint)', fontSize: 13 }}>{t('还没有记录', 'No entries yet')}</div>
             ) : (
               <div style={{ ...card, padding: '2px 14px' }}>
                 {/* 查看 / 就地修改 / 删除（components/cycle/CycleLogList.tsx，三处共用） */}

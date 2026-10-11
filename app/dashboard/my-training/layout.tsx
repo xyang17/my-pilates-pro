@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
+import { useLang } from '@/context/LanguageContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
@@ -9,6 +10,7 @@ import { useEffect } from 'react'
 // 接口那边（/api/personal-workouts）也会从数据库查角色再拒一次，这里只是界面上的门。
 export default function MyTrainingLayout({ children }: { children: React.ReactNode }) {
   const { userRole, loading } = useAuth()
+  const { t } = useLang()
   const router = useRouter()
   const allowed = userRole === 'TRAINER' || userRole === 'ADMIN'
 
@@ -16,6 +18,6 @@ export default function MyTrainingLayout({ children }: { children: React.ReactNo
     if (!loading && !allowed) router.replace('/dashboard')
   }, [loading, allowed, router])
 
-  if (loading || !allowed) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--c-text-secondary)' }}>加载中…</div>
+  if (loading || !allowed) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--c-text-secondary)' }}>{t('加载中…', 'Loading…')}</div>
   return <>{children}</>
 }

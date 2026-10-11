@@ -8,9 +8,12 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CycleLogList } from '@/components/cycle/CycleLogList'
 
-const SEX_LABELS: Record<string, string> = { MALE: '男', FEMALE: '女', OTHER: '其他', UNDISCLOSED: '不便告知' }
-const FLOW_LABELS: Record<string, string> = { LIGHT: '量少', MEDIUM: '量中', HEAVY: '量多' }
-const PAIN_LABELS: Record<string, string> = { NONE: '无痛感', MILD: '轻微', MODERATE: '中等', SEVERE: '严重' }
+const SEX_ZH: Record<string, string> = { MALE: '男', FEMALE: '女', OTHER: '其他', UNDISCLOSED: '不便告知' }
+const SEX_EN: Record<string, string> = { MALE: 'Male', FEMALE: 'Female', OTHER: 'Other', UNDISCLOSED: 'Prefer not to say' }
+const FLOW_ZH: Record<string, string> = { LIGHT: '量少', MEDIUM: '量中', HEAVY: '量多' }
+const FLOW_EN: Record<string, string> = { LIGHT: 'Light', MEDIUM: 'Medium', HEAVY: 'Heavy' }
+const PAIN_ZH: Record<string, string> = { NONE: '无痛感', MILD: '轻微', MODERATE: '中等', SEVERE: '严重' }
+const PAIN_EN: Record<string, string> = { NONE: 'No pain', MILD: 'Mild', MODERATE: 'Moderate', SEVERE: 'Severe' }
 
 interface BasicProfile {
   sex?: 'MALE' | 'FEMALE' | 'OTHER' | 'UNDISCLOSED' | null
@@ -30,6 +33,9 @@ interface CycleLog {
 export default function ProfilePage() {
   const { user, userRole, loading, logout } = useAuth()
   const { lang, setLang, fontSize, setFontSize, t } = useLang()
+  const SEX_LABELS = lang === 'zh' ? SEX_ZH : SEX_EN
+  const FLOW_LABELS = lang === 'zh' ? FLOW_ZH : FLOW_EN
+  const PAIN_LABELS = lang === 'zh' ? PAIN_ZH : PAIN_EN
   const router = useRouter()
 
   // 经营设置（只有教练看得到；学员端这个页面完全不受影响）
@@ -79,7 +85,7 @@ export default function ProfilePage() {
           loyalty_bonus_enabled: next.enabled ? 'true' : 'false',
         }),
       })
-      if (!res.ok) throw new Error('保存失败')
+      if (!res.ok) throw new Error(t('保存失败', 'Save failed'))
       setSettingsSaved(true)
       setTimeout(() => setSettingsSaved(false), 1500)
     } catch (err: any) {
@@ -135,7 +141,7 @@ export default function ProfilePage() {
           height_cm: basicForm.height_cm === '' ? null : Number(basicForm.height_cm),
         }),
       })
-      if (!res.ok) throw new Error('保存失败')
+      if (!res.ok) throw new Error(t('保存失败', 'Save failed'))
       const data = await res.json()
       setBasic({ sex: data.sex, birth_date: data.birth_date, height_cm: data.height_cm })
       setEditBasic(false)
@@ -156,7 +162,7 @@ export default function ProfilePage() {
         body: JSON.stringify({ user_id: user.id, ...cycleForm }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || '保存失败')
+      if (!res.ok) throw new Error(data.error || t('保存失败', 'Save failed'))
       setCycleLogs(prev => [data, ...prev].sort((a, b) => b.start_date.localeCompare(a.start_date)))
       setCycleForm({ start_date: '', end_date: '', flow_level: '', pain_level: '', notes: '' })
       setShowAddCycle(false)
@@ -168,7 +174,7 @@ export default function ProfilePage() {
   }
 
   const handleDeleteCycle = async (id: string) => {
-    if (!user || !window.confirm('确定删除这条周期记录？')) return
+    if (!user || !window.confirm(t('确定删除这条周期记录？', 'Delete this entry?'))) return
     setDeletingCycleId(id)
     try {
       const res = await fetch(`/api/cycle-logs/${id}`, {
@@ -189,7 +195,7 @@ export default function ProfilePage() {
 
   if (loading || !user) return (
     <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>加载中…</span>
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>{t('加载中…', 'Loading…')}</span>
     </div>
   )
 
@@ -472,14 +478,14 @@ export default function ProfilePage() {
             borderRadius: 'var(--r-lg)', padding: '0 var(--sp-5)', marginBottom: 'var(--sp-4)',
           }}>
             <p style={{ margin: 0, padding: 'var(--sp-4) 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-text-hint)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-              经营设置
-              {savingSettings && <span style={{ color: 'var(--c-brand)', marginLeft: 8, textTransform: 'none' }}>保存中…</span>}
-              {settingsSaved && <span style={{ color: 'var(--c-brand)', marginLeft: 8, textTransform: 'none' }}>✓ 已保存</span>}
+              {t('经营设置', 'Business settings')}
+              {savingSettings && <span style={{ color: 'var(--c-brand)', marginLeft: 8, textTransform: 'none' }}>{t('保存中…', 'Saving…')}</span>}
+              {settingsSaved && <span style={{ color: 'var(--c-brand)', marginLeft: 8, textTransform: 'none' }}>{t('✓ 已保存', '✓ Saved')}</span>}
             </p>
 
             <div style={{ padding: 'var(--sp-4) 0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)' }}>满课赠送</span>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-primary)' }}>{t('满课赠送', 'Loyalty bonus')}</span>
                 <button
                   onClick={() => {
                     const next = { ...settings, enabled: !settings.enabled }
@@ -491,35 +497,43 @@ export default function ProfilePage() {
                     background: settings.enabled ? 'var(--c-brand)' : 'transparent',
                     color: settings.enabled ? '#fff' : 'var(--c-text-secondary)',
                   }}>
-                  {settings.enabled ? '已开启' : '已关闭'}
+                  {settings.enabled ? t('已开启', 'On') : t('已关闭', 'Off')}
                 </button>
               </div>
 
               {settings.enabled && (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>每满</span>
+                    <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>{t('每满', 'Every')}</span>
                     <input
                       type="text" inputMode="numeric" value={settings.threshold}
                       onChange={e => setSettings({ ...settings, threshold: e.target.value.replace(/\D/g, '') })}
                       onBlur={() => saveSettings(settings)}
                       style={{ width: 56, padding: '7px 6px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, textAlign: 'center', boxSizing: 'border-box' }}
                     />
-                    <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>节课，赠送</span>
+                    <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>{t('节课，赠送', 'classes, give')}</span>
                     <input
                       type="text" inputMode="numeric" value={settings.bonus}
                       onChange={e => setSettings({ ...settings, bonus: e.target.value.replace(/\D/g, '') })}
                       onBlur={() => saveSettings(settings)}
                       style={{ width: 56, padding: '7px 6px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, textAlign: 'center', boxSizing: 'border-box' }}
                     />
-                    <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>节</span>
+                    <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>{t('节', 'free')}</span>
                   </div>
                   <p style={{ margin: '8px 0 0', fontSize: 11, color: '#bbb', lineHeight: 1.7 }}>
+                    {lang === 'zh' ? (<>
                     学员<b>默认不参加</b>满赠。要参加的学员，在学员页「课时包」里选「按默认规则」（就是这里设的数），
                     或者「单独设」（比如每满 10 送 1）。
                     「买 N 送 M」在建课时包时填「赠送」。<br />
                     按学员<b>累计完成</b>的课数算（私教 + 团课，自我练习不算），跨课时包累加。到了就给你发条消息提醒，
                     赠课要你确认后才发放，不会自动加。
+                    </>) : (<>
+                    Clients are <b>not enrolled by default</b>. To enroll one, open the client’s “Packages” tab and choose
+                    “Default rule” (the numbers set here) or “Custom” (e.g. every 10 → 1 free).
+                    For buy-N-get-M, fill “Bonus” when creating a package.<br />
+                    Counts each client’s <b>completed</b> classes (private + group; self-practice excluded) across packages.
+                    You’ll get a message when one is due; nothing is added until you confirm.
+                    </>)}
                   </p>
                 </>
               )}

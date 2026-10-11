@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useLang } from '@/context/LanguageContext'
 import {
   Bell, ChevronLeft, ChevronRight, Clock, Plus, Calendar, FileDown,
   CalendarCheck, Dumbbell, ClipboardCheck, Activity, BookOpen, ClipboardList, Trophy,
@@ -40,13 +41,16 @@ interface DashboardData {
 
 const WEEK_HEAD = ['一', '二', '三', '四', '五', '六', '日']
 const WEEKDAY_ZH = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+const WEEK_HEAD_EN = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+const WEEKDAY_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTH_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-const STATUS_LABEL: Record<string, { text: string; bg: string; color: string }> = {
-  planned:     { text: '待上课', bg: '#EDE6F4', color: '#9880B8' },
-  scheduled:   { text: '待上课', bg: '#EDE6F4', color: '#9880B8' },
-  in_progress: { text: '进行中', bg: '#FFF8E1', color: '#F57F17' },
-  completed:   { text: '已完成', bg: '#E8F5E9', color: '#2E7D32' },
-  cancelled:   { text: '已取消', bg: '#F5EDED', color: '#C4A4A4' },
+const STATUS_LABEL: Record<string, { text: string; en: string; bg: string; color: string }> = {
+  planned:     { text: '待上课', en: 'Upcoming',    bg: '#EDE6F4', color: '#9880B8' },
+  scheduled:   { text: '待上课', en: 'Upcoming',    bg: '#EDE6F4', color: '#9880B8' },
+  in_progress: { text: '进行中', en: 'In progress', bg: '#FFF8E1', color: '#F57F17' },
+  completed:   { text: '已完成', en: 'Done',        bg: '#E8F5E9', color: '#2E7D32' },
+  cancelled:   { text: '已取消', en: 'Cancelled',   bg: '#F5EDED', color: '#C4A4A4' },
 }
 
 // ── 纯字符串日期运算（YYYY-MM-DD），不受时区影响 ──
@@ -63,11 +67,12 @@ const addDays = (date: string, n: number) => {
 const weekday = (date: string) => new Date(`${date}T00:00:00Z`).getUTCDay()
 const mondayOf = (date: string) => addDays(date, -((weekday(date) + 6) % 7))
 const dayNum = (date: string) => Number(date.slice(8, 10))
-const fmtMD = (date: string) => `${Number(date.slice(5, 7))}月${dayNum(date)}日`
+const fmtMD = (date: string, lang: 'zh' | 'en' = 'zh') =>
+  lang === 'zh' ? `${Number(date.slice(5, 7))}月${dayNum(date)}日` : `${MONTH_EN[Number(date.slice(5, 7)) - 1]} ${dayNum(date)}`
 
 function FeatureGroup({ title, items }: {
   title: string
-  items: { label: string; href: string; icon: React.ElementType }[]
+  items: { label: string; href: string; icon: React.ElementType }[]   // label 已按语言取好
 }) {
   return (
     <div style={{ marginBottom: 16 }}>
@@ -100,6 +105,8 @@ export function TrainerHome({ userId, userRole, displayName }: {
   userRole: string
   displayName: string
 }) {
+  const { lang, t } = useLang()
+  const wk = (d: string) => (lang === 'zh' ? WEEKDAY_ZH : WEEKDAY_EN)[weekday(d)]
   const today = useMemo(localToday, [])
   const [selected, setSelected] = useState(today)
   const [data, setData] = useState<DashboardData | null>(null)
@@ -139,28 +146,28 @@ export function TrainerHome({ userId, userRole, displayName }: {
     setSelected(mondayOf(next) === mondayOf(today) ? today : next)
   }
 
-  const dayTitle = selected === today ? '今天的课'
-    : selected === addDays(today, 1) ? '明天的课'
-    : selected === addDays(today, -1) ? '昨天的课'
-    : `${fmtMD(selected)} ${WEEKDAY_ZH[weekday(selected)]}的课`
+  const dayTitle = selected === today ? t('今天的课', 'Today')
+    : selected === addDays(today, 1) ? t('明天的课', 'Tomorrow')
+    : selected === addDays(today, -1) ? t('昨天的课', 'Yesterday')
+    : lang === 'zh' ? `${fmtMD(selected)} ${wk(selected)}的课` : `${wk(selected)}, ${fmtMD(selected, 'en')}`
 
   const teach = [
-    { label: '约课',     href: '/dashboard/booking',      icon: CalendarCheck },
-    { label: '可约时段', href: '/dashboard/availability', icon: Clock },
-    { label: '课程训练', href: '/dashboard/classes',      icon: Dumbbell },
-    { label: '课后作业', href: '/dashboard/workouts',     icon: ClipboardCheck },
+    { label: t('约课', 'Booking'),          href: '/dashboard/booking',      icon: CalendarCheck },
+    { label: t('可约时段', 'Availability'), href: '/dashboard/availability', icon: Clock },
+    { label: t('课程训练', 'Classes'),      href: '/dashboard/classes',      icon: Dumbbell },
+    { label: t('课后作业', 'Homework'),     href: '/dashboard/workouts',     icon: ClipboardCheck },
     // 身体测试在这里也留入口：有时候做体测本身就是一节课的内容（学员详情页里也能进）
-    { label: '身体测试', href: '/dashboard/assessments',  icon: Activity },
-    { label: '导出训练记录', href: '/dashboard/export',    icon: FileDown },
+    { label: t('身体测试', 'Assessments'),  href: '/dashboard/assessments',  icon: Activity },
+    { label: t('导出训练记录', 'Export'),   href: '/dashboard/export',       icon: FileDown },
   ]
   const content = [
-    { label: '动作库',   href: '/dashboard/exercises', icon: BookOpen },
-    { label: '教案模板', href: '/dashboard/plans',     icon: ClipboardList },
-    { label: '训练方案', href: '/dashboard/programs',  icon: Trophy },
+    { label: t('动作库', 'Exercises'),      href: '/dashboard/exercises', icon: BookOpen },
+    { label: t('教案模板', 'Lesson Plans'), href: '/dashboard/plans',     icon: ClipboardList },
+    { label: t('训练方案', 'Programs'),     href: '/dashboard/programs',  icon: Trophy },
   ]
   const business = [
-    { label: '统计', href: '/dashboard/stats', icon: BarChart3 },
-    ...(userRole === 'ADMIN' ? [{ label: '邀请码', href: '/dashboard/invite-codes', icon: Ticket }] : []),
+    { label: t('统计', 'Stats'), href: '/dashboard/stats', icon: BarChart3 },
+    ...(userRole === 'ADMIN' ? [{ label: t('邀请码', 'Invite Codes'), href: '/dashboard/invite-codes', icon: Ticket }] : []),
   ]
 
   const card: React.CSSProperties = { background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 12 }
@@ -172,13 +179,13 @@ export function TrainerHome({ userId, userRole, displayName }: {
         <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 16 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: 13, color: 'var(--c-text-hint)', margin: '0 0 2px' }}>
-              {fmtMD(today)} {WEEKDAY_ZH[weekday(today)]}
+              {lang === 'zh' ? `${fmtMD(today)} ${wk(today)}` : `${wk(today)}, ${fmtMD(today, 'en')}`}
             </p>
             <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--c-text-primary)', margin: 0 }}>
-              你好，{displayName.split('@')[0]}
+              {t('你好，', 'Hi, ')}{displayName.split('@')[0]}
             </h1>
           </div>
-          <Link href="/dashboard/notifications" aria-label="消息"
+          <Link href="/dashboard/notifications" aria-label={t('消息', 'Messages')}
             style={{ position: 'relative', width: 40, height: 40, borderRadius: '50%', background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Bell size={18} color="var(--c-text-secondary)" />
             {unread > 0 && (
@@ -196,20 +203,20 @@ export function TrainerHome({ userId, userRole, displayName }: {
         {/* 周视图 */}
         <div style={{ ...card, padding: '10px 6px 8px', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', padding: '0 6px 6px' }}>
-            <button onClick={() => shiftWeek(-1)} aria-label="上一周"
+            <button onClick={() => shiftWeek(-1)} aria-label={t('上一周', 'Previous week')}
               style={{ border: 'none', background: 'none', padding: 4, cursor: 'pointer', color: 'var(--c-text-hint)', display: 'flex' }}>
               <ChevronLeft size={16} />
             </button>
             <span style={{ fontSize: 12, color: 'var(--c-text-secondary)', flex: 1, textAlign: 'center' }}>
-              {Number(weekStart.slice(5, 7))}月{dayNum(weekStart)}日 – {fmtMD(weekDays[6])}
+              {fmtMD(weekStart, lang)} – {fmtMD(weekDays[6], lang)}
             </span>
-            <button onClick={() => shiftWeek(1)} aria-label="下一周"
+            <button onClick={() => shiftWeek(1)} aria-label={t('下一周', 'Next week')}
               style={{ border: 'none', background: 'none', padding: 4, cursor: 'pointer', color: 'var(--c-text-hint)', display: 'flex' }}>
               <ChevronRight size={16} />
             </button>
             <Link href="/dashboard/calendar"
               style={{ marginLeft: 6, fontSize: 12, color: 'var(--c-brand)', textDecoration: 'none', fontWeight: 600, whiteSpace: 'nowrap' }}>
-              月历 ›
+              {t('月历 ›', 'Month ›')}
             </Link>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
@@ -220,7 +227,7 @@ export function TrainerHome({ userId, userRole, displayName }: {
               return (
                 <button key={d} onClick={() => setSelected(d)}
                   style={{ border: 'none', background: 'none', padding: '2px 0', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                  <span style={{ fontSize: 11, color: 'var(--c-text-hint)' }}>{WEEK_HEAD[i]}</span>
+                  <span style={{ fontSize: 11, color: 'var(--c-text-hint)' }}>{(lang === 'zh' ? WEEK_HEAD : WEEK_HEAD_EN)[i]}</span>
                   <span style={{
                     width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 14, fontWeight: isSel || isToday ? 700 : 500,
@@ -248,22 +255,22 @@ export function TrainerHome({ userId, userRole, displayName }: {
               {dayTitle}{classes.length ? ` (${classes.length})` : ''}
             </h2>
             <Link href="/dashboard/classes/new" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--c-brand)', textDecoration: 'none', fontWeight: 500 }}>
-              <Plus size={14} /> 新建
+              <Plus size={14} /> {t('新建', 'New')}
             </Link>
           </div>
 
           {loading && !classes.length ? (
-            <div style={{ ...card, padding: '24px 20px', textAlign: 'center', color: 'var(--c-text-hint)', fontSize: 13 }}>加载中…</div>
+            <div style={{ ...card, padding: '24px 20px', textAlign: 'center', color: 'var(--c-text-hint)', fontSize: 13 }}>{t('加载中…', 'Loading…')}</div>
           ) : !classes.length ? (
             <div style={{ ...card, padding: '24px 20px', textAlign: 'center' }}>
               <Calendar size={24} color="var(--c-text-hint)" style={{ margin: '0 auto 8px', display: 'block' }} />
-              <p style={{ fontSize: 13, color: 'var(--c-text-hint)', margin: 0 }}>这天没有课程安排</p>
+              <p style={{ fontSize: 13, color: 'var(--c-text-hint)', margin: 0 }}>{t('这天没有课程安排', 'No classes this day')}</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, opacity: loading ? 0.6 : 1 }}>
               {classes.map(cls => {
                 const st = STATUS_LABEL[cls.status] || STATUS_LABEL.scheduled
-                const time = cls.start_time ? cls.start_time.slice(0, 5) : '待定'
+                const time = cls.start_time ? cls.start_time.slice(0, 5) : t('待定', 'TBD')
                 const needsReview = cls.status === 'completed' && !cls.post_summary
                 const names = cls.client_names ?? []
                 return (
@@ -273,16 +280,16 @@ export function TrainerHome({ userId, userRole, displayName }: {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
                           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)' }}>
-                            {names.length ? `${names.slice(0, 2).join('、')}${names.length > 2 ? ` 等${names.length}人` : ''} · ` : ''}{cls.name}
+                            {names.length ? `${names.slice(0, 2).join(lang === 'zh' ? '、' : ', ')}${names.length > 2 ? t(` 等${names.length}人`, ` +${names.length - 2}`) : ''} · ` : ''}{cls.name}
                           </span>
-                          <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: st.bg, color: st.color, fontWeight: 500 }}>{st.text}</span>
+                          <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: st.bg, color: st.color, fontWeight: 500 }}>{lang === 'zh' ? st.text : st.en}</span>
                           {needsReview && (
-                            <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#EDE6F4', color: '#9880B8', fontWeight: 500 }}>待复盘</span>
+                            <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#EDE6F4', color: '#9880B8', fontWeight: 500 }}>{t('待复盘', 'To review')}</span>
                           )}
                         </div>
                         {cls.duration ? (
                           <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--c-text-hint)' }}>
-                            <Clock size={11} /> {cls.duration} 分钟
+                            <Clock size={11} /> {cls.duration} {t('分钟', 'min')}
                           </span>
                         ) : null}
                       </div>
@@ -297,10 +304,10 @@ export function TrainerHome({ userId, userRole, displayName }: {
 
         {/* 全部功能：手机上底栏只有 4 个，其余入口都在这里。电脑上左侧边栏已经有，不重复。 */}
         <section className="md:hidden">
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', margin: '0 0 12px' }}>全部功能</h2>
-          <FeatureGroup title="教学" items={teach} />
-          <FeatureGroup title="内容" items={content} />
-          <FeatureGroup title="经营" items={business} />
+          <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text-primary)', margin: '0 0 12px' }}>{t('全部功能', 'All features')}</h2>
+          <FeatureGroup title={t('教学', 'Teaching')} items={teach} />
+          <FeatureGroup title={t('内容', 'Content')} items={content} />
+          <FeatureGroup title={t('经营', 'Business')} items={business} />
         </section>
       </main>
     </div>

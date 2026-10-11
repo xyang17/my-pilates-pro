@@ -32,14 +32,33 @@ export default function LoginPage() {
           'Login timed out — this is usually a network issue. Check your connection and try again.'
         ))), 15000)
       )
-      const { error } = await Promise.race([
-        supabase.auth.signInWithPassword({ email, password }),
-        timeout,
-      ])
-      if (error) { setError(error.message); return }
+      // 网络类错误（Safari:「Load failed」，Chrome:「Failed to fetch」）自动重试一次——
+      // 手机网络切换、信号不好时第一次请求常常就是发不出去
+      const isNetworkErr = (e: any) =>
+        /load failed|failed to fetch|networkerror|network request failed|fetch failed/i.test(String(e?.message || e))
+      const attempt = () => Promise.race([supabase.auth.signInWithPassword({ email, password }), timeout])
+      let result
+      try {
+        result = await attempt()
+        if (result.error && isNetworkErr(result.error)) throw result.error
+      } catch (e: any) {
+        if (!isNetworkErr(e)) throw e
+        await new Promise(r => setTimeout(r, 800))
+        result = await attempt()
+      }
+      const { error } = result
+      if (error) {
+        setError(isNetworkErr(error)
+          ? t('网络连接不上，请检查网络（或切换 Wi-Fi / 流量）后再试', 'Can’t reach the server. Check your connection (try switching Wi-Fi / mobile data) and try again.')
+          : error.message)
+        return
+      }
       router.push('/dashboard')
     } catch (err: any) {
-      setError(err.message || t('登录失败', 'Login failed'))
+      const msg = String(err?.message || '')
+      setError(/load failed|failed to fetch|networkerror|fetch failed/i.test(msg)
+        ? t('网络连接不上，请检查网络（或切换 Wi-Fi / 流量）后再试', 'Can’t reach the server. Check your connection (try switching Wi-Fi / mobile data) and try again.')
+        : msg || t('登录失败', 'Login failed'))
     } finally {
       setLoading(false)
     }

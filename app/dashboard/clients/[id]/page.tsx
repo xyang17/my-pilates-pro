@@ -103,7 +103,7 @@ const PAIN_LABELS: Record<string, string> = { NONE: '无痛感', MILD: '轻微',
 
 export default function ClientDetailPage() {
   const { user, userRole, loading: authLoading } = useAuth()
-  const { lang } = useLang()
+  const { lang, t } = useLang()
   const router = useRouter()
   const params = useParams()
   const clientId = params.id as string
@@ -659,10 +659,10 @@ export default function ClientDetailPage() {
           <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
             {/* 导出这个学员一段时间的训练内容（选时间段 → 生成 PDF） */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderBottom: '1px solid var(--c-border)', background: '#FAF8FD' }}>
-              <span style={{ flex: 1, fontSize: 12, color: 'var(--c-text-secondary)' }}>按时间段导出训练内容</span>
+              <span style={{ flex: 1, fontSize: 12, color: 'var(--c-text-secondary)' }}>{t('按时间段导出训练内容', 'Export training for a date range')}</span>
               <Link href={`/dashboard/export?client=${clientId}`}
                 style={{ fontSize: 13, color: 'var(--c-brand)', border: '1px solid var(--c-brand)', borderRadius: 6, padding: '5px 12px', textDecoration: 'none', fontWeight: 600 }}>
-                ⬇ 导出 PDF
+                ⬇ {t('导出 PDF', 'Export PDF')}
               </Link>
             </div>
             {selfPracticeCount > 0 && (
@@ -877,18 +877,18 @@ export default function ClientDetailPage() {
           <div style={{ background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
             <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--c-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>
-                {packages.length === 0 ? '还没有课时包' : `共 ${packages.length} 个`}
+                {packages.length === 0 ? t('还没有课时包', 'No packages yet') : t(`共 ${packages.length} 个`, `${packages.length} package(s)`)}
               </span>
               <div style={{ display: 'flex', gap: 8 }}>
                 {effRule?.enabled && (
                   <button onClick={handleGrantBonus} disabled={granting}
                     style={{ fontSize: 13, color: '#E65100', border: '1px solid #FFB74D', borderRadius: 6, padding: '5px 14px', background: '#FFF8E1', cursor: granting ? 'wait' : 'pointer', fontWeight: 500 }}>
-                    🎁 赠 {effRule.sessions} 节
+                    🎁 {t(`赠 ${effRule.sessions} 节`, `Give ${effRule.sessions} free`)}
                   </button>
                 )}
                 <button onClick={() => setShowAddPkg(v => !v)}
                   style={{ fontSize: 13, color: 'var(--c-brand)', border: '1px solid var(--c-brand)', borderRadius: 6, padding: '5px 14px', background: 'none', cursor: 'pointer', fontWeight: 500 }}>
-                  {showAddPkg ? '取消' : '＋ 新建课时包'}
+                  {showAddPkg ? t('取消', 'Cancel') : t('＋ 新建课时包', '＋ New package')}
                 </button>
               </div>
             </div>
@@ -896,33 +896,38 @@ export default function ClientDetailPage() {
             {showAddPkg && (
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--c-border)', background: 'var(--c-fill-light)' }}>
                 <p style={{ margin: '0 0 12px', fontSize: 12, color: '#999', lineHeight: 1.7 }}>
+                  {lang === 'zh' ? (<>
                   学员如果之前已经上过课，这里直接填<b>还剩多少节</b>就行，不用回头把历史课一节节挂进来。
                   从今往后完成的课会自动从这个包里扣。
+                  </>) : (<>
+                  If the client already used part of a package, just enter <b>how many sessions are left</b> — no need to attach past classes.
+                  Classes completed from now on are deducted from this package automatically.
+                  </>)}
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>节数 *</label>
+                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>{t('节数 *', 'Sessions *')}</label>
                     <input type="text" inputMode="numeric" value={pkgForm.total}
                       onChange={e => setPkgForm(f => ({ ...f, total: e.target.value.replace(/\D/g, '') }))}
                       placeholder="10"
                       style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>赠送（买N送M）</label>
+                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>{t('赠送（买N送M）', 'Bonus (buy N get M)')}</label>
                     <input type="text" inputMode="numeric" value={pkgForm.bonus}
                       onChange={e => setPkgForm(f => ({ ...f, bonus: e.target.value.replace(/\D/g, '') }))}
                       placeholder="0"
                       style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>实付金额</label>
+                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>{t('实付金额', 'Amount paid')}</label>
                     <input type="text" inputMode="numeric" value={pkgForm.price}
                       onChange={e => setPkgForm(f => ({ ...f, price: e.target.value.replace(/[^\d.]/g, '') }))}
                       placeholder="2000"
                       style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>有效期（选填）</label>
+                    <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>{t('有效期（选填）', 'Expires (optional)')}</label>
                     <input type="date" value={pkgForm.expires}
                       onChange={e => setPkgForm(f => ({ ...f, expires: e.target.value }))}
                       style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
@@ -930,11 +935,11 @@ export default function ClientDetailPage() {
                 </div>
                 <input type="text" value={pkgForm.notes}
                   onChange={e => setPkgForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="备注（选填）"
+                  placeholder={t('备注（选填）', 'Notes (optional)')}
                   style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', marginBottom: 10 }} />
                 <button onClick={handleAddPackage} disabled={savingPkg}
                   style={{ padding: '8px 20px', background: savingPkg ? 'var(--c-lavender)' : 'var(--c-brand)', color: '#fff', border: 'none', borderRadius: 6, cursor: savingPkg ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600 }}>
-                  {savingPkg ? '保存中…' : '保存'}
+                  {savingPkg ? t('保存中…', 'Saving…') : t('保存', 'Save')}
                 </button>
               </div>
             )}
@@ -953,11 +958,11 @@ export default function ClientDetailPage() {
             />
 
             {pkgLoading ? (
-              <p style={{ padding: 40, textAlign: 'center', color: '#bbb', margin: 0 }}>加载中…</p>
+              <p style={{ padding: 40, textAlign: 'center', color: '#bbb', margin: 0 }}>{t('加载中…', 'Loading…')}</p>
             ) : packages.length === 0 ? (
               <p style={{ padding: 40, textAlign: 'center', color: '#bbb', margin: 0, fontSize: 13, lineHeight: 1.8 }}>
-                这个学员是单次付费<br />
-                <span style={{ fontSize: 12 }}>买了课时包之后，完成的课会自动从包里扣</span>
+                {t('这个学员是单次付费', 'This client pays per class')}<br />
+                <span style={{ fontSize: 12 }}>{t('买了课时包之后，完成的课会自动从包里扣', 'Once they buy a package, completed classes are deducted from it')}</span>
               </p>
             ) : (
               packages.map((pkg, i) => {
@@ -976,14 +981,14 @@ export default function ClientDetailPage() {
                         {pkg.remaining_sessions}
                       </span>
                       <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>
-                        / {pkg.granted_sessions} 节剩余
+                        / {pkg.granted_sessions} {t('节剩余', 'left')}
                       </span>
                       {pkg.source === 'loyalty' && (
-                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 8, background: '#FFF3E0', color: '#E65100' }}>满赠</span>
+                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 8, background: '#FFF3E0', color: '#E65100' }}>{t('满赠', 'Bonus')}</span>
                       )}
-                      {pkg.is_used_up && <span style={{ fontSize: 11, color: '#999' }}>已用完</span>}
-                      {pkg.is_expired && <span style={{ fontSize: 11, color: '#c0392b' }}>已过期</span>}
-                      {pkg.status === 'refunded' && <span style={{ fontSize: 11, color: '#999' }}>已退款</span>}
+                      {pkg.is_used_up && <span style={{ fontSize: 11, color: '#999' }}>{t('已用完', 'Used up')}</span>}
+                      {pkg.is_expired && <span style={{ fontSize: 11, color: '#c0392b' }}>{t('已过期', 'Expired')}</span>}
+                      {pkg.status === 'refunded' && <span style={{ fontSize: 11, color: '#999' }}>{t('已退款', 'Refunded')}</span>}
                       <button onClick={() => handleDeletePackage(pkg)}
                         style={{ marginLeft: 'auto', border: 'none', background: 'transparent', color: '#ccc', cursor: 'pointer', fontSize: 13 }}>✕</button>
                     </div>
@@ -993,11 +998,11 @@ export default function ClientDetailPage() {
                     </div>
 
                     <p style={{ margin: 0, fontSize: 12, color: '#999' }}>
-                      {pkg.purchased_at} 购买
-                      {pkg.total_sessions > 0 && pkg.bonus_sessions > 0 && ` · 买${pkg.total_sessions}送${pkg.bonus_sessions}`}
+                      {t(`${pkg.purchased_at} 购买`, `Bought ${pkg.purchased_at}`)}
+                      {pkg.total_sessions > 0 && pkg.bonus_sessions > 0 && t(` · 买${pkg.total_sessions}送${pkg.bonus_sessions}`, ` · buy ${pkg.total_sessions} get ${pkg.bonus_sessions}`)}
                       {pkg.price != null && ` · ¥${pkg.price}`}
-                      {pkg.expires_at && ` · ${pkg.expires_at} 到期`}
-                      {pkg.used_sessions > 0 && ` · 已上 ${pkg.used_sessions} 节`}
+                      {pkg.expires_at && t(` · ${pkg.expires_at} 到期`, ` · expires ${pkg.expires_at}`)}
+                      {pkg.used_sessions > 0 && t(` · 已上 ${pkg.used_sessions} 节`, ` · ${pkg.used_sessions} used`)}
                     </p>
                     {pkg.notes && <p style={{ margin: '4px 0 0', fontSize: 12, color: '#bbb' }}>{pkg.notes}</p>}
                   </div>

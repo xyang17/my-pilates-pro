@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { lastPerformanceForClient } from '@/lib/lastExercise'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -56,9 +57,26 @@ export async function POST(
 
     const nextOrder = existing && existing.length > 0 ? existing[0].order + 1 : 1
 
-    // Auto-fill defaults from master_exercise if not provided
+    // 预填优先级：调用方传了值 > 这个学员上次练这个动作的组次重量（私教课）> 动作库默认值
     let defaults: any = {}
+    let lastFilled = false
     if (body.exercise_id && body.sets == null && body.reps == null && body.weight == null) {
+      const { data: cls } = await supabaseAdmin.from('class')
+        .select('id, date, class_type, assigned_to').eq('id', id).maybeSingle()
+      if (cls?.class_type === 'private' && cls.assigned_to) {
+        const last = (await lastPerformanceForClient(cls.assigned_to, [body.exercise_id], {
+          excludeClassId: cls.id, beforeOrOn: cls.date,
+        }))[body.exercise_id]
+        if (last) {
+          defaults = {
+            default_sets: last.sets, default_reps: last.reps, default_weight: last.weight,
+            default_weight_unit: last.weight_unit, default_duration: last.duration, default_duration_unit: last.duration_unit,
+          }
+          lastFilled = true
+        }
+      }
+    }
+    if (!lastFilled && body.exercise_id && body.sets == null && body.reps == null && body.weight == null) {
       const { data: master } = await supabaseAdmin
         .from('master_exercise')
         .select('default_sets, default_reps, default_weight, default_weight_unit, default_duration, default_duration_unit')
@@ -88,7 +106,7 @@ export async function POST(
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-    return NextResponse.json(data[0], { status: 201 })
+    return NextResponse.json({ ...data[0], prefilled_from_last: lastFilled }, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

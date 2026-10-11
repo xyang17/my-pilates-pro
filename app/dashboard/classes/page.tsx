@@ -21,10 +21,10 @@ interface ClassItem {
 }
 
 // 单色紫系状态配置
-const STATUS_CONFIG: Record<string, { bar: string; bg: string; color: string; border: string; label: string; dot: string }> = {
-  planned:     { bar: '#C2AFCC', bg: '#EDE6F4', color: '#9888B0', border: '1px solid #C2AFCC', label: '未开始', dot: '○' },
-  in_progress: { bar: '#9880B8', bg: '#C2AFCC', color: '#fff',    border: '1px solid #9880B8', label: '进行中', dot: '●' },
-  completed:   { bar: '#9880B8', bg: '#EDE6F4', color: '#5A4878', border: '1.5px solid #9880B8', label: '已完成', dot: '✓' },
+const STATUS_CONFIG: Record<string, { bar: string; bg: string; color: string; border: string; label: string; en: string; dot: string }> = {
+  planned:     { bar: '#C2AFCC', bg: '#EDE6F4', color: '#9888B0', border: '1px solid #C2AFCC', label: '未开始', en: 'Not started', dot: '○' },
+  in_progress: { bar: '#9880B8', bg: '#C2AFCC', color: '#fff',    border: '1px solid #9880B8', label: '进行中', en: 'In progress', dot: '●' },
+  completed:   { bar: '#9880B8', bg: '#EDE6F4', color: '#5A4878', border: '1.5px solid #9880B8', label: '已完成', en: 'Done', dot: '✓' },
 }
 
 export default function ClassesPage() {
@@ -56,7 +56,7 @@ export default function ClassesPage() {
       const res = await fetch('/api/classes', {
         headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
       })
-      if (!res.ok) throw new Error('获取课程失败')
+      if (!res.ok) throw new Error(t('获取课程失败', 'Failed to load classes'))
       setClasses(await res.json())
     } catch (err: any) {
       setError(err.message)
@@ -66,7 +66,7 @@ export default function ClassesPage() {
   }
 
   const handleDeleteClass = async (cls: ClassItem) => {
-    if (!window.confirm(`确定删除课程「${cls.name}」？此操作无法撤销。`)) return
+    if (!window.confirm(t(`确定删除课程「${cls.name}」？此操作无法撤销。`, `Delete “${cls.name}”? This can’t be undone.`))) return
     setDeletingId(cls.id)
     try {
       const res = await fetch(`/api/classes/${cls.id}`, {
@@ -76,7 +76,7 @@ export default function ClassesPage() {
       if (res.ok) setClasses(prev => prev.filter(c => c.id !== cls.id))
       else {
         const d = await res.json().catch(() => ({}))
-        alert(d.error || '删除失败')
+        alert(d.error || t('删除失败', 'Delete failed'))
       }
     } catch {
       alert('网络错误，请重试')
@@ -104,7 +104,7 @@ export default function ClassesPage() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--sp-3)' }}>
         <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid var(--c-fill-mid)', borderTopColor: 'var(--c-brand)', animation: 'spin 0.8s linear infinite' }} />
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>加载中…</span>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>{t('加载中…', 'Loading…')}</span>
       </div>
     </div>
   )
@@ -124,9 +124,9 @@ export default function ClassesPage() {
         top: 0,
         zIndex: 10,
       }}>
-        <Link href="/dashboard" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>← 返回</Link>
+        <Link href="/dashboard" style={{ color: 'var(--c-text-secondary)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>← {t('返回', 'Back')}</Link>
         <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', flex: 1 }}>
-          课程训练
+          {t('课程训练', 'Classes')}
         </h1>
         <Link href="/dashboard/classes/new" style={{
           padding: '7px 16px',
@@ -137,7 +137,7 @@ export default function ClassesPage() {
           fontSize: 'var(--text-sm)',
           fontWeight: 500,
         }}>
-          + 新建
+          {t('+ 新建', '+ New')}
         </Link>
       </header>
 
@@ -157,8 +157,8 @@ export default function ClassesPage() {
         {isTrainer && (reviewCount > 0 || reviewOnly) && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 'var(--sp-4)' }}>
             {([
-              { on: false, label: `全部 (${classes.length})` },
-              { on: true,  label: `待复盘 (${reviewCount})` },
+              { on: false, label: `${t('全部', 'All')} (${classes.length})` },
+              { on: true,  label: `${t('待复盘', 'To review')} (${reviewCount})` },
             ]).map(f => (
               <button key={f.label} onClick={() => setReviewOnly(f.on)}
                 style={{
@@ -177,9 +177,9 @@ export default function ClassesPage() {
         {selfCount > 0 && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 'var(--sp-4)' }}>
             {([
-              { key: 'all', label: `全部 (${classes.length})` },
-              { key: 'class', label: `课程 (${classes.length - selfCount})` },
-              { key: 'self', label: `自我练习 (${selfCount})` },
+              { key: 'all', label: `${t('全部', 'All')} (${classes.length})` },
+              { key: 'class', label: `${t('课程', 'Classes')} (${classes.length - selfCount})` },
+              { key: 'self', label: `${t('自我练习', 'Self-practice')} (${selfCount})` },
             ] as const).map(f => (
               <button key={f.key} onClick={() => setListFilter(f.key)}
                 style={{
@@ -204,10 +204,10 @@ export default function ClassesPage() {
             textAlign: 'center',
           }}>
             <p style={{ color: 'var(--c-text-hint)', marginBottom: 'var(--sp-4)', fontSize: 'var(--text-base)' }}>
-              暂无课程
+              {t('暂无课程', 'No classes yet')}
             </p>
             <Link href="/dashboard/classes/new" style={{ color: 'var(--c-brand)', fontWeight: 500, textDecoration: 'none', fontSize: 'var(--text-sm)' }}>
-              新建第一节课 →
+              {t('新建第一节课 →', 'Create your first class →')}
             </Link>
           </div>
         ) : (
@@ -248,13 +248,13 @@ export default function ClassesPage() {
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls.name}</span>
                         {cls.class_type === 'self_practice' && (
                           <span style={{ fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 8, background: 'var(--c-fill-light)', color: 'var(--c-brand)', border: '1px solid var(--c-border-em)', flexShrink: 0 }}>
-                            自我练习
+                            {t('自我练习', 'Self-practice')}
                           </span>
                         )}
                       </p>
                       <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--c-text-secondary)' }}>
                         {new Date(cls.date + 'T12:00:00').toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
-                        {' · '}{cls.duration} 分钟
+                        {' · '}{cls.duration} {t('分钟', 'min')}
                         {cls.discipline && ` · ${cls.discipline}`}
                       </p>
                     </div>
@@ -273,7 +273,7 @@ export default function ClassesPage() {
                       alignItems: 'center',
                       gap: 4,
                     }}>
-                      <span>{cfg.dot}</span>{cfg.label}
+                      <span>{cfg.dot}</span>{lang === 'zh' ? cfg.label : cfg.en}
                     </span>
 
                     {!isTrainer && <span style={{ color: 'var(--c-text-hint)', fontSize: 'var(--text-base)', flexShrink: 0 }}>›</span>}
@@ -284,7 +284,7 @@ export default function ClassesPage() {
                     <button
                       onClick={e => { e.stopPropagation(); handleDeleteClass(cls) }}
                       disabled={isDeleting}
-                      title="删除课程"
+                      title={t('删除课程', 'Delete class')}
                       style={{
                         position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
                         width: 30, height: 30, border: 'none', borderRadius: '50%',

@@ -186,6 +186,37 @@ export default function ClassDetailPage() {
   // 类别/形式/难度这些课程属性对它没意义，动作列表也不需要编辑，只留一个备注
   const isSelfPractice = classData?.class_type === 'self_practice'
 
+  // 这个学员「上次」练每个动作是怎么练的（私教课才有，lib/lastExercise.ts）。
+  // 动作增删后重新拉；加动作时服务端也会直接用上次的组次重量预填。
+  const [lastPerf, setLastPerf] = useState<Record<string, {
+    date: string; sets: number | null; reps: number | null; weight: number | null; weight_unit: string | null
+    duration: number | null; duration_unit: string | null; from_actual: boolean
+  }>>({})
+  const exIdsKey = (classData?.exercises || []).map(e => e.exercise_id).sort().join(',')
+  useEffect(() => {
+    if (!classData || !user || classData.class_type !== 'private' || !exIdsKey) { setLastPerf({}); return }
+    fetch(`/api/classes/${classData.id}/last-performance`, {
+      headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' },
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setLastPerf(d?.items || {}))
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classData?.id, classData?.class_type, exIdsKey, user?.id])
+  const lastText = (exId: string) => {
+    const l = lastPerf[exId]
+    if (!l) return null
+    const parts: string[] = []
+    if (l.sets && l.reps) parts.push(`${l.sets}×${l.reps}`)
+    else if (l.sets) parts.push(lang === 'zh' ? `${l.sets}组` : `${l.sets} sets`)
+    else if (l.reps) parts.push(lang === 'zh' ? `${l.reps}次` : `${l.reps} reps`)
+    if (l.weight) parts.push(`${l.weight}${l.weight_unit || 'kg'}`)
+    if (l.duration) parts.push(`${l.duration}${l.duration_unit === 'seconds' ? (lang === 'zh' ? '秒' : 's') : (lang === 'zh' ? '分钟' : 'min')}`)
+    if (!parts.length) return null
+    const d = `${Number(l.date.slice(5, 7))}/${Number(l.date.slice(8, 10))}`
+    return `${parts.join(' · ')}（${d}${l.from_actual ? '' : (lang === 'zh' ? ' 计划' : ' plan')}）`
+  }
+
   // 结算方式：这节私教课是从某个课时包里扣，还是按次单独收费。
   // 包列表只在私教课且有指定学员时才需要拉。
   const [clientPackages, setClientPackages] = useState<any[]>([])
@@ -518,6 +549,8 @@ export default function ClassDetailPage() {
         const errData = await res.json().catch(() => ({}))
         throw new Error(errData.error || `HTTP ${res.status}`)
       }
+      const added = await res.json().catch(() => null)
+      if (added?.prefilled_from_last) showToast(t('已按这个学员上次的组次重量预填', 'Pre-filled from this client’s last session'), 'success')
       setAddSearch('')
       fetchClassData()
       fetchRecentExercises() // refresh recent list after adding
@@ -1682,6 +1715,11 @@ export default function ClassDetailPage() {
                         {(ex.actual_sets != null || ex.actual_weight != null) && (
                           <p style={{ margin: '2px 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-brand)' }}>
                             ✓ {[ex.actual_sets && `${ex.actual_sets}${t('组','sets')}`, ex.actual_reps && `×${ex.actual_reps}`, ex.actual_weight && `${ex.actual_weight}kg`].filter(Boolean).join(' ')}
+                          </p>
+                        )}
+                        {lastText(ex.exercise_id) && (
+                          <p style={{ margin: '2px 0 0', fontSize: 'var(--text-xs)', color: 'var(--c-text-secondary)' }}>
+                            {t('上次', 'Last')}：{lastText(ex.exercise_id)}
                           </p>
                         )}
                       </div>

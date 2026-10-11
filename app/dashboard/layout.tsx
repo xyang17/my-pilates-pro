@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
+import { useLang } from '@/context/LanguageContext'
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -40,9 +41,11 @@ import {
   FileDown,
 } from 'lucide-react'
 
+// 导航文字中英文都写在这里（label 中文 / en 英文），渲染时按当前语言取。
 interface NavGroup {
   label?: string
-  items: { label: string; href: string; icon: React.ElementType }[]
+  en?: string
+  items: { label: string; en: string; href: string; icon: React.ElementType }[]
 }
 
 // 教练端导航按「用途」分组（见 docs/交接-导航重构与个人训练.md 第三节）：
@@ -54,43 +57,43 @@ interface NavGroup {
 const trainerNav: NavGroup[] = [
   {
     items: [
-      { label: '今日概览', href: '/dashboard',               icon: LayoutDashboard },
-      { label: '消息',     href: '/dashboard/notifications', icon: Bell },
+      { label: '今日概览', en: 'Today', href: '/dashboard',               icon: LayoutDashboard },
+      { label: '消息', en: 'Messages',     href: '/dashboard/notifications', icon: Bell },
     ],
   },
   {
-    label: '我的训练',
+    label: '我的训练', en: 'My Training',
     items: [
-      { label: '我的训练', href: '/dashboard/my-training',         icon: HeartPulse },
-      { label: '训练记录', href: '/dashboard/my-training/records', icon: NotebookPen },
-      { label: '计时器',   href: '/dashboard/timer',               icon: Timer },
+      { label: '我的训练', en: 'My Training', href: '/dashboard/my-training',         icon: HeartPulse },
+      { label: '训练记录', en: 'Workout Log', href: '/dashboard/my-training/records', icon: NotebookPen },
+      { label: '计时器', en: 'Timer',   href: '/dashboard/timer',               icon: Timer },
     ],
   },
   {
-    label: '教学',
+    label: '教学', en: 'Teaching',
     items: [
-      { label: '课程日历',  href: '/dashboard/calendar',     icon: Calendar },
-      { label: '约课',      href: '/dashboard/booking',      icon: CalendarCheck },
-      { label: '可约时段',  href: '/dashboard/availability', icon: Clock },
-      { label: '课程训练',  href: '/dashboard/classes',      icon: Dumbbell },
-      { label: '学员管理',  href: '/dashboard/clients',      icon: Users },
-      { label: '课后作业',  href: '/dashboard/workouts',     icon: ClipboardList },
-      { label: '身体测试',  href: '/dashboard/assessments',  icon: Activity },
-      { label: '导出训练记录', href: '/dashboard/export',     icon: FileDown },
+      { label: '课程日历', en: 'Calendar',  href: '/dashboard/calendar',     icon: Calendar },
+      { label: '约课', en: 'Booking',      href: '/dashboard/booking',      icon: CalendarCheck },
+      { label: '可约时段', en: 'Availability',  href: '/dashboard/availability', icon: Clock },
+      { label: '课程训练', en: 'Classes',  href: '/dashboard/classes',      icon: Dumbbell },
+      { label: '学员管理', en: 'Clients',  href: '/dashboard/clients',      icon: Users },
+      { label: '课后作业', en: 'Homework',  href: '/dashboard/workouts',     icon: ClipboardList },
+      { label: '身体测试', en: 'Assessments',  href: '/dashboard/assessments',  icon: Activity },
+      { label: '导出训练记录', en: 'Export Training', href: '/dashboard/export',     icon: FileDown },
     ],
   },
   {
-    label: '内容',
+    label: '内容', en: 'Content',
     items: [
-      { label: '动作库',   href: '/dashboard/exercises', icon: BookOpen },
-      { label: '教案模板', href: '/dashboard/plans',     icon: ClipboardList },
-      { label: '训练方案', href: '/dashboard/programs',  icon: Trophy },
+      { label: '动作库', en: 'Exercises',   href: '/dashboard/exercises', icon: BookOpen },
+      { label: '教案模板', en: 'Lesson Plans', href: '/dashboard/plans',     icon: ClipboardList },
+      { label: '训练方案', en: 'Programs', href: '/dashboard/programs',  icon: Trophy },
     ],
   },
   {
-    label: '经营',
+    label: '经营', en: 'Business',
     items: [
-      { label: '统计', href: '/dashboard/stats', icon: BarChart3 },
+      { label: '统计', en: 'Stats', href: '/dashboard/stats', icon: BarChart3 },
     ],
   },
 ]
@@ -98,14 +101,14 @@ const trainerNav: NavGroup[] = [
 const clientNav: NavGroup[] = [
   {
     items: [
-      { label: '首页',     href: '/dashboard',           icon: Home },
-      { label: '约课',     href: '/dashboard/booking',   icon: CalendarCheck },
-      { label: '我的课程', href: '/dashboard/classes',   icon: Dumbbell },
-      { label: '课后作业', href: '/dashboard/workouts',  icon: ClipboardList },
-      { label: '计时器',   href: '/dashboard/timer',     icon: Timer },
-      { label: '消息',     href: '/dashboard/notifications', icon: Bell },
-      { label: '训练方案', href: '/dashboard/programs',  icon: Trophy },
-      { label: '我的主页', href: '/dashboard/profile',   icon: User },
+      { label: '首页', en: 'Home',     href: '/dashboard',           icon: Home },
+      { label: '约课', en: 'Booking',     href: '/dashboard/booking',   icon: CalendarCheck },
+      { label: '我的课程', en: 'My Classes', href: '/dashboard/classes',   icon: Dumbbell },
+      { label: '课后作业', en: 'Homework', href: '/dashboard/workouts',  icon: ClipboardList },
+      { label: '计时器', en: 'Timer',   href: '/dashboard/timer',     icon: Timer },
+      { label: '消息', en: 'Messages',     href: '/dashboard/notifications', icon: Bell },
+      { label: '训练方案', en: 'Programs', href: '/dashboard/programs',  icon: Trophy },
+      { label: '我的主页', en: 'My Profile', href: '/dashboard/profile',   icon: User },
     ],
   },
 ]
@@ -113,22 +116,24 @@ const clientNav: NavGroup[] = [
 // 教练底栏 4 个：最常点的首页 / 学员 / 我的，加上新的「我的训练」。
 // 课程、计划不是日常高频入口，收进首页的「全部功能」。
 const trainerTabs = [
-  { label: '首页',     href: '/dashboard',             icon: LayoutDashboard },
-  { label: '学员',     href: '/dashboard/clients',     icon: Users },
-  { label: '我的训练', href: '/dashboard/my-training', icon: HeartPulse },
-  { label: '我的',     href: '/dashboard/profile',     icon: User },
+  { label: '首页', en: 'Home',     href: '/dashboard',             icon: LayoutDashboard },
+  { label: '学员', en: 'Clients',     href: '/dashboard/clients',     icon: Users },
+  { label: '我的训练', en: 'My Training', href: '/dashboard/my-training', icon: HeartPulse },
+  { label: '我的', en: 'Me',     href: '/dashboard/profile',     icon: User },
 ]
 
 const clientTabs = [
-  { label: '首页',  href: '/dashboard',           icon: Home },
-  { label: '课程',  href: '/dashboard/classes',   icon: Dumbbell },
-  { label: '作业',  href: '/dashboard/workouts',  icon: ClipboardList },
-  { label: '方案',  href: '/dashboard/programs',  icon: Trophy },
-  { label: '我的',  href: '/dashboard/profile',   icon: User },
+  { label: '首页', en: 'Home',  href: '/dashboard',           icon: Home },
+  { label: '课程', en: 'Classes',  href: '/dashboard/classes',   icon: Dumbbell },
+  { label: '作业', en: 'Homework',  href: '/dashboard/workouts',  icon: ClipboardList },
+  { label: '方案', en: 'Programs',  href: '/dashboard/programs',  icon: Trophy },
+  { label: '我的', en: 'Me',  href: '/dashboard/profile',   icon: User },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, userRole, loading, logout } = useAuth()
+  const { lang, t } = useLang()
+  const L = (x: { label?: string; en?: string }) => (lang === 'zh' ? x.label : (x.en || x.label))
   const router = useRouter()
   const pathname = usePathname()
 
@@ -162,12 +167,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // 否则加载完成那一刻 hook 数量变了，React 直接报错（Rendered more hooks than during the previous render）。
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--c-text-secondary)' }}>
-      加载中…
+      {t('加载中…', 'Loading…')}
     </div>
   )
   if (!user) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--c-text-secondary)', fontSize: 14 }}>
-      正在跳转登录…
+      {t('正在跳转登录…', 'Redirecting to sign in…')}
     </div>
   )
 
@@ -203,7 +208,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <SidebarGroup key={gi}>
               {group.label && (
                 <SidebarGroupLabel style={{ fontSize: 10, letterSpacing: '0.06em', color: 'var(--c-text-hint)', padding: '8px 16px 2px' }}>
-                  {group.label}
+                  {L(group)}
                 </SidebarGroupLabel>
               )}
               <SidebarMenu>
@@ -224,7 +229,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         }}
                       >
                         <Icon size={15} />
-                        <span>{item.label}</span>
+                        <span>{L(item)}</span>
                         {item.href === '/dashboard/notifications' && unread > 0 && (
                           <span style={{
                             marginLeft: 'auto', minWidth: 18, height: 18, padding: '0 5px',
@@ -256,7 +261,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         }}
                       >
                         <Ticket size={15} />
-                        <span>邀请码</span>
+                        <span>{t('邀请码', 'Invite Codes')}</span>
                       </Link>
                     </SidebarMenuItem>
                   )
@@ -283,7 +288,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <button
               onClick={handleLogout}
-              title="退出"
+              title={t('退出', 'Sign out')}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-hint)', padding: 4, display: 'flex' }}
             >
               <LogOut size={14} />
@@ -326,7 +331,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }}
             >
               <Icon size={20} />
-              <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{tab.label}</span>
+              <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{L(tab)}</span>
             </Link>
           )
         })}

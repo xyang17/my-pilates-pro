@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useLang } from '@/context/LanguageContext'
 
 // 生理周期记录列表：查看 / 就地修改 / 删除。
 // 三个地方共用：学员「我的主页」、教练看学员的「生理周期」页签、教练自己的「我的训练 → 生理周期」。
@@ -17,6 +18,8 @@ export interface CycleLog {
 
 export const FLOW_LABELS: Record<string, string> = { LIGHT: '量少', MEDIUM: '量中', HEAVY: '量多' }
 export const PAIN_LABELS: Record<string, string> = { NONE: '无痛感', MILD: '轻微', MODERATE: '中等', SEVERE: '严重' }
+const FLOW_EN: Record<string, string> = { LIGHT: 'Light', MEDIUM: 'Medium', HEAVY: 'Heavy' }
+const PAIN_EN: Record<string, string> = { NONE: 'No pain', MILD: 'Mild', MODERATE: 'Moderate', SEVERE: 'Severe' }
 
 const tt = (t: ((zh: string, en: string) => string) | undefined, zh: string, en: string) => (t ? t(zh, en) : zh)
 
@@ -36,6 +39,10 @@ function EditForm({ log, headers, t, onSaved, onCancel }: {
   onSaved: (updated: CycleLog) => void
   onCancel: () => void
 }) {
+  const { lang, t: ctxT } = useLang()
+  t = t || ctxT
+  const FL = lang === 'zh' ? FLOW_LABELS : FLOW_EN
+  const PL = lang === 'zh' ? PAIN_LABELS : PAIN_EN
   const [f, setF] = useState({
     start_date: log.start_date || '',
     end_date: log.end_date || '',
@@ -82,14 +89,14 @@ function EditForm({ log, headers, t, onSaved, onCancel }: {
           <label style={label}>{tt(t, '流量', 'Flow')}</label>
           <select value={f.flow_level} onChange={e => setF(p => ({ ...p, flow_level: e.target.value }))} style={input}>
             <option value="">{tt(t, '不记录', 'Skip')}</option>
-            {Object.entries(FLOW_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.entries(FL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </div>
         <div>
           <label style={label}>{tt(t, '痛经程度', 'Pain level')}</label>
           <select value={f.pain_level} onChange={e => setF(p => ({ ...p, pain_level: e.target.value }))} style={input}>
             <option value="">{tt(t, '不记录', 'Skip')}</option>
-            {Object.entries(PAIN_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.entries(PL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </div>
       </div>
@@ -111,12 +118,16 @@ function EditForm({ log, headers, t, onSaved, onCancel }: {
   )
 }
 
-export function CycleLogList<T extends CycleLog>({ logs, headers, onChange, t }: {
+export function CycleLogList<T extends CycleLog>({ logs, headers, onChange }: {
   logs: T[]
   headers: Record<string, string>
   onChange: (next: T[]) => void
-  t?: (zh: string, en: string) => string
+  t?: (zh: string, en: string) => string   // 可不传：组件内部会用当前语言
 }) {
+  const { lang, t: ctxT } = useLang()
+  const t = ctxT
+  const FL = lang === 'zh' ? FLOW_LABELS : FLOW_EN
+  const PL = lang === 'zh' ? PAIN_LABELS : PAIN_EN
   const [editingId, setEditingId] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -157,7 +168,7 @@ export function CycleLogList<T extends CycleLog>({ logs, headers, onChange, t }:
                 </div>
                 {(c.flow_level || c.pain_level) && (
                   <div style={{ fontSize: 12, color: '#aaa' }}>
-                    {[c.flow_level && FLOW_LABELS[c.flow_level], c.pain_level && PAIN_LABELS[c.pain_level]].filter(Boolean).join(' · ')}
+                    {[c.flow_level && FL[c.flow_level], c.pain_level && PL[c.pain_level]].filter(Boolean).join(' · ')}
                   </div>
                 )}
                 {c.notes && <div style={{ fontSize: 12, color: '#bbb', marginTop: 2 }}>💬 {c.notes}</div>}

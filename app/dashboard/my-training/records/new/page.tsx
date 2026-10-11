@@ -62,7 +62,7 @@ function NewRecordInner() {
 
 export default function NewRecordPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>加载中…</div>}>
+    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>…</div>}>
       <NewRecordInner />
     </Suspense>
   )

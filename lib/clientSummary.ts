@@ -35,7 +35,8 @@ export interface ClientSummary {
     to_next: number                    // 再上几节到下一次赠课
     pending: number                    // 已达标但还没发的赠课次数
   }
-  alerts: { kind: 'bonus_due' | 'package_low' | 'package_empty' | 'package_expiring' | 'inactive'; text: string }[]
+  // 提醒文字中英文都给（text 中文 / en 英文），前端按当前语言取
+  alerts: { kind: 'bonus_due' | 'package_low' | 'package_empty' | 'package_expiring' | 'inactive'; text: string; en: string }[]
 }
 
 const LOW_REMAINING = 2          // 剩这么多节就提醒续费
@@ -133,15 +134,15 @@ export async function summarizeClients(clientIds: string[]): Promise<Record<stri
 
     const last = lastOf(billableDone)
     const alerts: ClientSummary['alerts'] = []
-    if (pending > 0) alerts.push({ kind: 'bonus_due', text: `有 ${pending * bonus} 节赠课待发` })
-    if (usable.length > 0 && remaining <= LOW_REMAINING) alerts.push({ kind: 'package_low', text: `课时包只剩 ${remaining} 节` })
-    if (usable.length === 0 && hadPackage) alerts.push({ kind: 'package_empty', text: '课时包已用完' })
+    if (pending > 0) alerts.push({ kind: 'bonus_due', text: `有 ${pending * bonus} 节赠课待发`, en: `${pending * bonus} bonus session(s) to give` })
+    if (usable.length > 0 && remaining <= LOW_REMAINING) alerts.push({ kind: 'package_low', text: `课时包只剩 ${remaining} 节`, en: `Only ${remaining} session(s) left` })
+    if (usable.length === 0 && hadPackage) alerts.push({ kind: 'package_empty', text: '课时包已用完', en: 'Package used up' })
     if (expiries[0] && daysBetween(today, expiries[0]) <= EXPIRING_DAYS) {
       const d = daysBetween(today, expiries[0])
-      alerts.push({ kind: 'package_expiring', text: d <= 0 ? '课时包今天到期' : `课时包 ${d} 天后到期` })
+      alerts.push({ kind: 'package_expiring', text: d <= 0 ? '课时包今天到期' : `课时包 ${d} 天后到期`, en: d <= 0 ? 'Package expires today' : `Package expires in ${d} day(s)` })
     }
     if (upcoming.length === 0 && last && daysBetween(last, today) > INACTIVE_DAYS) {
-      alerts.push({ kind: 'inactive', text: `${daysBetween(last, today)} 天没来上课了` })
+      alerts.push({ kind: 'inactive', text: `${daysBetween(last, today)} 天没来上课了`, en: `No class for ${daysBetween(last, today)} days` })
     }
 
     out[id] = {

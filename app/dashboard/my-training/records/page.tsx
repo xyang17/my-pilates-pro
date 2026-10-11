@@ -23,7 +23,7 @@ export default function MyTrainingRecordsPage() {
     fetch('/api/personal-workouts', { headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' } })
       .then(async r => {
         const d = await r.json().catch(() => [])
-        if (!r.ok) throw new Error(d.error || '加载失败')
+        if (!r.ok) throw new Error(d.error || t('加载失败', 'Failed to load'))
         setList(d)
       })
       .catch(e => setError(e.message))

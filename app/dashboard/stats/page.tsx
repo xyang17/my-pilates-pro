@@ -295,7 +295,7 @@ export default function StatsPage() {
                   }}>
                   <span style={{ fontSize: 16 }}>⚠</span>
                   <span style={{ flex: 1, fontSize: 13, lineHeight: 1.5 }}>
-                    <b>{summary?.missingPrice} 节已完成的课没填价格</b>，收入少算了。点这里逐个补上
+                    <b>{t(`${summary?.missingPrice} 节已完成的课没填价格`, `${summary?.missingPrice} completed classes have no price`)}</b>{t('，收入少算了。点这里逐个补上', ' — revenue is undercounted. Tap to fill them in')}
                   </span>
                   <span>›</span>
                 </button>
