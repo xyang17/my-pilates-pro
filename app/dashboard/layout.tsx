@@ -104,6 +104,7 @@ const clientNav: NavGroup[] = [
       { label: '首页', en: 'Home',     href: '/dashboard',           icon: Home },
       { label: '约课', en: 'Booking',     href: '/dashboard/booking',   icon: CalendarCheck },
       { label: '我的课程', en: 'My Classes', href: '/dashboard/classes',   icon: Dumbbell },
+      { label: '导出记录', en: 'Export', href: '/dashboard/export',    icon: FileDown },   // 学员导出自己的训练记录 PDF
       { label: '课后作业', en: 'Homework', href: '/dashboard/workouts',  icon: ClipboardList },
       { label: '计时器', en: 'Timer',   href: '/dashboard/timer',     icon: Timer },
       { label: '消息', en: 'Messages',     href: '/dashboard/notifications', icon: Bell },
