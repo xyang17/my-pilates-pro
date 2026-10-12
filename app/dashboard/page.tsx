@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { TrainerHome } from '@/components/home/TrainerHome'
 import { MySessionsCard } from '@/components/clients/MySessionsCard'
+import { CycleHomeCard } from '@/components/cycle/CycleHomeCard'
 import {
   Calendar, ChevronRight, Clock, Users, ClipboardCheck, Plus,
   Dumbbell, Activity, BookOpen, Trophy, ClipboardList, BarChart3, Ticket, User,
@@ -169,6 +170,9 @@ export default function DashboardPage() {
 
         {/* 我的课时：有课时包 / 参加了满赠才显示，两样都没有就不出现 */}
         <MySessionsCard userId={user?.id || ''} userRole={userRole || ''} />
+
+        {/* 生理周期：女性账户才显示，首页一键记「今天来了 / 结束了」；完整记录在我的主页 */}
+        <CycleHomeCard userId={user?.id || ''} userRole={userRole || ''} historyHref="/dashboard/profile" />
 
         {/* Today's classes */}
         <section style={{ marginBottom: 24 }}>

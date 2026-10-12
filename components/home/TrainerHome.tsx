@@ -1,5 +1,6 @@
 'use client'
 
+import { CycleHomeCard } from '@/components/cycle/CycleHomeCard'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useLang } from '@/context/LanguageContext'
@@ -301,6 +302,9 @@ export function TrainerHome({ userId, userRole, displayName }: {
             </div>
           )}
         </section>
+
+        {/* 我自己的生理周期（女性账户才显示）；完整记录在 我的训练 → 生理周期 */}
+        <CycleHomeCard userId={userId} userRole={userRole} historyHref="/dashboard/my-training/cycle" />
 
         {/* 全部功能：手机上底栏只有 4 个，其余入口都在这里。电脑上左侧边栏已经有，不重复。 */}
         <section className="md:hidden">
