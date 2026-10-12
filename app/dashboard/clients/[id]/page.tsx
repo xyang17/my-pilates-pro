@@ -99,6 +99,7 @@ interface CycleLog {
 }
 
 const SEX_LABELS: Record<string, string> = { MALE: '男', FEMALE: '女', OTHER: '其他', UNDISCLOSED: '不便告知' }
+const SEX_LABELS_EN: Record<string, string> = { MALE: 'Male', FEMALE: 'Female', OTHER: 'Other', UNDISCLOSED: 'Prefer not to say' }
 const FLOW_LABELS: Record<string, string> = { LIGHT: '量少', MEDIUM: '量中', HEAVY: '量多' }
 const PAIN_LABELS: Record<string, string> = { NONE: '无痛感', MILD: '轻微', MODERATE: '中等', SEVERE: '严重' }
 
@@ -197,6 +198,25 @@ export default function ClientDetailPage() {
       height_cm: client?.height_cm != null ? String(client.height_cm) : '',
     })
     setEditNotes(true)
+  }
+
+  const [savingSex, setSavingSex] = useState(false)
+  const quickSetSex = async (sex: string) => {
+    if (!client || savingSex) return
+    setSavingSex(true)
+    try {
+      const res = await fetch(`/api/clients/${clientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({ sex }),
+      })
+      if (!res.ok) throw new Error(t('保存失败', 'Save failed'))
+      setClient(prev => prev ? { ...prev, sex: sex as any } : prev)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setSavingSex(false)
+    }
   }
 
   const handleSaveNotes = async () => {
@@ -511,12 +531,25 @@ export default function ClientDetailPage() {
               <h2 style={{ margin: '0 0 var(--sp-1)', fontSize: 'var(--text-xl)', fontWeight: 600, color: 'var(--c-text-primary)' }}>{client.name}</h2>
               <p style={{ margin: '0 0 4px 0', color: '#999', fontSize: '13px' }}>📧 {client.email}</p>
               <p style={{ margin: 0, color: '#bbb', fontSize: '12px' }}>
-                加入时间: {new Date(client.created_at).toLocaleDateString('zh-CN')}
+                {t('加入时间', 'Joined')}: {new Date(client.created_at).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US')}
                 {(client.sex || client.birth_date || client.height_cm) && ' · '}
-                {client.sex && SEX_LABELS[client.sex]}
+                {client.sex && (lang === 'zh' ? SEX_LABELS[client.sex] : SEX_LABELS_EN[client.sex])}
                 {client.birth_date && ` · ${client.birth_date}`}
                 {client.height_cm != null && ` · ${client.height_cm}cm`}
               </p>
+              {/* 早期注册的学员没有性别 → 没有「生理周期」页签。教练在这里点一下就能补上 */}
+              {!client.sex && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                  <span style={{ fontSize: 12, color: '#C99A3E' }}>{t('性别未设置（设为女才有生理周期）：', 'Sex not set (Female enables cycle tracking):')}</span>
+                  {(['FEMALE', 'MALE', 'OTHER', 'UNDISCLOSED'] as const).map(k => (
+                    <button key={k} disabled={savingSex} onClick={() => quickSetSex(k)}
+                      style={{ padding: '3px 11px', borderRadius: 12, fontSize: 12, cursor: 'pointer',
+                        border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-text-secondary)' }}>
+                      {lang === 'zh' ? SEX_LABELS[k] : SEX_LABELS_EN[k]}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

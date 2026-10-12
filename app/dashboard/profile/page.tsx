@@ -99,8 +99,8 @@ export default function ProfilePage() {
     if (!user) return
     fetch(`/api/users/${user.id}`, { headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' } })
       .then(res => res.ok ? res.json() : null)
-      .then(data => { if (data) setBasic({ sex: data.sex, birth_date: data.birth_date, height_cm: data.height_cm }) })
-      .catch(() => {})
+      .then(data => { if (data) setBasic({ sex: data.sex, birth_date: data.birth_date, height_cm: data.height_cm }); setBasicLoaded(true) })
+      .catch(() => setBasicLoaded(true))
   }, [user, userRole])
 
   useEffect(() => {
@@ -116,6 +116,29 @@ export default function ProfilePage() {
       if (res.ok) setCycleLogs(await res.json())
     } finally {
       setCycleLoaded(true)
+    }
+  }
+
+  // 早期注册的账户没有性别（那时注册页还没这一项），生理周期等功能就不会出现。
+  // 没填过的直接在这里点一下就能补上，不用进编辑表单。
+  const [basicLoaded, setBasicLoaded] = useState(false)
+  const [savingSex, setSavingSex] = useState(false)
+  const quickSetSex = async (sex: string) => {
+    if (!user || savingSex) return
+    setSavingSex(true)
+    try {
+      const res = await fetch(`/api/users/${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user.id, 'x-user-role': userRole || '' },
+        body: JSON.stringify({ sex }),
+      })
+      if (!res.ok) throw new Error(t('保存失败', 'Save failed'))
+      const data = await res.json()
+      setBasic({ sex: data.sex, birth_date: data.birth_date, height_cm: data.height_cm })
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setSavingSex(false)
     }
   }
 
@@ -389,6 +412,33 @@ export default function ProfilePage() {
             ))
           )}
         </div>
+
+        {/* 还没填性别：提示补一下（女性账户补完就会出现生理周期） */}
+        {basicLoaded && !basic.sex && !editBasic && (
+          <div style={{
+            background: 'var(--c-card-bg)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)',
+            padding: 'var(--sp-5) var(--sp-6)', marginBottom: 'var(--sp-4)',
+          }}>
+            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--c-text-primary)', marginBottom: 4 }}>
+              {t('补充一下性别', 'Please add your sex')}
+            </div>
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--c-text-hint)', lineHeight: 1.6 }}>
+              {t('选「女」后可以在这里记录生理周期，教练安排训练时会参考。',
+                 'Choose "Female" to log your menstrual cycle here — your coach uses it when planning training.')}
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {(['FEMALE', 'MALE', 'OTHER', 'UNDISCLOSED'] as const).map(k => (
+                <button key={k} onClick={() => quickSetSex(k)} disabled={savingSex}
+                  style={{
+                    padding: '7px 16px', borderRadius: 16, fontSize: 13, cursor: savingSex ? 'not-allowed' : 'pointer',
+                    border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-text-secondary)',
+                  }}>
+                  {SEX_LABELS[k]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 生理周期：只有性别是女性才出现 */}
         {basic.sex === 'FEMALE' && (

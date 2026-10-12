@@ -119,25 +119,29 @@ export async function PUT(
       if (userErr) return NextResponse.json({ error: userErr.message }, { status: 400 })
     }
 
-    // Select-then-update-or-insert (no unique constraint on user_id yet)
-    const { data: existing } = await supabaseAdmin
-      .from('client')
-      .select('id')
-      .eq('user_id', id)
-      .maybeSingle()
+    // client 表（伤病 / 目标 / 紧急联系人）只更新这次传了的字段。
+    // 以前是整体覆盖：只改性别或满赠设置时，没传的备注会被清成空。
+    const clientUpdates: Record<string, unknown> = {}
+    if (injury_notes      !== undefined) clientUpdates.injury_notes      = injury_notes ?? null
+    if (goals             !== undefined) clientUpdates.goals             = goals ?? null
+    if (emergency_contact !== undefined) clientUpdates.emergency_contact = emergency_contact ?? null
 
     let error: any = null
-    if (existing) {
-      const res = await supabaseAdmin
+    if (Object.keys(clientUpdates).length > 0) {
+      // Select-then-update-or-insert (no unique constraint on user_id yet)
+      const { data: existing } = await supabaseAdmin
         .from('client')
-        .update({ injury_notes: injury_notes ?? null, goals: goals ?? null, emergency_contact: emergency_contact ?? null })
+        .select('id')
         .eq('user_id', id)
-      error = res.error
-    } else {
-      const res = await supabaseAdmin
-        .from('client')
-        .insert({ user_id: id, injury_notes: injury_notes ?? null, goals: goals ?? null, emergency_contact: emergency_contact ?? null })
-      error = res.error
+        .maybeSingle()
+
+      if (existing) {
+        const res = await supabaseAdmin.from('client').update(clientUpdates).eq('user_id', id)
+        error = res.error
+      } else {
+        const res = await supabaseAdmin.from('client').insert({ user_id: id, ...clientUpdates })
+        error = res.error
+      }
     }
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
