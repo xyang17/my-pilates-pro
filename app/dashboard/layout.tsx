@@ -53,7 +53,7 @@ interface NavGroup {
 //   教学     —— 服务学员
 //   内容     —— 教学用的素材
 //   经营     —— 统计；邀请码（仅管理员）会自动追加在最后一组
-// 学员端 clientNav / clientTabs 不动。
+// 学员端 clientTabs（手机底栏）不动；clientNav（电脑侧栏）要跟手机首页的功能宫格一致，手机有的电脑也得有。
 const trainerNav: NavGroup[] = [
   {
     items: [
@@ -103,12 +103,16 @@ const clientNav: NavGroup[] = [
     items: [
       { label: '首页', en: 'Home',     href: '/dashboard',           icon: Home },
       { label: '约课', en: 'Booking',     href: '/dashboard/booking',   icon: CalendarCheck },
+      { label: '课程日历', en: 'Calendar', href: '/dashboard/calendar',  icon: Calendar },
       { label: '我的课程', en: 'My Classes', href: '/dashboard/classes',   icon: Dumbbell },
       { label: '导出记录', en: 'Export', href: '/dashboard/export',    icon: FileDown },   // 学员导出自己的训练记录 PDF
       { label: '课后作业', en: 'Homework', href: '/dashboard/workouts',  icon: ClipboardList },
       { label: '计时器', en: 'Timer',   href: '/dashboard/timer',     icon: Timer },
       { label: '消息', en: 'Messages',     href: '/dashboard/notifications', icon: Bell },
       { label: '训练方案', en: 'Programs', href: '/dashboard/programs',  icon: Trophy },
+      // 学员的体测要直接进自己那一页（/dashboard/assessments 是教练的学员列表）；{self} 渲染时换成本人 id
+      { label: '身体测试', en: 'Assessments', href: '/dashboard/assessments/{self}', icon: Activity },
+      { label: '动作库', en: 'Exercises', href: '/dashboard/exercises', icon: BookOpen },
       { label: '我的主页', en: 'My Profile', href: '/dashboard/profile',   icon: User },
     ],
   },
@@ -178,7 +182,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   )
 
   const isTrainer = userRole === 'TRAINER' || userRole === 'ADMIN'
-  const navGroups = isTrainer ? trainerNav : clientNav
+  const navGroups = isTrainer ? trainerNav : clientNav.map(g => ({
+    ...g,
+    items: g.items.map(i => (i.href.includes('{self}') ? { ...i, href: i.href.replace('{self}', user?.id ?? '') } : i)),
+  }))
   const tabs = isTrainer ? trainerTabs : clientTabs
   const displayName = user.user_metadata?.name || user.email || ''
   const initials = displayName.slice(0, 2).toUpperCase()
