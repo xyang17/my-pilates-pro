@@ -7,10 +7,11 @@ import Link from 'next/link'
 import { TrainerHome } from '@/components/home/TrainerHome'
 import { MySessionsCard } from '@/components/clients/MySessionsCard'
 import { CycleHomeCard } from '@/components/cycle/CycleHomeCard'
+import { useLang } from '@/context/LanguageContext'
 import {
   Calendar, ChevronRight, Clock, Users, ClipboardCheck, Plus,
   Dumbbell, Activity, BookOpen, Trophy, ClipboardList, BarChart3, Ticket, User,
-  CalendarCheck, Timer, Bell, NotebookPen,
+  CalendarCheck, Timer, Bell, NotebookPen, FileDown,
 } from 'lucide-react'
 
 interface ClassItem {
@@ -63,6 +64,7 @@ const fmtDate = (d: string) => {
 export default function DashboardPage() {
   const { user, userRole, loading } = useAuth()
   const router = useRouter()
+  const { lang } = useLang()
   const [data, setData] = useState<DashboardData | null>(null)
   const [fetching, setFetching] = useState(true)
 
@@ -112,18 +114,19 @@ export default function DashboardPage() {
   // 教练的功能入口在 components/home/TrainerHome.tsx（分组显示）
   const featureEntries = (
       [
-        { label: '约课',     href: '/dashboard/booking',      icon: CalendarCheck },
-        { label: '课程日历', href: '/dashboard/calendar',     icon: Calendar },
-        { label: '我的课程', href: '/dashboard/classes',      icon: Dumbbell },
+        { label: '约课', en: 'Booking',     href: '/dashboard/booking',      icon: CalendarCheck },
+        { label: '课程日历', en: 'Calendar', href: '/dashboard/calendar',     icon: Calendar },
+        { label: '我的课程', en: 'My classes', href: '/dashboard/classes',      icon: Dumbbell },
+        { label: '导出记录', en: 'Export', href: '/dashboard/export',       icon: FileDown },
         // 学员端的体测页要直接进自己那一页 ——
         // /dashboard/assessments 是教练的学员列表，会员进去会被弹回首页
-        { label: '身体测试', href: `/dashboard/assessments/${user?.id ?? ''}`, icon: Activity },
-        { label: '动作库',   href: '/dashboard/exercises',    icon: BookOpen },
-        { label: '训练方案', href: '/dashboard/programs',     icon: Trophy },
-        { label: '课后作业', href: '/dashboard/workouts',     icon: ClipboardCheck },
-        { label: '计时器',   href: '/dashboard/timer',        icon: Timer },
-        { label: '消息',     href: '/dashboard/notifications', icon: Bell },
-        { label: '我的主页', href: '/dashboard/profile',      icon: User },
+        { label: '身体测试', en: 'Assessments', href: `/dashboard/assessments/${user?.id ?? ''}`, icon: Activity },
+        { label: '动作库', en: 'Exercises',   href: '/dashboard/exercises',    icon: BookOpen },
+        { label: '训练方案', en: 'Programs', href: '/dashboard/programs',     icon: Trophy },
+        { label: '课后作业', en: 'Homework', href: '/dashboard/workouts',     icon: ClipboardCheck },
+        { label: '计时器', en: 'Timer',   href: '/dashboard/timer',        icon: Timer },
+        { label: '消息', en: 'Messages',     href: '/dashboard/notifications', icon: Bell },
+        { label: '我的主页', en: 'My profile', href: '/dashboard/profile',      icon: User },
       ]
   )
 
@@ -347,7 +350,7 @@ export default function DashboardPage() {
                     <span style={{
                       fontSize: 12, fontWeight: 500, color: 'var(--c-text-primary)',
                       textAlign: 'center', lineHeight: 1.3,
-                    }}>{item.label}</span>
+                    }}>{lang === 'zh' ? item.label : item.en}</span>
                   </div>
                 </Link>
               )

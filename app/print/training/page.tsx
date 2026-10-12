@@ -94,7 +94,8 @@ function PrintInner() {
   useEffect(() => {
     if (loading) return
     if (!user) { router.replace('/auth/login'); return }
-    if (userRole !== 'TRAINER' && userRole !== 'ADMIN') { router.replace('/dashboard'); return }
+    // 教练导任何学员；学员只能导自己的（接口也会拦）
+    if (userRole !== 'TRAINER' && userRole !== 'ADMIN' && clientId !== user.id) { router.replace('/dashboard'); return }
     fetch(`/api/clients/${clientId}/export?from=${from}&to=${to}&self=${self}`, {
       headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' },
     })

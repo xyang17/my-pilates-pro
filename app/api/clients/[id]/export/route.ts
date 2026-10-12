@@ -4,7 +4,7 @@ import { supabaseAdmin, isStaff } from '@/lib/db'
 // GET /api/clients/[id]/export?from=YYYY-MM-DD&to=YYYY-MM-DD&self=0|1
 // 导出某个学员一段时间内的训练内容（给打印 / 存 PDF 的页面用）。
 //
-// 只给教练/管理员；角色从数据库查，不信请求头。
+// 教练/管理员可以导任何学员；学员只能导自己的。角色从数据库查，不信请求头。
 // 包含：私教（assigned_to）+ 报名的团课；self=1 时再带上学员的自我练习。已取消的课不导出。
 // 每节课：日期时间、课程名、类型、时长、状态、课程备注、课后总结、动作（计划 / 实际 / 逐组明细 / 备注）。
 // 【不含】价格等经营信息——这份东西可能直接发给学员。
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const userId = req.headers.get('x-user-id')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { data: me } = await supabaseAdmin.from('user').select('role').eq('id', userId).single()
-    if (!isStaff(me?.role ?? null)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!isStaff(me?.role ?? null) && userId !== id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const from = req.nextUrl.searchParams.get('from')
     const to = req.nextUrl.searchParams.get('to')

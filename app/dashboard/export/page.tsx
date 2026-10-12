@@ -47,7 +47,8 @@ function ExportInner() {
   useEffect(() => {
     if (loading) return
     if (!user) { router.replace('/auth/login'); return }
-    if (!isStaff) { router.replace('/dashboard'); return }
+    // 学员：只导自己的，不用选人
+    if (!isStaff) { setClientId(user.id); return }
     fetch('/api/clients', { headers: { 'x-user-id': user.id, 'x-user-role': userRole || '' } })
       .then(r => (r.ok ? r.json() : []))
       .then((list: any[]) => setClients(list.map(c => ({ id: c.id, name: c.name, email: c.email }))))
@@ -66,7 +67,7 @@ function ExportInner() {
   const lab: React.CSSProperties = { display: 'block', fontSize: 12, color: 'var(--c-text-secondary)', marginBottom: 6, fontWeight: 600 }
   const inp: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: '1px solid var(--c-border)', borderRadius: 8, fontSize: 15, background: 'var(--c-card-bg)', color: 'var(--c-text-primary)' }
 
-  if (loading || !isStaff) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--c-text-secondary)' }}>{t('加载中…', 'Loading…')}</div>
+  if (loading || !user) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--c-text-secondary)' }}>{t('加载中…', 'Loading…')}</div>
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--c-page-bg)' }}>
@@ -75,17 +76,17 @@ function ExportInner() {
         display: 'flex', alignItems: 'center', gap: 12, position: 'sticky', top: 0, zIndex: 10,
       }}>
         <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: 'var(--c-text-secondary)', fontSize: 14, cursor: 'pointer', padding: 0 }}>← {t('返回', 'Back')}</button>
-        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)' }}>{t('导出训练记录', 'Export training record')}</h1>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)' }}>{isStaff ? t('导出训练记录', 'Export training record') : t('导出我的训练记录', 'Export my training record')}</h1>
       </header>
 
       <main style={{ padding: 'var(--sp-5)', maxWidth: 560, margin: '0 auto' }}>
-        <div style={card}>
+        {isStaff && <div style={card}>
           <label style={lab}>{t('学员', 'Client')}</label>
           <select value={clientId} onChange={e => { setClientId(e.target.value); setErr('') }} style={inp}>
             <option value="">{t('选择学员…', 'Choose a client…')}</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name || c.email}</option>)}
           </select>
-        </div>
+        </div>}
 
         <div style={card}>
           <label style={lab}>{t('时间段', 'Date range')}</label>
@@ -112,7 +113,7 @@ function ExportInner() {
         <div style={card}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14, color: 'var(--c-text-primary)' }}>
             <input type="checkbox" checked={withSelf} onChange={e => setWithSelf(e.target.checked)} style={{ width: 18, height: 18 }} />
-            {t('同时导出学员的自我练习', 'Include the client’s self-practice')}
+            {isStaff ? t('同时导出学员的自我练习', 'Include the client’s self-practice') : t('同时导出我的自我练习', 'Include my self-practice')}
           </label>
           <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--c-text-hint)', lineHeight: 1.6 }}>
             {t('导出内容：每节课的日期、课程、动作（计划和实际完成）、备注和课后总结。已取消的课不导出，不含价格。', 'Includes each class’s date, name, exercises (planned and done), notes and post-class summary. Cancelled classes and prices are left out.')}
@@ -125,7 +126,7 @@ function ExportInner() {
           style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: 'var(--c-brand)', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
           {t('生成 PDF', 'Create PDF')}
         </button>
-        {clientId && (
+        {isStaff && clientId && (
           <p style={{ textAlign: 'center', marginTop: 14 }}>
             <Link href={`/dashboard/clients/${clientId}`} style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>{t('去这个学员的主页', 'Open this client')}</Link>
           </p>

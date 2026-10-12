@@ -128,6 +128,12 @@ export default function ClassesPage() {
         <h1 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--c-text-primary)', flex: 1 }}>
           {t('课程训练', 'Classes')}
         </h1>
+        {/* 学员：导出自己的训练记录（教练的入口在首页功能宫格和学员页） */}
+        {!isTrainer && (
+          <Link href="/dashboard/export" style={{ color: 'var(--c-brand)', textDecoration: 'none', fontSize: 'var(--text-sm)', fontWeight: 500, marginRight: 4 }}>
+            {t('导出 PDF', 'Export PDF')}
+          </Link>
+        )}
         <Link href="/dashboard/classes/new" style={{
           padding: '7px 16px',
           background: 'var(--c-brand)',
