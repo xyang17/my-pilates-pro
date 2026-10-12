@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { fmtUnits, unitsFromDuration, cleanDecimalInput } from '@/lib/sessionUnits'
 
 interface MasterExercise {
   id: string
@@ -68,6 +69,7 @@ interface ClassData {
   price?: number
   package_id?: string | null
   pay_per_class?: boolean
+  package_units?: number | string | null
   color?: string
   cover_image_url?: string
   trainer_id?: string
@@ -244,6 +246,33 @@ export default function ClassDetailPage() {
       .then(d => setClientPackages(Array.isArray(d) ? d : []))
       .catch(() => {})
   }, [classData?.assigned_to, classData?.class_type, isTrainer, user, userRole])
+
+  // 这节课从包里扣几节（1.5 小时 = 1.5）。没设过 = 按时长默认
+  const [unitsDraft, setUnitsDraft] = useState('')
+  const handleChangeUnits = async (units: number) => {
+    if (!classData || savingBilling || !(units > 0 && units <= 10)) return
+    setSavingBilling(true)
+    try {
+      const res = await fetch(`/api/classes/${classId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        body: JSON.stringify({ package_units: units }),
+      })
+      if (!res.ok) throw new Error(t('保存失败', 'Save failed'))
+      setClassData(prev => prev ? { ...prev, package_units: units } : prev)
+      setUnitsDraft('')
+      if (classData.assigned_to) {
+        const r = await fetch(`/api/packages?clientId=${classData.assigned_to}`, {
+          headers: { 'x-user-id': user?.id || '', 'x-user-role': userRole || '' },
+        })
+        if (r.ok) { const d = await r.json(); setClientPackages(Array.isArray(d) ? d : []) }
+      }
+    } catch (e: any) {
+      showToast(e.message || t('保存失败', 'Save failed'), 'error')
+    } finally {
+      setSavingBilling(false)
+    }
+  }
 
   const handleChangeBilling = async (packageId: string | null) => {
     if (!classData || savingBilling) return
@@ -1288,6 +1317,8 @@ export default function ClassDetailPage() {
                   // 按次：明确选过，或者根本没有可用的包。没选过又有包 = 「待定」，完成时会自动扣包
                   const perClassOn = !classData.package_id && (!!classData.pay_per_class || !hasUsable)
                   const undecided = !classData.package_id && !classData.pay_per_class && hasUsable
+                  const unitsLabel = fmtUnits(classData.package_units != null && classData.package_units !== ''
+                    ? Number(classData.package_units) : unitsFromDuration(classData.duration))
                   const chip = (on: boolean): React.CSSProperties => ({
                     padding: '6px 14px', borderRadius: 16, fontSize: 12, cursor: 'pointer',
                     border: `1px solid ${on ? 'var(--c-brand)' : 'var(--c-border)'}`,
@@ -1307,19 +1338,46 @@ export default function ClassDetailPage() {
                       {usable.map(p => (
                         <button key={p.id} onClick={() => handleChangeBilling(p.id)} disabled={savingBilling}
                           style={chip(classData.package_id === p.id)}>
-                          {t('课时包', 'Package')} · {t(`剩 ${p.remaining_sessions}/${p.granted_sessions}`, `${p.remaining_sessions}/${p.granted_sessions} left`)}
+                          {t('课时包', 'Package')} · {t(`剩 ${fmtUnits(p.remaining_sessions)}/${fmtUnits(p.granted_sessions)}`, `${fmtUnits(p.remaining_sessions)}/${fmtUnits(p.granted_sessions)} left`)}
                           {p.expires_at ? t(` · ${p.expires_at} 到期`, ` · exp. ${p.expires_at}`) : ''}
                         </button>
                       ))}
                     </div>
+                    {(classData.package_id || undecided) && (() => {
+                      const cur = classData.package_units != null && classData.package_units !== ''
+                        ? Number(classData.package_units) : unitsFromDuration(classData.duration)
+                      const presets = [1, 1.5, 2]
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                          <span style={{ fontSize: 11, color: '#999' }}>{t('扣', 'Deduct')}</span>
+                          {presets.map(u => (
+                            <button key={u} onClick={() => handleChangeUnits(u)} disabled={savingBilling}
+                              style={{ ...chip(cur === u), padding: '4px 12px' }}>{fmtUnits(u)}</button>
+                          ))}
+                          <input type="text" inputMode="decimal" placeholder={presets.includes(cur) ? t('其他', 'Other') : fmtUnits(cur)}
+                            value={unitsDraft}
+                            onChange={e => setUnitsDraft(cleanDecimalInput(e.target.value))}
+                            onBlur={() => { const n = Number(unitsDraft); if (unitsDraft && n > 0 && n !== cur) handleChangeUnits(n); else setUnitsDraft('') }}
+                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                            style={{ width: 56, padding: '4px 8px', fontSize: 12, borderRadius: 14, textAlign: 'center',
+                              border: `1px solid ${!presets.includes(cur) ? 'var(--c-brand)' : 'var(--c-border)'}`,
+                              background: 'transparent', color: 'var(--c-text-primary)', boxSizing: 'border-box' }} />
+                          <span style={{ fontSize: 11, color: '#999' }}>
+                            {t('节', 'session(s)')}
+                            {classData.package_units == null && classData.duration
+                              ? t(`（按时长 ${classData.duration} 分钟）`, ` (from ${classData.duration} min)`) : ''}
+                          </span>
+                        </div>
+                      )
+                    })()}
                     <p style={{ margin: '6px 0 0', fontSize: 11, color: undecided ? '#C99A3E' : '#bbb' }}>
                       {classData.package_id
                         ? (classData.status === 'completed'
-                            ? t('这节课已从该课时包扣除 1 节', '1 session was deducted from this package')
-                            : t('标记完成后会从该课时包扣 1 节', '1 session will be deducted when marked complete'))
+                            ? t(`这节课已从该课时包扣除 ${unitsLabel} 节`, `${unitsLabel} session(s) deducted from this package`)
+                            : t(`标记完成后会从该课时包扣 ${unitsLabel} 节`, `${unitsLabel} session(s) will be deducted when marked complete`))
                         : undecided
-                          ? t('还没选：标记完成时会自动从课时包扣 1 节。这节单独收费的话请点「按次收费」。',
-                              'Not chosen yet: completing this class will deduct 1 package session. Tap "Pay per class" if it is billed separately.')
+                          ? t(`还没选：标记完成时会自动从课时包扣 ${unitsLabel} 节。这节单独收费的话请点「按次收费」。`,
+                              `Not chosen yet: completing this class will deduct ${unitsLabel} package session(s). Tap "Pay per class" if it is billed separately.`)
                           : hasUsable
                             ? t('这节课单独收费，不占用课时包', 'Billed separately, does not use a package')
                             : t('这个学员目前没有可用的课时包', 'No usable package for this client')}

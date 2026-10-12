@@ -1,5 +1,6 @@
 'use client'
 
+import { fmtUnits } from '@/lib/sessionUnits'
 import { useEffect, useState } from 'react'
 import { useLang } from '@/context/LanguageContext'
 
@@ -62,13 +63,13 @@ export function MySessionsCard({ userId, userRole }: { userId: string; userRole:
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>{t('课时包', 'Package')}</span>
             <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>
-              {t('还剩', '')} <b style={{ fontSize: 22, color: low ? '#C0504D' : 'var(--c-brand)' }}>{P.remaining}</b> {t('节', 'left')}
-              <span style={{ color: 'var(--c-text-hint)' }}> / {t(`共 ${P.granted} 节`, `of ${P.granted}`)}</span>
+              {t('还剩', '')} <b style={{ fontSize: 22, color: low ? '#C0504D' : 'var(--c-brand)' }}>{fmtUnits(P.remaining)}</b> {t('节', 'left')}
+              <span style={{ color: 'var(--c-text-hint)' }}> / {t(`共 ${fmtUnits(P.granted)} 节`, `of ${fmtUnits(P.granted)}`)}</span>
             </span>
           </div>
           <Bar value={P.used} max={P.granted} color={low ? '#D98080' : 'var(--c-brand)'} />
           <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--c-text-hint)' }}>
-            {t(`已上 ${P.used} 节`, `${P.used} done`)}
+            {t(`已上 ${fmtUnits(P.used)} 节`, `${fmtUnits(P.used)} done`)}
             {P.expires_at && (
               <span style={{ color: expDays !== null && expDays <= 14 ? '#C0504D' : undefined }}>
                 {' · '}{expDays !== null && expDays <= 0 ? t('今天到期', 'expires today') : expDays !== null && expDays <= 14 ? t(`${expDays} 天后到期`, `expires in ${expDays} days`) : t(`${fmtDate(P.expires_at, 'zh')}到期`, `expires ${fmtDate(P.expires_at, 'en')}`)}

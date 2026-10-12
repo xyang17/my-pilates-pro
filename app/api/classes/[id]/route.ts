@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { projectClassForRole } from '@/lib/db'
+import { toUnits, unitsFromDuration } from '@/lib/sessionUnits'
 import { notifyClient, checkLoyaltyBonus } from '@/lib/notifications'
 
 const supabaseAdmin = createClient(
@@ -86,8 +87,10 @@ async function autoLinkPackage(cls: any): Promise<string | null> {
   const pick = pkgs?.[0]
   if (!pick) return null
 
+  // 扣几节：教练填过就用填的，没填按时长（90 分钟 = 1.5 节）
+  const units = cls.package_units != null ? Number(cls.package_units) : unitsFromDuration(cls.duration)
   const { error } = await supabaseAdmin
-    .from('class').update({ package_id: pick.id }).eq('id', cls.id)
+    .from('class').update({ package_id: pick.id, package_units: units }).eq('id', cls.id)
   if (error) {
     console.error('[class] 挂课时包失败:', error.message)
     return null
@@ -127,6 +130,12 @@ export async function PUT(
       updates.pay_per_class = !body.package_id
     }
     if (body.pay_per_class   !== undefined) updates.pay_per_class   = !!body.pay_per_class
+    // 这节课从包里扣几节（1.5 小时 = 1.5）。null = 按 1 节 / 按时长
+    if (body.package_units   !== undefined) {
+      const u = body.package_units === null || body.package_units === '' ? null : toUnits(body.package_units, NaN)
+      if (u !== null && !(u > 0 && u <= 10)) return NextResponse.json({ error: '扣课节数要在 0 到 10 之间' }, { status: 400 })
+      updates.package_units = u
+    }
     if (body.color           !== undefined) updates.color           = body.color
     if (body.cover_image_url !== undefined) updates.cover_image_url = body.cover_image_url
     if (body.trainer_id      !== undefined) updates.trainer_id      = body.trainer_id

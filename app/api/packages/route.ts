@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { toUnits } from '@/lib/sessionUnits'
 import { NextRequest, NextResponse } from 'next/server'
 import { isStaff } from '@/lib/db'
 
@@ -61,10 +62,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '缺少学员' }, { status: 400 })
     }
 
-    const total = Math.max(0, Math.floor(num(body.total_sessions)))
-    const bonus = Math.max(0, Math.floor(num(body.bonus_sessions)))
+    // 可以有小数（剩 10.5 节这种），最多两位，不取整
+    const total = toUnits(body.total_sessions)
+    const bonus = toUnits(body.bonus_sessions)
     if (total + bonus <= 0) {
-      return NextResponse.json({ error: '节数至少要有 1 节' }, { status: 400 })
+      return NextResponse.json({ error: '节数要大于 0' }, { status: 400 })
     }
 
     const { data, error } = await supabaseAdmin

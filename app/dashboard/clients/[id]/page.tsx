@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { CycleLogList } from '@/components/cycle/CycleLogList'
 import { ClientStatusPanel, ClientSummary } from '@/components/clients/ClientCard'
 import { LoyaltyRuleEditor } from '@/components/clients/LoyaltyRuleEditor'
+import { fmtUnits, cleanDecimalInput } from '@/lib/sessionUnits'
 
 interface ClientClass {
   id: string
@@ -356,7 +357,7 @@ export default function ClientDetailPage() {
 
   const handleDeletePackage = async (pkg: PackageBalance) => {
     const warn = pkg.used_sessions > 0
-      ? `这个包已经消耗了 ${pkg.used_sessions} 节课。删除后这些课会退回「单次付费」，确定？`
+      ? `这个包已经消耗了 ${fmtUnits(pkg.used_sessions)} 节课。删除后这些课会退回「单次付费」，确定？`
       : '确定删除这个课时包？'
     if (!window.confirm(warn)) return
     const res = await fetch(`/api/packages/${pkg.id}`, {
@@ -472,7 +473,7 @@ export default function ClientDetailPage() {
   // 还能用的包才算进「剩余课时」：过期的、用完的、退款作废的都不算
   const activeRemaining = packages
     .filter(p => p.status === 'active' && !p.is_expired && !p.is_used_up)
-    .reduce((sum, p) => sum + p.remaining_sessions, 0)
+    .reduce((sum, p) => sum + Number(p.remaining_sessions || 0), 0)
 
   const visibleClasses = client.classes.filter(c =>
     classFilter === 'all' ? true
@@ -527,7 +528,7 @@ export default function ClientDetailPage() {
             {[
               // 课程数都不含自我练习——那是学员自己练的，不是计费上课
               { label: '已上课', val: billableDone },
-              { label: '剩余课时', val: pkgLoading ? '…' : (packages.length === 0 ? '—' : activeRemaining) },
+              { label: '剩余课时', val: pkgLoading ? '…' : (packages.length === 0 ? '—' : fmtUnits(activeRemaining)) },
               { label: '自我练习', val: client.self_practice_completed ?? selfPracticeCount },
               { label: '作业完成', val: hwDone },
             ].map(s => (
@@ -907,15 +908,15 @@ export default function ClientDetailPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>{t('节数 *', 'Sessions *')}</label>
-                    <input type="text" inputMode="numeric" value={pkgForm.total}
-                      onChange={e => setPkgForm(f => ({ ...f, total: e.target.value.replace(/\D/g, '') }))}
+                    <input type="text" inputMode="decimal" value={pkgForm.total}
+                      onChange={e => setPkgForm(f => ({ ...f, total: cleanDecimalInput(e.target.value) }))}
                       placeholder="10"
                       style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: 11, color: '#999', marginBottom: 4 }}>{t('赠送（买N送M）', 'Bonus (buy N get M)')}</label>
-                    <input type="text" inputMode="numeric" value={pkgForm.bonus}
-                      onChange={e => setPkgForm(f => ({ ...f, bonus: e.target.value.replace(/\D/g, '') }))}
+                    <input type="text" inputMode="decimal" value={pkgForm.bonus}
+                      onChange={e => setPkgForm(f => ({ ...f, bonus: cleanDecimalInput(e.target.value) }))}
                       placeholder="0"
                       style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
                   </div>
@@ -978,10 +979,10 @@ export default function ClientDetailPage() {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
                       <span style={{ fontSize: 20, fontWeight: 800, color: dead ? '#999' : 'var(--c-brand)' }}>
-                        {pkg.remaining_sessions}
+                        {fmtUnits(pkg.remaining_sessions)}
                       </span>
                       <span style={{ fontSize: 13, color: 'var(--c-text-secondary)' }}>
-                        / {pkg.granted_sessions} {t('节剩余', 'left')}
+                        / {fmtUnits(pkg.granted_sessions)} {t('节剩余', 'left')}
                       </span>
                       {pkg.source === 'loyalty' && (
                         <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 8, background: '#FFF3E0', color: '#E65100' }}>{t('满赠', 'Bonus')}</span>
@@ -999,10 +1000,10 @@ export default function ClientDetailPage() {
 
                     <p style={{ margin: 0, fontSize: 12, color: '#999' }}>
                       {t(`${pkg.purchased_at} 购买`, `Bought ${pkg.purchased_at}`)}
-                      {pkg.total_sessions > 0 && pkg.bonus_sessions > 0 && t(` · 买${pkg.total_sessions}送${pkg.bonus_sessions}`, ` · buy ${pkg.total_sessions} get ${pkg.bonus_sessions}`)}
+                      {pkg.total_sessions > 0 && pkg.bonus_sessions > 0 && t(` · 买${fmtUnits(pkg.total_sessions)}送${fmtUnits(pkg.bonus_sessions)}`, ` · buy ${fmtUnits(pkg.total_sessions)} get ${fmtUnits(pkg.bonus_sessions)}`)}
                       {pkg.price != null && ` · ¥${pkg.price}`}
                       {pkg.expires_at && t(` · ${pkg.expires_at} 到期`, ` · expires ${pkg.expires_at}`)}
-                      {pkg.used_sessions > 0 && t(` · 已上 ${pkg.used_sessions} 节`, ` · ${pkg.used_sessions} used`)}
+                      {pkg.used_sessions > 0 && t(` · 已上 ${fmtUnits(pkg.used_sessions)} 节`, ` · ${fmtUnits(pkg.used_sessions)} used`)}
                     </p>
                     {pkg.notes && <p style={{ margin: '4px 0 0', fontSize: 12, color: '#bbb' }}>{pkg.notes}</p>}
                   </div>

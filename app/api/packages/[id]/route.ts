@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { toUnits } from '@/lib/sessionUnits'
 import { NextRequest, NextResponse } from 'next/server'
 import { isStaff } from '@/lib/db'
 
@@ -24,7 +25,7 @@ export async function PUT(
     // 部分更新：没传的字段一律不碰。
     // 全量覆盖会把没填的字段清空，这个坑这个项目踩过（动作库导入覆盖数据那次）。
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-    const int = (v: any) => Math.max(0, Math.floor(Number(v) || 0))
+    const int = (v: any) => toUnits(v)   // 名字沿用，实际允许两位小数
 
     if (body.total_sessions !== undefined) updates.total_sessions = int(body.total_sessions)
     if (body.bonus_sessions !== undefined) updates.bonus_sessions = int(body.bonus_sessions)

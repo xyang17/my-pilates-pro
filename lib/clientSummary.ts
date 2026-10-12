@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/db'
 import { studioToday } from '@/lib/time'
+import { toUnits } from '@/lib/sessionUnits'
 import { resolveLoyaltyRule, LoyaltyRule, LoyaltySource } from '@/lib/loyaltyRule'
 
 // 学员卡片上要显示的摘要（学员列表、学员详情页顶部共用）。
@@ -119,9 +120,10 @@ export async function summarizeClients(clientIds: string[]): Promise<Record<stri
     const allPkgs = pkgsBy[id] || []
     const usable = allPkgs.filter(p => p.status === 'active' && !p.is_expired && !p.is_used_up)
     const hadPackage = allPkgs.some(p => p.status === 'active')
-    const remaining = usable.reduce((s, p) => s + Number(p.remaining_sessions || 0), 0)
-    const granted = usable.reduce((s, p) => s + Number(p.granted_sessions || 0), 0)
-    const used = usable.reduce((s, p) => s + Number(p.used_sessions || 0), 0)
+    // 可能有小数（1.5 节），加完规整到两位，不取整
+    const remaining = toUnits(usable.reduce((s, p) => s + Number(p.remaining_sessions || 0), 0))
+    const granted = toUnits(usable.reduce((s, p) => s + Number(p.granted_sessions || 0), 0))
+    const used = toUnits(usable.reduce((s, p) => s + Number(p.used_sessions || 0), 0))
     const expiries = usable.map(p => p.expires_at).filter(Boolean).sort() as string[]
 
     const base = baseBy[id] || 0

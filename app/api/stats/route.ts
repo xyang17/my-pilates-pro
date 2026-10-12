@@ -236,14 +236,14 @@ export async function GET(req: NextRequest) {
       scoped(
         supabaseAdmin
           .from('class')
-          .select('id, name, date, start_time, price, duration, status, class_type, created_by, assigned_to, package_id')
+          .select('id, name, date, start_time, price, duration, status, class_type, created_by, assigned_to, package_id, package_units')
           .gte('date', startStr)
           .lte('date', endStr)
       ),
       scoped(
         supabaseAdmin
           .from('class')
-          .select('price, status, package_id')
+          .select('price, status, package_id, package_units')
           .gte('date', toDateStr(prevStart))
           .lte('date', toDateStr(prevEnd))
           .eq('status', 'completed')
@@ -273,7 +273,10 @@ export async function GET(req: NextRequest) {
       ;(pkgs || []).forEach((p: any) => { perSession[p.id] = num(p.price_per_session) })
     }
 
-    const revenueOf = (r: any) => r.package_id ? (perSession[r.package_id] ?? 0) : num(r.price)
+    // 1.5 小时的课扣 1.5 节，收入也按 1.5 节算
+    const revenueOf = (r: any) => r.package_id
+      ? (perSession[r.package_id] ?? 0) * (r.package_units != null ? num(r.package_units) : 1)
+      : num(r.price)
 
     const rows = rawRows.map(r => ({ ...r, rev: revenueOf(r) })) as ClassRow[]
     const summary = summarize(rows)

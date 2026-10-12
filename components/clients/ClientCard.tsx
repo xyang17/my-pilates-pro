@@ -1,5 +1,6 @@
 'use client'
 
+import { fmtUnits } from '@/lib/sessionUnits'
 import Link from 'next/link'
 import { useLang } from '@/context/LanguageContext'
 
@@ -69,7 +70,7 @@ function PaymentPill({ s }: { s: ClientSummary }) {
   const low = s.payment.remaining <= 2
   return (
     <Pill color={low ? '#A0403C' : '#7A6398'} bg={low ? '#FDECEA' : '#EDE6F4'}>
-      {t('课时包 剩', 'Package')} {s.payment.remaining}/{s.payment.granted}
+      {t('课时包 剩', 'Package')} {fmtUnits(s.payment.remaining)}/{fmtUnits(s.payment.granted)}
     </Pill>
   )
 }
@@ -175,7 +176,7 @@ export function ClientStatusPanel({ s, onOpenPackages }: { s: ClientSummary; onO
           ) : (
             <>
               <div style={{ fontSize: 16, fontWeight: 700, color: s.payment.remaining <= 2 ? '#A0403C' : 'var(--c-text-primary)' }}>
-                {t(`还剩 ${s.payment.remaining} 节`, `${s.payment.remaining} left`)}
+                {t(`还剩 ${fmtUnits(s.payment.remaining)} 节`, `${fmtUnits(s.payment.remaining)} left`)}
                 <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--c-text-secondary)' }}> / {t('共', 'of')} {s.payment.granted}</span>
               </div>
               <div style={{ margin: '6px 0 4px' }}><Bar value={s.payment.used} max={s.payment.granted} color="var(--c-brand)" /></div>
