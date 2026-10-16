@@ -945,6 +945,51 @@ Same as above (set in Vercel project settings)
 
 ---
 
+## 2026-10-16 — 「计费课时」口径统一与全路径审计
+
+**背景**：学员详情页把自我练习加进了上课节数（廖一 19 节私教 + 4 节自我练习 → 显示 23 节）。
+教练的原话：「一定不要乱加上去了」。满赠提醒、课时包扣减、收入统计全都依赖这个数，
+一处算错会连锁错下去。
+
+**口径（唯一定义，在 `lib/classCounts.ts`）**
+
+| 类型 | class_type | 算计费课时？ | 进收入统计？ | 扣课时包？ |
+|---|---|---|---|---|
+| 私教 | `private` | ✅ | ✅ | ✅ |
+| 团课 | `group`（走 `class_enrollment`） | ✅ | ✅ | ✅ |
+| 自我练习 | `self_practice` | ❌ | ❌ | ❌ |
+
+**关键实现细节**：自我练习的 `assigned_to` 也是学员本人，所以**不能只按 `assigned_to` 数**
+——这正是当初算错的原因。统一用白名单 `.eq('class_type','private')`，
+不要用黑名单 `.neq('class_type','self_practice')`：以后再加新的 class_type，
+白名单会安全地不计入，黑名单会默默算进去。
+
+**全路径审计（2026-10-16，7 条路径全部复核通过）**
+
+| 路径 | 做法 |
+|---|---|
+| `lib/classCounts.ts` | `.eq('class_type','private')` + 团课走报名表 ✅ |
+| `lib/clientSummary.ts` | `billable = class_type === 'private'` ✅ |
+| `app/dashboard/clients/[id]/page.tsx` | 用后端的 `billable_completed`，自我练习单独一栏显示 ✅ |
+| `app/api/stats/route.ts` | `scoped()` 统一排除，`scope='store'` 也盖到 ✅ |
+| `app/api/dashboard/route.ts` | `scopeOwn()` 统一排除 ✅ |
+| `package_balance` 视图 | 扣减子查询里排除 ✅ |
+| `lib/lastExercise.ts` | 只取私教 ✅ |
+
+**线上数据验证**：满 20 赠 1 的提醒发生在 2026-10-09，正好是廖一第 20 节**私教**完成时。
+如果自我练习被算进去，私教 16 节 + 自我练习 4 节会让它在 09-20 就提前触发。
+提醒的时间点本身就证明了计数是对的。
+
+**顺带发现的两个问题（与计数无关，待处理）**
+1. 2026-10-13 那节课 `price` 为空且 `pay_per_class = true`，收入统计里按 0 元计，会出现在「待补价格」里。
+2. 按次收费的学员拿到赠课后，赠课用不掉：`autoLinkPackage()` 遇到 `pay_per_class = true` 直接返回，
+   所以那 1 节赠课会一直挂在账上。需要在发赠课时提示教练，或者让赠课包能覆盖按次收费标记。
+
+**经验教训**：派生计数（每次从 class 表数）比存计数器好，改课删课之后自动跟着对；
+但前提是「数什么」只有一个定义。这次的错不是算错，是同一个概念在前端和后端各数了一遍。
+
+---
+
 ## Troubleshooting Guide
 
 | Problem | Solution |
@@ -965,6 +1010,6 @@ Same as above (set in Vercel project settings)
 
 ---
 
-**Last Updated:** August 25, 2026  
-**Next Review:** September 25, 2026  
+**Last Updated:** October 16, 2026  
+**Next Review:** November 16, 2026  
 **Status:** Core Features Live — UI Polish + Data Integrity Hardening Phase
