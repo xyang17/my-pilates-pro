@@ -391,6 +391,10 @@ export default function StatsPage() {
             statusFilter={detailStatus}
             setStatusFilter={setDetailStatus}
             onSaved={handlePriceSaved}
+            rangeLabel={data.range?.label || ''}
+            rangeStart={data.range?.start || ''}
+            rangeEnd={data.range?.end || ''}
+            scope={scope}
           />
         )}
 

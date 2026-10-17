@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { Download } from 'lucide-react'
 import { useLang } from '@/context/LanguageContext'
 
 // 统计页的「课程明细」：这段时间每一节课一行，价格可以就地改。
@@ -23,6 +24,13 @@ export interface ClassDetail {
   usual_price: number | null
   flag: null | 'missing' | 'low' | 'high'
   editable: boolean
+  // 导出 Excel 用。revenue = 实际计入统计的收入（挂包的课是包均价×扣的节数），
+  // price = 原始课价（挂包的课为空）。两者都导，教练在 Excel 里求和才能跟页面对上。
+  revenue?: number
+  package_id?: string | null
+  package_units?: number | null
+  pay_per_class?: boolean
+  notes?: string
 }
 
 type StatusFilter = 'all' | 'completed' | 'notDone' | 'cancelled' | 'problem'
@@ -136,8 +144,139 @@ function PriceCell({ d, userId, userRole, onSaved }: {
   )
 }
 
+// ── 导出 Excel ──────────────────────────────────────────────────────────
+//
+// 导的就是教练当前在明细里看到的那些课（已经过完 clientFilter / typeFilter / statusFilter）。
+// 「所见即所得」是刻意的：导出按钮就在筛选器下面，导出别的东西会让人莫名其妙。
+//
+// 两列钱都给：
+//   价格     = class.price，挂了课时包的课这列是空的（钱在包里，不是漏填）
+//   计入收入 = 统计页实际计入的金额，挂包的课 = 包单节均价 × 扣的节数
+// 只给前者，教练在 Excel 里一求和就对不上页面上的收入数字。
+//
+// xlsx 是动态 import 的：这个库不小，只有真点了导出才值得加载。
+async function exportToExcel(opts: {
+  rows: ClassDetail[]
+  lang: string
+  t: (zh: string, en: string) => string
+  showTrainer: boolean
+  rangeLabel: string
+  rangeStart: string
+  rangeEnd: string
+  scope: string
+  typeFilter: string
+  statusFilter: StatusFilter
+  clientName?: string
+}) {
+  const { rows, lang, t, showTrainer, rangeLabel, rangeStart, rangeEnd, scope, typeFilter, statusFilter, clientName } = opts
+  const XLSX = await import('xlsx')
+  const zh = lang === 'zh'
+
+  const typeText = (c: ClassDetail) =>
+    c.class_type === 'group' ? t('团课', 'Group')
+    : c.class_type === 'private' ? t('私教', 'Private')
+    : c.class_type
+  const statusText = (c: ClassDetail) => {
+    const st = STATUS[c.status]
+    return st ? (zh ? st.text : st.en) : c.status
+  }
+  const payText = (c: ClassDetail) =>
+    c.package_id ? t('课时包', 'Package')
+    : c.pay_per_class ? t('按次收费', 'Per class')
+    : ''
+
+  const header = [
+    t('日期', 'Date'),
+    t('星期', 'Weekday'),
+    t('开始时间', 'Start'),
+    t('时长(分钟)', 'Duration (min)'),
+    t('学员', 'Clients'),
+    t('课程名称', 'Class name'),
+    t('类型', 'Type'),
+    t('状态', 'Status'),
+    ...(showTrainer ? [t('教练', 'Trainer')] : []),
+    t('价格(元)', 'Price'),
+    t('计入收入(元)', 'Counted revenue'),
+    t('付费方式', 'Payment'),
+    t('扣课时(节)', 'Sessions used'),
+    t('价格提醒', 'Price flag'),
+    t('课程备注', 'Notes'),
+  ]
+
+  const body = rows.map(c => {
+    const dt = new Date(`${c.date}T00:00:00`)
+    return [
+      c.date,
+      zh ? `周${WEEK[dt.getDay()]}` : WEEK_EN[dt.getDay()],
+      c.start_time ? c.start_time.slice(0, 5) : '',
+      c.duration || null,
+      c.students.join(zh ? '、' : ', '),
+      c.name || '',
+      typeText(c),
+      statusText(c),
+      ...(showTrainer ? [c.trainer_name || ''] : []),
+      c.price,                                   // null 就留空，不要写 0
+      // 只有已完成的课才填这一列。统计页的收入也只算已完成的，
+      // 未上/已取消的课如果也写上金额，整列一求和就会比页面上的收入多出来。
+      c.status === 'completed' ? (c.revenue ?? c.price ?? 0) : null,
+      payText(c),
+      c.package_id ? (c.package_units ?? 1) : null,
+      FLAG_TEXT(c, t),
+      c.notes || '',
+    ]
+  })
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...body])
+  ws['!cols'] = [
+    { wch: 11 }, { wch: 6 }, { wch: 7 }, { wch: 11 }, { wch: 16 }, { wch: 20 },
+    { wch: 7 }, { wch: 8 }, ...(showTrainer ? [{ wch: 10 }] : []),
+    { wch: 10 }, { wch: 13 }, { wch: 10 }, { wch: 11 }, { wch: 18 }, { wch: 50 },
+  ]
+  ws['!autofilter'] = {
+    ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: body.length, c: header.length - 1 } }),
+  }
+
+  // 汇总页：把「这份文件到底是哪些课」记下来。
+  // 导出是跟着筛选走的，不记下来过两个月就不知道这份表是什么了。
+  const completed = rows.filter(c => c.status === 'completed')
+  const revenueSum = completed.reduce((s, c) => s + (c.revenue ?? c.price ?? 0), 0)
+  const now = new Date()
+  const meta: (string | number)[][] = [
+    [t('课程明细导出', 'Class detail export'), ''],
+    [t('导出时间', 'Exported at'), `${now.toLocaleDateString()} ${now.toTimeString().slice(0, 5)}`],
+    [t('统计区间', 'Period'), `${rangeLabel}（${rangeStart} ~ ${rangeEnd}）`],
+    [t('数据范围', 'Scope'), scope === 'store' ? t('全店', 'Whole studio') : t('只看自己', 'Own classes only')],
+    [t('类型筛选', 'Type filter'), typeFilter === 'all' ? t('全部类型', 'All types') : typeFilter === 'private' ? t('私教', 'Private') : t('团课', 'Group')],
+    [t('状态筛选', 'Status filter'),
+      statusFilter === 'all' ? t('全部', 'All')
+      : statusFilter === 'completed' ? t('已完成', 'Done')
+      : statusFilter === 'notDone' ? t('未上', 'Pending')
+      : statusFilter === 'cancelled' ? t('已取消', 'Cancelled')
+      : t('价格待核对', 'Check price')],
+    [t('只看学员', 'Client filter'), clientName || t('不限', 'All clients')],
+    ['', ''],
+    [t('课程节数', 'Classes'), rows.length],
+    [t('其中已完成', 'Completed'), completed.length],
+    [t('已完成收入合计(元)', 'Completed revenue'), Math.round(revenueSum)],
+    ['', ''],
+    [t('说明', 'Note'),
+      t('「价格」是建课时填的课价，挂了课时包的课这列为空（钱在包里）；「计入收入」才是统计页实际计算的金额，只有已完成的课才有值，整列求和就等于上面的收入合计。',
+        '“Price” is the price entered on the class; it is blank for classes paid from a package. “Counted revenue” is what the stats page actually counts — only completed classes have a value, and summing the column equals the total above.')],
+    [t('自我练习', 'Self practice'),
+      t('学员自己练的不是计费上课，统计和导出都不包含。', 'Client self-practice is not a billable class and is excluded from stats and this export.')],
+  ]
+  const wsMeta = XLSX.utils.aoa_to_sheet(meta)
+  wsMeta['!cols'] = [{ wch: 20 }, { wch: 70 }]
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, t('课程明细', 'Classes'))
+  XLSX.utils.book_append_sheet(wb, wsMeta, t('汇总', 'Summary'))
+  XLSX.writeFile(wb, `${t('课程明细', 'classes')}_${rangeStart}_${rangeEnd}.xlsx`)
+}
+
 export function StatsDetail({
   classes, userId, userRole, showTrainer, clientFilter, clientName, onClearClient, statusFilter, setStatusFilter, onSaved,
+  rangeLabel, rangeStart, rangeEnd, scope,
 }: {
   classes: ClassDetail[]
   userId: string
@@ -149,9 +288,15 @@ export function StatsDetail({
   statusFilter: StatusFilter
   setStatusFilter: (f: StatusFilter) => void
   onSaved: (id: string, price: number | null) => void
+  rangeLabel: string
+  rangeStart: string
+  rangeEnd: string
+  scope: string
 }) {
   const { lang, t } = useLang()
   const [typeFilter, setTypeFilter] = useState<'all' | 'private' | 'group'>('all')
+  const [exporting, setExporting] = useState(false)
+  const [exportErr, setExportErr] = useState('')
 
   const base = useMemo(() => classes.filter(c =>
     (!clientFilter || c.client_ids.includes(clientFilter)) &&
@@ -173,7 +318,24 @@ export function StatsDetail({
     : statusFilter === 'cancelled' ? c.status === 'cancelled'
     : !!c.flag
   )
-  const shownRevenue = shown.filter(c => c.status === 'completed').reduce((s, c) => s + (c.price || 0), 0)
+  // 用 revenue（挂课时包的课按包均价分摊），不是 price —— 用 price 会让挂包的课算成 0，
+  // 这里的小计就跟上面的收入卡片对不上。revenue 是后端算好的，老数据没有就退回 price。
+  const shownRevenue = shown.filter(c => c.status === 'completed').reduce((s, c) => s + (c.revenue ?? c.price ?? 0), 0)
+
+  const handleExport = async () => {
+    setExporting(true)
+    setExportErr('')
+    try {
+      await exportToExcel({
+        rows: shown, lang, t, showTrainer,
+        rangeLabel, rangeStart, rangeEnd, scope, typeFilter, statusFilter, clientName,
+      })
+    } catch (e: any) {
+      setExportErr(e?.message || t('导出失败', 'Export failed'))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   // 按日期分组
   const groups: [string, ClassDetail[]][] = []
@@ -202,6 +364,30 @@ export function StatsDetail({
       <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--c-text-hint)' }}>
         {t('点价格可以直接改。「比平时低/高」是跟这个学员最近的价格比，只是提醒，不一定是错的。', 'Tap a price to edit it. “Lower/higher than usual” compares with this client’s recent prices — just a hint, not necessarily wrong.')}
       </p>
+
+      {/* 导出按钮放在筛选器上面、紧跟标题：导出的就是下面筛出来的那些课，位置上要让人一眼看出关系 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <button
+          onClick={handleExport}
+          disabled={exporting || shown.length === 0}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+            border: '1px solid var(--c-brand)',
+            background: shown.length === 0 ? 'var(--c-fill-light)' : 'var(--c-card-bg)',
+            color: shown.length === 0 ? 'var(--c-text-hint)' : 'var(--c-brand)',
+            cursor: exporting || shown.length === 0 ? 'not-allowed' : 'pointer',
+          }}>
+          <Download size={14} />
+          {exporting
+            ? t('正在生成…', 'Generating…')
+            : t(`导出 Excel（${shown.length} 节）`, `Export Excel (${shown.length})`)}
+        </button>
+        <span style={{ fontSize: 11, color: 'var(--c-text-hint)' }}>
+          {t('导出的就是当前筛选出的课，含价格与备注', 'Exports exactly the filtered classes, with prices and notes')}
+        </span>
+      </div>
+      {exportErr && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#C0504D' }}>{exportErr}</p>}
 
       {clientFilter && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--c-fill-light)', borderRadius: 8, marginBottom: 8, fontSize: 13 }}>

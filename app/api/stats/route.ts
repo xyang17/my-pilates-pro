@@ -71,6 +71,9 @@ interface ClassRow {
   created_by: string
   assigned_to: string | null
   package_id: string | null
+  package_units: number | null
+  pay_per_class: boolean | null
+  notes: string | null
   /** 这节课实际算多少钱。挂了课时包的按包的单节均价，没挂的按 class.price。
    *  收入一律用这个字段，不要再直接读 price —— 直接读会让挂包的课算成 0。 */
   rev: number
@@ -236,7 +239,7 @@ export async function GET(req: NextRequest) {
       scoped(
         supabaseAdmin
           .from('class')
-          .select('id, name, date, start_time, price, duration, status, class_type, created_by, assigned_to, package_id, package_units')
+          .select('id, name, date, start_time, price, duration, status, class_type, created_by, assigned_to, package_id, package_units, pay_per_class, notes')
           .gte('date', startStr)
           .lte('date', endStr)
       ),
@@ -398,6 +401,15 @@ export async function GET(req: NextRequest) {
           students,
           usual_price: usual,
           flag,
+          // 下面这几个只有导出 Excel 在用。
+          // revenue 是这节课「实际计入统计的收入」：挂了课时包就是包的单节均价 × 扣的节数，
+          // 没挂包就是 class.price。上面的 price 是原始课价，挂包的课它是空的——
+          // 导出必须同时给这两列，不然教练在 Excel 里求和会跟页面上的收入对不上。
+          revenue: r.rev,
+          package_id: r.package_id || null,
+          package_units: r.package_units == null ? null : Number(r.package_units),
+          pay_per_class: !!r.pay_per_class,
+          notes: r.notes || '',
           // 前端用它决定这一行能不能直接改价（接口那边还会再校验一次）
           editable: userRole === 'ADMIN' || r.created_by === userId,
         }
